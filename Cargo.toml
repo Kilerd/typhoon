@@ -5,3 +5,5 @@ authors = ["Xin Chen <xinszchen@thoughtworks.com>"]
 edition = "2018"
 
 [dependencies]
+env_logger = "0.5.13"
+combine = "3.8.1"
