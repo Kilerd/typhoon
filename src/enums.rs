@@ -42,6 +42,7 @@ pub enum BinOperator {
     Div,
     Mul,
     Pow,
+    FloorDiv,
     Invert,
     BitAnd,
     BitXor,

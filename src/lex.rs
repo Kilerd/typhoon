@@ -4,7 +4,7 @@ use crate::enums::{Atom, BinOperation, BinOperator};
 use combine::parser::choice::or;
 use combine::parser::combinator::recognize;
 use combine::parser::range::range;
-use combine::{choice, many, many1, optional, skip_many, ParseError, Parser, Stream};
+use combine::{attempt, choice, many, many1, optional, skip_many, ParseError, Parser, Stream};
 
 pub fn integer<I>() -> impl Parser<Input = I, Output = i64>
 where
@@ -104,7 +104,7 @@ pub fn factor_[I]()(I) -> BinOperation
                         _ => unreachable!()
                     }
                 }),
-                power()
+            power()
     ))
 }
 
@@ -120,7 +120,6 @@ where
 }
 
 parser! {
-
 #[inline(always)]
 pub fn power_[I]()(I) -> BinOperation
     where [ I: Stream<Item = char> ]
@@ -128,16 +127,36 @@ pub fn power_[I]()(I) -> BinOperation
         (
         atom().map(BinOperation::Power),
         optional(
-            (
-            string("**"),
-            factor()
-            )
+            attempt(string("**")).and(factor())
         )
         )
         .map(|(a, f)| if f.is_some() {BinOperation::Expresion(Box::new(a), BinOperator::Pow, Box::new(f.unwrap().1))} else {a})
-
+}
 }
 
+#[inline(always)]
+pub fn term<I>() -> impl Parser<Input = I, Output = String>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    term_()
+}
+
+parser! {
+#[inline(always)]
+pub fn term_[I]()(I) -> String
+    where [ I: Stream<Item = char> ]
+{
+    recognize((
+        factor(),
+        skip_many((
+            choice((string("*"), string("/"), string("%"), string("//"))),
+            term(),
+        )),
+    ))
+
+}
 }
 
 #[cfg(test)]
@@ -299,12 +318,11 @@ mod test {
                     BinOperator::Pow,
                     Box::new(BinOperation::Factor(
                         BinOperator::Sub,
-                        Box::new(BinOperation::Power(Atom::Float(1f64)))
-                    ))
+                        Box::new(BinOperation::Power(Atom::Float(1f64))),
+                    )),
                 ),
                 result.unwrap().0
             );
         }
-
     }
 }
