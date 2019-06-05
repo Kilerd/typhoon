@@ -88,24 +88,26 @@ parser! {
 pub fn factor_[I]()(I) -> BinOperation
     where [ I: Stream<Item = char> ]
 {
-        choice((
+        choice(
+            (
+                choice((
+                    char('+'),
+                    char('-'),
+                    char('~')
+                ))
+                    .and(factor())
+                    .map(|(c, f)| {
+                        match c {
+                            '+' => BinOperation::Factor(BinOperator::Add, Box::new(f)),
+                            '-' => BinOperation::Factor(BinOperator::Sub, Box::new(f)),
+                            '~' => BinOperation::Factor(BinOperator::Invert, Box::new(f)),
+                            _ => unreachable!()
+                        }
+                    }),
 
-            choice((
-                char('+'),
-                char('-'),
-                char('~')
-            ))
-                .and(factor())
-                .map(|(c, f)| {
-                    match c {
-                        '+' => BinOperation::Factor(BinOperator::Add, Box::new(f)),
-                        '-' => BinOperation::Factor(BinOperator::Sub, Box::new(f)),
-                        '~' => BinOperation::Factor(BinOperator::Invert, Box::new(f)),
-                        _ => unreachable!()
-                    }
-                }),
-            power()
-    ))
+                power()
+            )
+        )
 }
 
 }
@@ -323,6 +325,26 @@ mod test {
                 ),
                 result.unwrap().0
             );
+        }
+    }
+
+    mod factor {
+        use crate::enums::{Atom, BinOperation, BinOperator};
+        use crate::lex::factor;
+        use combine::parser::Parser;
+
+        #[test]
+        fn should_work() {
+            let result = factor().easy_parse("+1");
+            assert!(result.is_ok());
+
+            assert_eq!(
+                BinOperation::Factor(
+                    BinOperator::Add,
+                    Box::new(BinOperation::Power(Atom::Float(1f64)))
+                ),
+                result.unwrap().0
+            )
         }
     }
 }
