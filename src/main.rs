@@ -1,33 +1,20 @@
-#[macro_use]
-extern crate combine;
+use lalrpop_util::lalrpop_mod;
+use llvm_sys::core;
+use std::ptr;
+pub mod ast;
+lalrpop_mod!(pub parser);
 
-use crate::lex::{atom, factor, term};
-use combine::char::string;
-use combine::parser::combinator::recognize;
-use combine::{choice, many, optional, skip_many, ParseError, Parser, Stream};
-
-pub mod enums;
-pub mod lex;
-
-//pub fn power<I>() -> impl Parser<Input = I, Output = String>
-//where
-//    I: Stream<Item = char>,
-//    I::Error: ParseError<I::Item, I::Range, I::Position>,
-//{
-//    recognize((string("1"), optional((string("**"), string("1")))))
-//}
-//
-//pub fn mul<I>() -> impl Parser<Input = I, Output = String>
-//where
-//    I: Stream<Item = char>,
-//    I::Error: ParseError<I::Item, I::Range, I::Position>,
-//{
-//    recognize((string("1"), skip_many((string("*"), factor()))))
-//}
+macro_rules! c_str {
+    ($s:expr) => {
+        concat!($s, "\0").as_ptr() as *const i8
+    };
+}
 
 fn main() {
-    dbg!(atom().easy_parse("1"));
-    dbg!(factor().easy_parse("1**2"));
-    dbg!(factor().easy_parse("1"));
-    dbg!(term().easy_parse("2*3"));
+    dbg!(parser::ExprParser::new().parse("((22+2)*3%2)|1"));
+    dbg!(parser::ExprParser::new().parse("22"));
+    dbg!(parser::ExprParser::new().parse("a"));
+    dbg!(parser::ExprParser::new().parse("_a+2"));
+    dbg!(parser::StatementParser::new().parse("let b : i32 = a+2"));
+    dbg!(parser::StatementParser::new().parse("let a :i32 = ((22+dDS)*3%c)|1"));
 }

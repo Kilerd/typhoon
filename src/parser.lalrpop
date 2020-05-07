@@ -1,0 +1,51 @@
+use std::str::FromStr;
+use crate::ast::{Expr, Opcode, Statement};
+grammar;
+
+pub Statement: Box<Statement> = {
+    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> => Box::new(Statement::Assign(i, t, e)),
+}
+
+
+
+// mathematical
+pub Expr: Box<Expr> = {
+    <l:Expr> "|" <r:XorExpr> => Box::new(Expr::Or(l, r)),
+    XorExpr,
+}
+pub XorExpr : Box<Expr> = {
+    <l:XorExpr> "^" <r:AndExpr> => Box::new(Expr::Xor(l, r)),
+    AndExpr,
+}
+pub AndExpr : Box<Expr> = {
+    <l:AndExpr> "&" <r:ShiftExpr> => Box::new(Expr::And(l, r)),
+    ShiftExpr,
+}
+pub ShiftExpr: Box<Expr> = {
+    <l:ShiftExpr> "<<" <r:ArithExpr> => Box::new(Expr::LShift(l,r)),
+    <l:ShiftExpr> ">>" <r:ArithExpr> => Box::new(Expr::RShift(l,r)),
+    ArithExpr,
+}
+
+pub ArithExpr : Box<Expr> = {
+    <l:ArithExpr> "+" <r:TermExpr> => Box::new(Expr::Add(l,r)),
+    <l:ArithExpr> "-" <r:TermExpr> => Box::new(Expr::Sub(l,r)),
+    TermExpr,
+}
+
+pub TermExpr : Box<Expr> = {
+    <l:TermExpr> "*" <r:Factor> => Box::new(Expr::Mul(l,r)),
+    <l:TermExpr> "/" <r:Factor> => Box::new(Expr::Div(l,r)),
+    <l:TermExpr> "%" <r:Factor> => Box::new(Expr::Mod(l,r)),
+    Factor,
+}
+
+pub Factor: Box<Expr> = {
+    <Identifier> => Box::new(Expr::Identifier(<>)),
+    <Num> => Box::new(Expr::Number(<>)),
+    "(" <Expr> ")",
+}
+
+Identifier : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();
+
+Num: i32 = <r"[0-9]+"> => i32::from_str(<>).unwrap();
