@@ -1,5 +1,6 @@
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::core;
+use llvm_sys::core::LLVMPrintValueToString;
 use llvm_sys::target::{
     LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
     LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeTarget,
@@ -92,7 +93,12 @@ fn main() {
             let x = CStr::from_ptr(error_str);
             panic!("compile failed: {:?}", x);
         }
-
+        let output = std::process::Command::new("cc")
+            .arg("out.o")
+            .arg("-o")
+            .arg("out")
+            .output()
+            .expect("error on executing linker cc");
         // core::LLVMPrintModuleToFile(module, c_str!("out.ll"), ptr::null_mut());
 
         core::LLVMDisposeBuilder(builder);
