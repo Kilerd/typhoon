@@ -1,9 +1,14 @@
 use std::str::FromStr;
-use crate::ast::{Expr, Opcode, Statement};
+use crate::ast::{Expr, Opcode, Statement, Function};
 grammar;
 
+pub Function: Box<Function> = {
+    <v: (<Statement> r"\n"*)*> => Box::new(Function::new(v)),
+}
+
 pub Statement: Box<Statement> = {
-    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> => Box::new(Statement::Assign(i, t, e)),
+    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> ";" => Box::new(Statement::Assign(i, t, e)),
+    "return" <e:Expr> ";" => Box::new(Statement::Return(e)),
 }
 
 

@@ -1,4 +1,4 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, Function};
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::core;
 use llvm_sys::core::{LLVMPrintModuleToString, LLVMPrintValueToString};
@@ -14,6 +14,7 @@ use llvm_sys::target_machine::{
 use std::ffi::{CStr, CString};
 use std::ptr;
 use structopt::StructOpt;
+use std::path::PathBuf;
 
 macro_rules! c_str {
     ($s:expr) => {
@@ -32,19 +33,18 @@ struct Opt {
     // short and long flags (-d, --debug) will be deduced from the field's name
     #[structopt(short, long)]
     debug: bool,
-}
-impl Default for Opt {
-    fn default() -> Self {
-        Self { debug: true }
-    }
+
+    /// File name: only required when `out` is set to `file`
+    #[structopt(name = "FILE")]
+    file_name: String,
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let opt: Opt = Opt::from_args();
 
-    let x3 = "((22+2)*3%2)|1";
-    dbg!(&x3);
-    let x1: Box<Expr> = parser::ExprParser::new().parse(x3).unwrap();
+    let result = std::fs::read_to_string(&opt.file_name).expect(&format!("cannot open file '{}'", &opt.file_name));
+
+    let mut x1: Box<Function> = parser::FunctionParser::new().parse(&result).unwrap();
     // dbg!(parser::ExprParser::new().parse("22"));
     // dbg!(parser::ExprParser::new().parse("a"));
     // dbg!(parser::ExprParser::new().parse("_a+2"));
@@ -63,17 +63,16 @@ fn main() {
 
         let bb = core::LLVMAppendBasicBlockInContext(context, function, c_str!("entry"));
         core::LLVMPositionBuilderAtEnd(builder, bb);
-        let x2 = x1.codegen(context, builder);
-        core::LLVMBuildRet(builder, x2);
+        x1.codegen(context, builder);
 
+        println!("source code: \n{}\n", &result);
         if opt.debug {
             // emit llir
-
             let string = LLVMPrintModuleToString(module);
 
             let x = CStr::from_ptr(string).to_str().unwrap();
             println!("llir: \n {}", x);
-        } else {
+        }
             // emit executable binary file
             // compile to object
             let triple = LLVMGetDefaultTargetTriple();
@@ -124,7 +123,11 @@ fn main() {
                 .output()
                 .expect("error on executing linker cc");
             // core::LLVMPrintModuleToFile(module, c_str!("out.ll"), ptr::null_mut());
-        }
+        println!("executing output file");
+        let output = std::process::Command::new("./out")
+            .output()
+            .expect("error on executing output file");
+        println!("return {}", output.status);
 
         core::LLVMDisposeBuilder(builder);
         core::LLVMDisposeModule(module);
