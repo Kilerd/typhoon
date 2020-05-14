@@ -44,7 +44,7 @@ fn main() {
 
     let result = std::fs::read_to_string(&opt.file_name).expect(&format!("cannot open file '{}'", &opt.file_name));
 
-    let mut x1: Box<Function> = parser::FunctionParser::new().parse(&result).unwrap();
+    let mut x1: Box<Function> = parser::FunctionParser::new().parse(&result).expect("parse error");
     // dbg!(parser::ExprParser::new().parse("22"));
     // dbg!(parser::ExprParser::new().parse("a"));
     // dbg!(parser::ExprParser::new().parse("_a+2"));
@@ -52,27 +52,21 @@ fn main() {
     // dbg!(parser::StatementParser::new().parse("let a :i32 = ((22+dDS)*3%c)|1"));
 
     dbg!(&x1);
-    unsafe {
-        let context = core::LLVMContextCreate();
-        let module = core::LLVMModuleCreateWithName(c_str!("typhoon"));
-        let builder = core::LLVMCreateBuilderInContext(context);
+    if !opt.debug {
+        unsafe {
+            let context = core::LLVMContextCreate();
+            let module = core::LLVMModuleCreateWithName(c_str!("typhoon"));
+            let builder = core::LLVMCreateBuilderInContext(context);
+            x1.codegen(module, context, builder);
 
-        let int_type = core::LLVMInt32TypeInContext(context);
-        let function_type = core::LLVMFunctionType(int_type, ptr::null_mut(), 0, 0);
-        let function = core::LLVMAddFunction(module, c_str!("main"), function_type);
+            println!("source code: \n{}\n", &result);
 
-        let bb = core::LLVMAppendBasicBlockInContext(context, function, c_str!("entry"));
-        core::LLVMPositionBuilderAtEnd(builder, bb);
-        x1.codegen(context, builder);
-
-        println!("source code: \n{}\n", &result);
-        if opt.debug {
             // emit llir
             let string = LLVMPrintModuleToString(module);
 
             let x = CStr::from_ptr(string).to_str().unwrap();
             println!("llir: \n {}", x);
-        }
+
             // emit executable binary file
             // compile to object
             let triple = LLVMGetDefaultTargetTriple();
@@ -91,7 +85,6 @@ fn main() {
 
             let name = LLVMGetTargetName(target);
             let x = CStr::from_ptr(name as *mut i8);
-            println!("target name: {:?}", x);
             let target_machine = LLVMCreateTargetMachine(
                 target,
                 triple,
@@ -123,14 +116,16 @@ fn main() {
                 .output()
                 .expect("error on executing linker cc");
             // core::LLVMPrintModuleToFile(module, c_str!("out.ll"), ptr::null_mut());
-        println!("executing output file");
-        let output = std::process::Command::new("./out")
-            .output()
-            .expect("error on executing output file");
-        println!("return {}", output.status);
+            println!("executing output file");
+            let output = std::process::Command::new("./out")
+                .output()
+                .expect("error on executing output file");
+            println!("return {}", output.status);
 
-        core::LLVMDisposeBuilder(builder);
-        core::LLVMDisposeModule(module);
-        core::LLVMContextDispose(context);
+
+            core::LLVMDisposeBuilder(builder);
+            core::LLVMDisposeModule(module);
+            core::LLVMContextDispose(context);
+        }
     }
 }

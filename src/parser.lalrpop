@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{Expr, Opcode, Statement, Function};
+use crate::ast::*;
 grammar;
 
 pub Function: Box<Function> = {
@@ -12,8 +12,7 @@ pub Statement: Box<Statement> = {
 }
 
 
-
-// mathematical
+// expr
 pub Expr: Box<Expr> = {
     <l:Expr> "|" <r:XorExpr> => Box::new(Expr::Or(l, r)),
     XorExpr,
@@ -49,8 +48,28 @@ pub Factor: Box<Expr> = {
     <Identifier> => Box::new(Expr::Identifier(<>)),
     <Num> => Box::new(Expr::Number(<>)),
     "(" <Expr> ")",
+
+    "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}" => Box::new(Expr::If{condition, then_body, else_body})
 }
 
 Identifier : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();
 
-Num: i32 = <r"[0-9]+"> => i32::from_str(<>).unwrap();
+match {
+    r"-?[0-9][0-9_]*"
+} else {
+    r"[0-9][0-9_]*",
+    _
+}
+
+Num: Number = {
+    <r"-?[0-9][0-9_]*(i8)?"> => Number::Integer8(i8::from_str(&<>.replace("i8", "").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*(i16)>"> => Number::Integer16(i16::from_str(&<>.replace("i16","").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*(i32)?"> => Number::Integer32(i32::from_str(&<>.replace("i32","").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*(i64)?">  => Number::Integer64(i64::from_str(&<>.replace("i64","").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*"> => Number::Integer32(i32::from_str(&<>.replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*(u8)?"> => Number::UnSignInteger8(u8::from_str(&<>.replace("u8", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*(u16)?">  => Number::UnSignInteger16(u16::from_str(&<>.replace("u16", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*(u32)?">  => Number::UnSignInteger32(u32::from_str(&<>.replace("u32", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*(u64)?">  => Number::UnSignInteger64(u64::from_str(&<>.replace("u64", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*"> => Number::UnSignInteger32(u32::from_str(&<>.replace("_", "")).unwrap()),
+}
