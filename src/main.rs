@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Function};
+use crate::ast::{Expr, Function, Module};
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::core;
 use llvm_sys::core::{LLVMPrintModuleToString, LLVMPrintValueToString};
@@ -44,7 +44,7 @@ fn main() {
 
     let result = std::fs::read_to_string(&opt.file_name).expect(&format!("cannot open file '{}'", &opt.file_name));
 
-    let mut x1: Box<Function> = parser::FunctionParser::new().parse(&result).expect("parse error");
+    let mut x1: Box<Module> = parser::ModuleParser::new().parse(&result).expect("parse error");
     // dbg!(parser::ExprParser::new().parse("22"));
     // dbg!(parser::ExprParser::new().parse("a"));
     // dbg!(parser::ExprParser::new().parse("_a+2"));
@@ -55,9 +55,9 @@ fn main() {
     if !opt.debug {
         unsafe {
             let context = core::LLVMContextCreate();
-            let module = core::LLVMModuleCreateWithName(c_str!("typhoon"));
             let builder = core::LLVMCreateBuilderInContext(context);
-            x1.codegen(module, context, builder);
+
+            let module = x1.codegen(context, builder);
 
             println!("source code: \n{}\n", &result);
 
@@ -115,12 +115,20 @@ fn main() {
                 .arg("out")
                 .output()
                 .expect("error on executing linker cc");
+            if output.status.success() {
+                println!("executing output file");
+                let output = std::process::Command::new("./out")
+                    .output()
+                    .expect("error on executing output file");
+                println!("return {}", output.status);
+            }else {
+                println!("cannot emit executing file");
+                println!("stdout: \n {}", String::from_utf8(output.stdout).unwrap());
+                println!("stderr: \n {}", String::from_utf8(output.stderr).unwrap());
+
+            }
             // core::LLVMPrintModuleToFile(module, c_str!("out.ll"), ptr::null_mut());
-            println!("executing output file");
-            let output = std::process::Command::new("./out")
-                .output()
-                .expect("error on executing output file");
-            println!("return {}", output.status);
+
 
 
             core::LLVMDisposeBuilder(builder);

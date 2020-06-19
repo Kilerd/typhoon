@@ -2,8 +2,12 @@ use std::str::FromStr;
 use crate::ast::*;
 grammar;
 
+pub Module: Box<Module> = {
+    <m: (<Function>)*> => Box::new(Module::new(m)),
+}
+
 pub Function: Box<Function> = {
-    <v: (<Statement> r"\n"*)*> => Box::new(Function::new(v)),
+     "fn" <name:Identifier> "(" ")" "->" <ret:Identifier> "{" <v: (<Statement> r"\n"*)*> "}" => Box::new(Function::new(name, ret, v)),
 }
 
 pub Statement: Box<Statement> = {

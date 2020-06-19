@@ -6,11 +6,37 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::ptr;
 use llvm_sys::core;
+use std::ffi::CString;
 
+// stmt
+#[derive(Debug)]
+pub struct Module {
+    pub func: Vec<Box<Function>>,
+}
+
+impl Module {
+    pub fn new(func: Vec<Box<Function>>) -> Self {
+        Self {
+            func
+        }
+    }
+}
+
+impl Module {
+    pub unsafe fn codegen(&mut self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMModuleRef {
+        let module = core::LLVMModuleCreateWithName(c_str!("typhoon"));
+        for x in self.func.iter_mut() {
+            x.codegen(module, context, builder)
+        }
+        return module;
+    }
+}
 
 // stmt
 #[derive(Debug)]
 pub struct Function {
+    pub name: Identifier,
+    pub return_type: Identifier,
     pub stats: Vec<Box<Statement>>,
     pub context: FunctionContext,
 }
@@ -18,8 +44,10 @@ pub struct Function {
 pub type FunctionContext = HashMap<Identifier, LLVMValueRef>;
 
 impl Function {
-    pub fn new(stats: Vec<Box<Statement>>) -> Self {
+    pub fn new(name: Identifier, return_type: Identifier, stats: Vec<Box<Statement>>) -> Self {
         Self {
+            name,
+            return_type,
             stats,
             context: HashMap::new(),
         }
@@ -81,7 +109,6 @@ impl Number {
                 LLVMConstInt(int_type, *n as u64, 0)
             }
         }
-
     }
 }
 
@@ -106,15 +133,16 @@ pub enum Expr {
     Sub(Box<Expr>, Box<Expr>),
     Pow(Box<Expr>, Box<Expr>),
 
-    If{condition:Box<Expr>, then_body: Box<Expr>, else_body:Box<Expr>},
+    If { condition: Box<Expr>, then_body: Box<Expr>, else_body: Box<Expr> },
 }
 
 
 impl Function {
-    pub unsafe fn codegen(&mut self, module:LLVMModuleRef  ,context: LLVMContextRef, builder: LLVMBuilderRef)  {
+    pub unsafe fn codegen(&mut self, module: LLVMModuleRef, context: LLVMContextRef, builder: LLVMBuilderRef) {
         let int_type = core::LLVMInt32TypeInContext(context);
         let function_type = core::LLVMFunctionType(int_type, ptr::null_mut(), 0, 0);
-        let function = core::LLVMAddFunction(module, c_str!("main"), function_type);
+        let function_name = CString::new(self.name.as_str()).unwrap();
+        let function = core::LLVMAddFunction(module, function_name.as_ptr(), function_type);
         let bb = core::LLVMAppendBasicBlockInContext(context, function, c_str!("entry"));
         core::LLVMPositionBuilderAtEnd(builder, bb);
         for x in &self.stats {
@@ -146,10 +174,10 @@ impl Statement {
 
 
 impl Expr {
-    pub unsafe fn codegen(&self, context: LLVMContextRef, builder: LLVMBuilderRef, func_context: &mut FunctionContext, function:LLVMValueRef) -> LLVMValueRef {
+    pub unsafe fn codegen(&self, context: LLVMContextRef, builder: LLVMBuilderRef, func_context: &mut FunctionContext, function: LLVMValueRef) -> LLVMValueRef {
         match self {
             Expr::Number(n) => {
-                n.codegen(context, builder,func_context)
+                n.codegen(context, builder, func_context)
             }
             Expr::Identifier(identifier) => {
                 let x = func_context.get(identifier).expect(&format!("variable '{}' is undefined", identifier));
@@ -241,7 +269,6 @@ impl Expr {
                 let mut blocks = vec![then_block, else_block];
                 LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
                 phi
-
             }
         }
     }
