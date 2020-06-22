@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Function, Module};
+use crate::ast::{Module};
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::core;
 use llvm_sys::core::{LLVMPrintModuleToString, LLVMPrintValueToString};
@@ -45,11 +45,6 @@ fn main() {
     let result = std::fs::read_to_string(&opt.file_name).expect(&format!("cannot open file '{}'", &opt.file_name));
 
     let mut x1: Box<Module> = parser::ModuleParser::new().parse(&result).expect("parse error");
-    // dbg!(parser::ExprParser::new().parse("22"));
-    // dbg!(parser::ExprParser::new().parse("a"));
-    // dbg!(parser::ExprParser::new().parse("_a+2"));
-    // dbg!(parser::StatementParser::new().parse("let b : i32 = a+2"));
-    // dbg!(parser::StatementParser::new().parse("let a :i32 = ((22+dDS)*3%c)|1"));
 
     dbg!(&x1);
     if !opt.debug {
