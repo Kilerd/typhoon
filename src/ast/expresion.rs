@@ -15,7 +15,7 @@ use llvm_sys::{
 };
 use std::sync::{Arc};
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
 pub enum Opcode {
     Mul,
     Div,
@@ -96,11 +96,43 @@ impl Number {
             }
         }
     }
+    pub fn get_type(&self, upper_context: Arc<TyphoonContext>) -> Arc<Type> {
+        let number_name = match self {
+            Number::Integer8(_) => "i8",
+            Number::Integer16(_) => { "i16" }
+            Number::Integer32(_) => { "i32" }
+            Number::Integer64(_) => { "i64" }
+            Number::UnSignInteger8(_) => { "u8" }
+            Number::UnSignInteger16(_) => { "u16" }
+            Number::UnSignInteger32(_) => { "u32" }
+            Number::UnSignInteger64(_) => { "u64" }
+        };
+        let number_type_name = String::from(number_name);
+        upper_context.get_type_from_name(number_type_name)
+    }
 }
 
 impl Expr {
-    pub fn get_type(&self) -> Type {
-        todo!()
+    pub fn get_type(&self, upper_context: Arc<TyphoonContext>) -> Arc<Type> {
+        match self {
+            Expr::Number(number) => {
+                number.get_type(upper_context.clone())
+            }
+            Expr::Identifier(identifier) => {
+                upper_context.get_type_from_name(identifier.clone())
+            },
+            Expr::Add(lhs, rhs) => {
+                let lhs_type = lhs.get_type(upper_context.clone());
+                let rhs_type = rhs.get_type(upper_context.clone());
+                let option = lhs_type.get_operand_type(Opcode::Add, rhs_type);
+
+                //todo unwrap -> Option
+                option.expect("cannot get operanded type")
+            }
+            _ => {
+                todo!()
+            }
+        }
     }
 
     pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
@@ -132,6 +164,11 @@ impl Expr {
                 )
             }
             Expr::And(lhs, rhs) => {
+                let lhs_type = lhs.get_type(upper_context.clone());
+                let rhs_type = rhs.get_type(upper_context.clone());
+                if !lhs_type.can_be_operand(Opcode::Add, rhs_type) {
+                    panic!(format!("type {} cannot apply to typ {} with operand +", lhs_type.name, rhs_type.name));
+                }
                 let lhs_value = lhs.codegen(upper_context.clone());
                 let rhs_value = rhs.codegen(upper_context.clone());
                 LLVMBuildAnd(
