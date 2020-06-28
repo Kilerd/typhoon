@@ -1,6 +1,9 @@
-use crate::ast::function::Function;
-use llvm_sys::prelude::{LLVMContextRef, LLVMBuilderRef, LLVMModuleRef};
-use llvm_sys::core::LLVMModuleCreateWithName;
+use crate::ast::{function::Function, TyphoonContext};
+use llvm_sys::{
+    core::LLVMModuleCreateWithName,
+    prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef},
+};
+use std::sync::{Arc};
 
 // stmt
 #[derive(Debug)]
@@ -10,17 +13,22 @@ pub struct Module {
 
 impl Module {
     pub fn new(func: Vec<Box<Function>>) -> Self {
-        Self {
-            func
-        }
+        Self { func }
     }
 }
 
 impl Module {
-    pub unsafe fn codegen(&mut self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMModuleRef {
+    pub unsafe fn codegen(
+        &mut self,
+        context: LLVMContextRef,
+        builder: LLVMBuilderRef,
+    ) -> LLVMModuleRef {
+        println!("module codegen");
         let module = LLVMModuleCreateWithName(c_str!("typhoon"));
-        for x in self.func.iter_mut() {
-            x.codegen(module, context, builder)
+        let typhoon_context = Arc::new(TyphoonContext::new(context, builder, module));
+
+        for func in self.func.iter_mut() {
+            func.codegen(typhoon_context.clone())
         }
         return module;
     }

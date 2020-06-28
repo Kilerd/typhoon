@@ -1,31 +1,42 @@
-use crate::ast::expresion::{Identifier, Type, Expr};
-use llvm_sys::{LLVMContext, LLVMBuilder, LLVMValue};
-use crate::ast::function::FunctionContext;
-use llvm_sys::prelude::LLVMValueRef;
-use llvm_sys::core::{LLVMInt32TypeInContext, LLVMBuildAlloca, LLVMBuildStore, LLVMBuildRet};
+use crate::ast::{Expr, Identifier, Type, TypeName, TyphoonContext};
+use llvm_sys::{
+    core::{LLVMBuildAlloca, LLVMBuildRet, LLVMBuildStore, LLVMInt32TypeInContext}, LLVMValue,
+};
+use std::sync::{Arc};
 
 #[derive(Debug)]
 pub enum Statement {
-    Assign(Identifier, Type, Box<Expr>),
+    Assign(Identifier, TypeName, Box<Expr>),
     Return(Box<Expr>),
 }
 
-
 impl Statement {
-    pub unsafe fn codegen(&self, context: *mut LLVMContext, builder: *mut LLVMBuilder, func_context: &mut FunctionContext, function: LLVMValueRef) -> *mut LLVMValue {
+    pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> *mut LLVMValue {
+        println!("statement codegen");
         match self {
-            Statement::Assign(identifier, id_type, expr) => {
-                let expr_value = expr.codegen(context, builder, func_context, function);
-                let ttype = LLVMInt32TypeInContext(context);
-                let alloca = LLVMBuildAlloca(builder, ttype, c_str!("assign_type"));
-                let store = LLVMBuildStore(builder, expr_value, alloca);
+            Statement::Assign(identifier, _id_type, expr) => {
+                let expr_value = expr.codegen(upper_context.clone());
+                let ttype = LLVMInt32TypeInContext(upper_context.llvm_context);
+                let alloca = LLVMBuildAlloca(upper_context.builder, ttype, c_str!("assign_type"));
+                let store = LLVMBuildStore(upper_context.builder, expr_value, alloca);
                 let x = alloca.clone();
-                func_context.insert(identifier.clone(), x);
+
+                let mut guard = upper_context.variables.write().unwrap();
+                guard.insert(
+                    identifier.clone(),
+                    (
+                        x,
+                        Type {
+                            name: "".to_string(),
+                            operands: Default::default(),
+                        },
+                    ),
+                );
                 store
             }
             Statement::Return(expr) => {
-                let x1 = expr.codegen(context, builder, func_context, function);
-                LLVMBuildRet(builder, x1)
+                let x1 = expr.codegen(upper_context.clone());
+                LLVMBuildRet(upper_context.builder, x1)
                 // unimplemented!()
             }
         }

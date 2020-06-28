@@ -1,20 +1,24 @@
-use crate::ast::{Module};
+use crate::ast::Module;
 use lalrpop_util::lalrpop_mod;
-use llvm_sys::core;
-use llvm_sys::core::{LLVMPrintModuleToString, LLVMPrintValueToString};
-use llvm_sys::target::{
-    LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
-    LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeTarget,
+use llvm_sys::{
+    core,
+    core::{LLVMPrintModuleToString, LLVMPrintValueToString},
+    target::{
+        LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
+        LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeTarget,
+    },
+    target_machine::{
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
+        LLVMGetDefaultTargetTriple, LLVMGetFirstTarget, LLVMGetTargetFromName,
+        LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode, LLVMTarget,
+        LLVMTargetMachineEmitToFile, LLVMTargetRef,
+    },
 };
-use llvm_sys::target_machine::{
-    LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
-    LLVMGetDefaultTargetTriple, LLVMGetFirstTarget, LLVMGetTargetFromName, LLVMGetTargetFromTriple,
-    LLVMGetTargetName, LLVMRelocMode, LLVMTarget, LLVMTargetMachineEmitToFile, LLVMTargetRef,
+use std::{
+    ffi::{CStr, CString},
+    ptr,
 };
-use std::ffi::{CStr, CString};
-use std::ptr;
 use structopt::StructOpt;
-use std::path::PathBuf;
 
 macro_rules! c_str {
     ($s:expr) => {
@@ -22,9 +26,8 @@ macro_rules! c_str {
     };
 }
 pub mod ast;
+
 lalrpop_mod!(pub parser);
-
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "typhoon")]
@@ -42,9 +45,12 @@ struct Opt {
 fn main() {
     let opt: Opt = Opt::from_args();
 
-    let result = std::fs::read_to_string(&opt.file_name).expect(&format!("cannot open file '{}'", &opt.file_name));
+    let result = std::fs::read_to_string(&opt.file_name)
+        .expect(&format!("cannot open file '{}'", &opt.file_name));
 
-    let mut x1: Box<Module> = parser::ModuleParser::new().parse(&result).expect("parse error");
+    let mut x1: Box<Module> = parser::ModuleParser::new()
+        .parse(&result)
+        .expect("parse error");
 
     dbg!(&x1);
     if !opt.debug {
@@ -79,7 +85,7 @@ fn main() {
             let code_model = LLVMCodeModel::LLVMCodeModelDefault;
 
             let name = LLVMGetTargetName(target);
-            let x = CStr::from_ptr(name as *mut i8);
+            let _x = CStr::from_ptr(name as *mut i8);
             let target_machine = LLVMCreateTargetMachine(
                 target,
                 triple,
@@ -116,15 +122,12 @@ fn main() {
                     .output()
                     .expect("error on executing output file");
                 println!("return {}", output.status);
-            }else {
+            } else {
                 println!("cannot emit executing file");
                 println!("stdout: \n {}", String::from_utf8(output.stdout).unwrap());
                 println!("stderr: \n {}", String::from_utf8(output.stderr).unwrap());
-
             }
             // core::LLVMPrintModuleToFile(module, c_str!("out.ll"), ptr::null_mut());
-
-
 
             core::LLVMDisposeBuilder(builder);
             core::LLVMDisposeModule(module);
