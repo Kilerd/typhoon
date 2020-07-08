@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Identifier, Type, TypeName, TyphoonContext};
+use crate::ast::{Expr, Identifier, TypeName, TyphoonContext};
 use llvm_sys::{
     core::{LLVMBuildAlloca, LLVMBuildRet, LLVMBuildStore, LLVMInt32TypeInContext}, LLVMValue,
 };

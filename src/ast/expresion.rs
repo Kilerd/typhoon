@@ -14,7 +14,7 @@ use llvm_sys::{
     LLVMBuilder, LLVMContext, LLVMIntPredicate, LLVMValue,
 };
 use std::sync::{Arc};
-use combine::parser::sequence::then;
+
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
 pub enum Opcode {
@@ -155,7 +155,7 @@ impl Expr {
                 upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
             }
 
-            Expr::If { condition, then_body, else_body } => {
+            Expr::If { condition: _, then_body, else_body } => {
                 let then_ret_type = then_body.get_type(upper_context.clone());
                 let else_ret_type = else_body.get_type(upper_context.clone());
                 if !then_ret_type.equals(else_ret_type) {

@@ -1,4 +1,4 @@
-use crate::ast::{statement::Statement, Identifier, TyphoonContext, Type};
+use crate::ast::{statement::Statement, Identifier, TyphoonContext};
 use llvm_sys::{
     core,
     prelude::{LLVMValueRef},
@@ -9,7 +9,7 @@ use std::{
     ptr,
     sync::{Arc},
 };
-use llvm_sys::prelude::LLVMTypeRef;
+
 
 // stmt
 #[derive(Debug)]
