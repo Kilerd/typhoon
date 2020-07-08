@@ -35,9 +35,9 @@ impl Function {
 
 impl Function {
     pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) {
-        println!("function codegen");
+        debug!("function codegen: {}", &self.name);
 
-        let return_type = upper_context.get_type_from_name(self.return_type.clone());
+        let return_type = upper_context.get_type_from_name(self.return_type.clone()).expect("cannot get type");
         let llvm_return_type = return_type.generate_type(upper_context.clone());
 
         let function_type = core::LLVMFunctionType(llvm_return_type, ptr::null_mut(), 0, 0);
@@ -60,11 +60,11 @@ impl Function {
         for x in &self.stats {
             match x.as_ref() {
                 Statement::Return(expr) => {
-                    let x1 = expr.get_type(upper_context.clone());
+                    let x1 = expr.get_type(context.clone());
                     if !x1.equals(return_type.clone()) {
                         panic!(format!("return stats type {} is not adjusted to function return type {}", x1.name, return_type.name));
                     }
-                    expr.codegen(context.clone());
+                    x.codegen(context.clone());
                 }
                 _ => {
                     let _x1 = x.codegen(context.clone());

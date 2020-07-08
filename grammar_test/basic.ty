@@ -1,10 +1,10 @@
 fn test() -> i8 {
-    return 1;
+    return 1i8;
 }
 
-fn main() -> i8 {
+fn main() -> i32 {
     let a: i32 = (22+2)*3+2;
     let b: i32 = a + 1;
-    let c: i8 = if 0 { a } else { b };
+    let c: i32 = if 0 { a } else { b };
     return c;
 }

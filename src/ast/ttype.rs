@@ -4,29 +4,45 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex, RwLock},
 };
+use uuid::Uuid;
 
 pub type Identifier = String;
 
 pub type TypeName = String;
+pub type TypeId = Uuid;
 
 pub struct Type {
     pub name: Identifier,
-    pub operands: HashMap<(Opcode, Arc<Type>), Arc<Type>>,
+    pub type_id: TypeId,
+    pub operands: HashMap<(Opcode, TypeId), TypeId>,
 }
 
 impl Type {
-    pub unsafe fn generate_type(&self, context: Arc<TyphoonContext>) -> LLVMTypeRef {
-        // todo
-        llvm_sys::core::LLVMInt32TypeInContext(context.llvm_context)
+    pub fn new(name: Identifier) -> Self {
+        Self {
+            name,
+            type_id: Uuid::new_v4(),
+            operands: Default::default(),
+        }
     }
 
-    pub fn get_operand_type(&self, opcode: Opcode, rhs: Arc<Type>) -> Option<Arc<Type>> {
-        let key = (opcode, rhs);
+    pub unsafe fn generate_type(&self, context: Arc<TyphoonContext>) -> LLVMTypeRef {
+        // todo
+        if self.name.eq("i8") {
+            llvm_sys::core::LLVMInt8TypeInContext(context.llvm_context)
+        }else {
+            llvm_sys::core::LLVMInt32TypeInContext(context.llvm_context)
+        }
+
+    }
+
+    pub fn get_operand_type(&self, opcode: Opcode, rhs: Arc<Type>) -> Option<TypeId> {
+        let key = (opcode, rhs.type_id);
         self.operands.get(&key).map(|v| v.clone())
     }
 
     pub fn can_be_operand(&self, opcode: Opcode, rhs: Arc<Type>) -> bool {
-        let key = (opcode, rhs);
+        let key = (opcode, rhs.type_id);
         self.operands.contains_key(&key)
     }
 
@@ -40,8 +56,9 @@ pub struct TyphoonContext {
     pub builder: LLVMBuilderRef,
     pub module: LLVMModuleRef,
     pub upper: Option<Arc<TyphoonContext>>,
-    pub variables: RwLock<HashMap<Identifier, (LLVMValueRef, Type)>>,
+    pub variables: RwLock<HashMap<Identifier, (LLVMValueRef, TypeId)>>,
     pub types: HashMap<TypeName, Arc<Type>>,
+    pub types_id: HashMap<TypeId, Arc<Type>>,
     pub function: Option<LLVMValueRef>,
 }
 
@@ -53,12 +70,28 @@ impl TyphoonContext {
     ) -> TyphoonContext {
 
         // todo
-        let i8_type = Arc::new(Type { name: "i8".to_string(), operands: Default::default() });
-        let i32_type = Arc::new(Type { name: "i32".to_string(), operands: Default::default() });
+        let mut i8_type = Type::new("i8".to_string());
+        let mut i32_type = Type::new("i32".to_string());
 
-        let mut map = HashMap::new();
-        map.insert("i8".to_string(), i8_type);
-        map.insert("i32".to_string(), i32_type);
+        i8_type.operands.insert((Opcode::Add, i8_type.type_id), i8_type.type_id);
+        i8_type.operands.insert((Opcode::Mul, i8_type.type_id), i8_type.type_id);
+        i8_type.operands.insert((Opcode::Div, i8_type.type_id), i8_type.type_id);
+        i8_type.operands.insert((Opcode::Sub, i8_type.type_id), i8_type.type_id);
+        i32_type.operands.insert((Opcode::Add, i32_type.type_id), i32_type.type_id);
+        i32_type.operands.insert((Opcode::Mul, i32_type.type_id), i32_type.type_id);
+        i32_type.operands.insert((Opcode::Div, i32_type.type_id), i32_type.type_id);
+        i32_type.operands.insert((Opcode::Sub, i32_type.type_id), i32_type.type_id);
+
+        let arc = Arc::new(i8_type);
+        let arc1 = Arc::new(i32_type);
+
+        let mut type_map = HashMap::new();
+        type_map.insert("i8".to_string(), arc.clone());
+        type_map.insert("i32".to_string(), arc1.clone());
+
+        let mut type_id_map = HashMap::new();
+        type_id_map.insert(arc.clone().type_id, arc.clone());
+        type_id_map.insert(arc1.clone().type_id, arc1.clone());
 
         TyphoonContext {
             llvm_context,
@@ -66,8 +99,10 @@ impl TyphoonContext {
             module,
             upper: None,
             variables: RwLock::new(HashMap::new()),
-            types: map,
+            types: type_map,
+            types_id: type_id_map,
             function: None,
+
         }
     }
 
@@ -79,13 +114,54 @@ impl TyphoonContext {
             upper: Some(upper.clone()),
             variables: RwLock::new(HashMap::new()),
             types: HashMap::new(),
+            types_id: HashMap::default(),
             function: Some(function),
         }
     }
 
+    pub fn new_assign(&self, name: Identifier, value: LLVMValueRef, type_id: TypeId) {
+        debug!("add assign to variable table {} {}", &name, &type_id);
+        let mut guard = self.variables.write().unwrap();
+        guard.insert(name, (value, type_id));
+    }
+
+    pub fn get_variable_type(&self, name: Identifier) -> Option<Arc<Type>> {
+        debug!("get variable type {}", &name);
+        let guard = self.variables.read().unwrap();
+        guard
+            .get(&name)
+            .map(|d| d.1)
+            .and_then(|t| self.get_type_from_id(t))
+            .or_else(|| {
+                self.upper.as_ref().and_then(|f| {
+                    f.get_variable_type(name)
+                })
+            })
+    }
+
     #[inline]
-    pub fn get_type_from_name(&self, name: Identifier) -> Arc<Type> {
-        self.types.get(&name).expect("cannot find type").clone()
+    pub fn get_type_from_name(&self, name: Identifier) -> Option<Arc<Type>> {
+        debug!("get type from name {}", &name);
+        self.types
+            .get(&name)
+            .map(|d| d.clone())
+            .or_else(|| {
+                self.upper.as_ref().and_then(|f| {
+                    f.get_type_from_name(name)
+                })
+            })
+    }
+
+    pub fn get_type_from_id(&self, type_id: TypeId) -> Option<Arc<Type>> {
+        debug!("get type from id {}", &type_id);
+        self.types_id
+            .get(&type_id)
+            .map(|d| d.clone())
+            .or_else(|| {
+                self.upper.as_ref().and_then(|f| {
+                    f.get_type_from_id(type_id)
+                })
+            })
     }
 }
 

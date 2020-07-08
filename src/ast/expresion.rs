@@ -14,6 +14,7 @@ use llvm_sys::{
     LLVMBuilder, LLVMContext, LLVMIntPredicate, LLVMValue,
 };
 use std::sync::{Arc};
+use combine::parser::sequence::then;
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
 pub enum Opcode {
@@ -108,7 +109,7 @@ impl Number {
             Number::UnSignInteger64(_) => { "u64" }
         };
         let number_type_name = String::from(number_name);
-        upper_context.get_type_from_name(number_type_name)
+        upper_context.get_type_from_name(number_type_name).expect("cannot find type")
     }
 }
 
@@ -119,15 +120,48 @@ impl Expr {
                 number.get_type(upper_context.clone())
             }
             Expr::Identifier(identifier) => {
-                upper_context.get_type_from_name(identifier.clone())
-            },
+                upper_context.get_variable_type(identifier.clone()).expect("cannot find type")
+            }
             Expr::Add(lhs, rhs) => {
                 let lhs_type = lhs.get_type(upper_context.clone());
                 let rhs_type = rhs.get_type(upper_context.clone());
                 let option = lhs_type.get_operand_type(Opcode::Add, rhs_type);
 
                 //todo unwrap -> Option
-                option.expect("cannot get operanded type")
+                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
+            }
+            Expr::Sub(lhs, rhs) => {
+                let lhs_type = lhs.get_type(upper_context.clone());
+                let rhs_type = rhs.get_type(upper_context.clone());
+                let option = lhs_type.get_operand_type(Opcode::Sub, rhs_type);
+
+                //todo unwrap -> Option
+                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
+            }
+            Expr::Mul(lhs, rhs) => {
+                let lhs_type = lhs.get_type(upper_context.clone());
+                let rhs_type = rhs.get_type(upper_context.clone());
+                let option = lhs_type.get_operand_type(Opcode::Mul, rhs_type);
+
+                //todo unwrap -> Option
+                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
+            }
+            Expr::Div(lhs, rhs) => {
+                let lhs_type = lhs.get_type(upper_context.clone());
+                let rhs_type = rhs.get_type(upper_context.clone());
+                let option = lhs_type.get_operand_type(Opcode::Div, rhs_type);
+
+                //todo unwrap -> Option
+                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
+            }
+
+            Expr::If { condition, then_body, else_body } => {
+                let then_ret_type = then_body.get_type(upper_context.clone());
+                let else_ret_type = else_body.get_type(upper_context.clone());
+                if !then_ret_type.equals(else_ret_type) {
+                    panic!("the return type of then body is not equal to its of else body");
+                }
+                then_ret_type
             }
             _ => {
                 todo!()
@@ -136,7 +170,7 @@ impl Expr {
     }
 
     pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
-        println!("expr codegen");
+        debug!("expr codegen: {:?}", &self);
 
         match self {
             Expr::Number(n) => n.codegen(upper_context.clone()),
@@ -166,7 +200,7 @@ impl Expr {
             Expr::And(lhs, rhs) => {
                 let lhs_type = lhs.get_type(upper_context.clone());
                 let rhs_type = rhs.get_type(upper_context.clone());
-                if !lhs_type.can_be_operand(Opcode::Add, rhs_type) {
+                if !lhs_type.can_be_operand(Opcode::Add, rhs_type.clone()) {
                     panic!(format!("type {} cannot apply to typ {} with operand +", lhs_type.name, rhs_type.name));
                 }
                 let lhs_value = lhs.codegen(upper_context.clone());

@@ -1,8 +1,10 @@
+#[macro_use] extern crate log;
+
 use crate::ast::Module;
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::{
     core,
-    core::{LLVMPrintModuleToString, LLVMPrintValueToString},
+    core::{LLVMPrintModuleToString},
     target::{
         LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
         LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeTarget,
@@ -43,6 +45,8 @@ struct Opt {
 }
 
 fn main() {
+
+    env_logger::init();
     let opt: Opt = Opt::from_args();
 
     let result = std::fs::read_to_string(&opt.file_name)
