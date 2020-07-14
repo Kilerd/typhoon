@@ -2,12 +2,29 @@ use std::str::FromStr;
 use crate::ast::*;
 grammar;
 
+
+Comma<T>: Vec<T> = { // (1)
+    <v:(<T> ",")*> <e:T?> => match e { // (2)
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
 pub Module: Box<Module> = {
-    <m: (<Function>)*> => Box::new(Module::new(m)),
+    <m: (<ModuleItem>)*> => Box::new(Module::new(m)),
 }
 
-pub Function: Box<Function> = {
-     "fn" <name:Identifier> "(" ")" "->" <ret:Identifier> "{" <v: (<Statement> r"\n"*)*> "}" => Box::new(Function::new(name, ret, v)),
+pub ModuleItem: Box<ModuleItem> = {
+     "fn" <name:Identifier> "(" ")" "->" <ret:Identifier> "{" <v: (<Statement> r"\n"*)*> "}" => Box::new(ModuleItem::Function(Function::new(name, ret, v))),
+     "struct" <name:Identifier> "{" <v: Comma<StructDefineField>> "}" => Box::new(ModuleItem::StructDefine(StructDetail::new(name, v))),
+}
+
+pub StructDefineField: (String, String) = {
+    <k: Identifier> ":" <v: Identifier> => (k ,v)
 }
 
 pub Statement: Box<Statement> = {
@@ -49,11 +66,15 @@ pub TermExpr : Box<Expr> = {
 }
 
 pub Factor: Box<Expr> = {
+    <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}" => Box::new(Expr::StructAssign(type_identifier, v)),
     <Identifier> => Box::new(Expr::Identifier(<>)),
     <Num> => Box::new(Expr::Number(<>)),
     "(" <Expr> ")",
 
-    "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}" => Box::new(Expr::If{condition, then_body, else_body})
+    // "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}" => Box::new(Expr::If{condition, then_body, else_body})
+}
+pub AssignStructField: (String, Box<Expr>) = {
+    <k: Identifier> ":" <v: Expr> => (k ,v)
 }
 
 Identifier : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();

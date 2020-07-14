@@ -1,26 +1,17 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 use crate::ast::Module;
 use lalrpop_util::lalrpop_mod;
 use llvm_sys::{
-    core,
     core::{LLVMPrintModuleToString},
-    target::{
-        LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
-        LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeTarget,
-    },
-    target_machine::{
-        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
-        LLVMGetDefaultTargetTriple, LLVMGetFirstTarget, LLVMGetTargetFromName,
-        LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode, LLVMTarget,
-        LLVMTargetMachineEmitToFile, LLVMTargetRef,
-    },
-};
-use std::{
-    ffi::{CStr, CString},
-    ptr,
 };
 use structopt::StructOpt;
+use llvm_sys::core;
+use llvm_sys::target_machine::{LLVMGetDefaultTargetTriple, LLVMTargetRef, LLVMGetTargetFromTriple, LLVMCodeGenOptLevel, LLVMRelocMode, LLVMCodeModel, LLVMGetTargetName, LLVMCreateTargetMachine, LLVMCodeGenFileType, LLVMTargetMachineEmitToFile};
+use llvm_sys::target::{LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargets, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters};
+use std::ffi::{CStr, CString};
+use std::ptr;
 
 macro_rules! c_str {
     ($s:expr) => {
@@ -45,7 +36,6 @@ struct Opt {
 }
 
 fn main() {
-
     env_logger::init();
     let opt: Opt = Opt::from_args();
 
@@ -64,8 +54,6 @@ fn main() {
 
             let module = x1.codegen(context, builder);
 
-            println!("source code: \n{}\n", &result);
-
             // emit llir
             let string = LLVMPrintModuleToString(module);
 
@@ -80,11 +68,9 @@ fn main() {
             LLVM_InitializeAllTargetMCs();
             LLVM_InitializeAllAsmParsers();
             LLVM_InitializeAllAsmPrinters();
-            // let target = LLVMGetFirstTarget();
-            // LLVMGetTargetFromTriple(triple, target, ptr::null_mut());
             let mut target: LLVMTargetRef = std::mem::uninitialized();
             LLVMGetTargetFromTriple(triple, &mut target, ptr::null_mut());
-            let opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelLess;
+            let opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
             let reloc_mode = LLVMRelocMode::LLVMRelocDefault;
             let code_model = LLVMCodeModel::LLVMCodeModelDefault;
 

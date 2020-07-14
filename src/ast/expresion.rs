@@ -10,10 +10,12 @@ use llvm_sys::{
         LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
         LLVMInt8TypeInContext, LLVMPositionBuilderAtEnd,
     },
-    prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef},
-    LLVMBuilder, LLVMContext, LLVMIntPredicate, LLVMValue,
+    prelude::{LLVMValueRef},
+    LLVMIntPredicate, LLVMValue,
 };
 use std::sync::{Arc};
+use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore};
+use std::ffi::{CStr, CString};
 
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
@@ -27,6 +29,8 @@ pub enum Opcode {
 // mathematical
 #[derive(Debug)]
 pub enum Expr {
+    StructAssign(Identifier, Vec<(Identifier, Box<Expr>)>),
+
     Identifier(Identifier),
     Number(Number),
     Or(Box<Expr>, Box<Expr>),
@@ -163,6 +167,10 @@ impl Expr {
                 }
                 then_ret_type
             }
+
+            Expr::StructAssign(ident, _fields) => {
+                upper_context.get_type_from_name(ident.clone()).expect(format!("cannot get type {}", ident).as_str())
+            }
             _ => {
                 todo!()
             }
@@ -172,6 +180,7 @@ impl Expr {
     pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
         debug!("expr codegen: {:?}", &self);
 
+        trace!("show context data {:#?}", upper_context);
         match self {
             Expr::Number(n) => n.codegen(upper_context.clone()),
             Expr::Identifier(identifier) => {
@@ -344,6 +353,31 @@ impl Expr {
                 let mut blocks = vec![then_block, else_block];
                 LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
                 phi
+            }
+            Expr::StructAssign(ident, fields) => {
+                debug!("struct {} assign codegen: {:?}", &ident, &fields);
+                let arc = upper_context.get_type_from_name(ident.clone()).expect("cannot find type");
+                let x1 = arc.generate_type(upper_context.clone());
+                let name = CString::new(ident.as_str()).unwrap();
+
+                let alloca = LLVMBuildAlloca(upper_context.builder.clone(), x1, name.as_ptr());
+
+                // store fields
+                // todo check uninitial field
+                // todo check field type is equals to expr type
+                for (ident, expr) in fields {
+                    let field_idx = arc.get_type_field_idx(ident).expect("field is not in struct define");
+                    debug!("struct {} field {}:{} assign codegen", &ident, &field_idx, &ident);
+                    // for single struct or element, slice_idx should be always zero
+                    let slice_idx = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), 0, 0);
+                    let field_dix_t = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), field_idx as u64, 0);
+                    let mut vec1 = vec![slice_idx, field_dix_t];
+                    let expr_t = expr.codegen(upper_context.clone());
+                    let gep = LLVMBuildGEP(upper_context.builder, alloca, vec1.as_mut_ptr(), vec1.len() as u32, c_str!("struct_gep_ptr"));
+                    LLVMBuildStore(upper_context.builder, expr_t, gep);
+                }
+
+                alloca
             }
         }
     }

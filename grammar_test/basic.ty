@@ -1,10 +1,10 @@
-fn test() -> i8 {
-    return 1i8;
+struct A {
+    c: i32,
+    b:i8,
 }
 
 fn main() -> i32 {
-    let a: i32 = (22+2)*3+2;
-    let b: i32 = a + 1;
-    let c: i32 = if 0 { a } else { b };
-    return c;
+    let a:i32 = 1i32;
+    let b: A = A{b:1i8, c: 100i32};
+    return a;
 }
