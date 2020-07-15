@@ -5,6 +5,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 use uuid::Uuid;
+use crate::llvm_wrapper::typ::Typ;
 
 pub type Identifier = String;
 
@@ -38,19 +39,23 @@ impl Type {
         }
     }
 
-    pub unsafe fn generate_type(&self, context: Arc<TyphoonContext>) -> LLVMTypeRef {
-        // todo
+    pub fn generate_type(&self, context: Arc<TyphoonContext>) -> LLVMTypeRef {
+        // todo support all primitive type
         if self.name.eq("i8") {
-            llvm_sys::core::LLVMInt8TypeInContext(context.llvm_context)
+            Typ::int8(context.llvm_context)
         } else if self.name.eq("i32") {
-            llvm_sys::core::LLVMInt32TypeInContext(context.llvm_context)
+            Typ::int32(context.llvm_context)
         } else {
             if let Some((_, b)) = self.llvm_type_ref.as_ref() {
                 b.clone()
             } else {
-                llvm_sys::core::LLVMInt32TypeInContext(context.llvm_context)
+                Typ::int32(context.llvm_context)
             }
         }
+    }
+
+    pub fn is_primitive(&self) -> bool {
+        self.llvm_type_ref.is_none()
     }
 
     pub fn get_field_type(&self, context: Arc<TyphoonContext>, field: &Identifier) -> Option<Arc<Type>> {

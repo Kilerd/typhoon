@@ -18,6 +18,9 @@ use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore, LLVMBuildLoa
 use std::ffi::{CString};
 use llvm_sys::LLVMOpcode::LLVMAlloca;
 use crate::llvm_wrapper::literal::Literal;
+use crate::llvm_wrapper::build::Build;
+use env_logger::builder;
+use crate::llvm_wrapper::typ::Typ;
 
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
@@ -107,7 +110,7 @@ pub enum Number {
 }
 
 impl Number {
-    pub unsafe fn codegen(&self, context: Arc<TyphoonContext>) -> *mut LLVMValue {
+    pub fn codegen(&self, context: Arc<TyphoonContext>) -> *mut LLVMValue {
         match self {
             Number::Integer8(n) => Literal::int8(*n, context.llvm_context),
             Number::Integer16(n) => Literal::int16(*n, context.llvm_context),
@@ -168,7 +171,7 @@ impl Expr {
         }
     }
 
-    pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
+    pub fn codegen(&self, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
         debug!("expr codegen: {:?}", &self);
 
         trace!("show context data {:#?}", upper_context);
@@ -180,14 +183,14 @@ impl Expr {
                     .get(identifier)
                     .expect(&format!("variable '{}' is undefined", identifier));
                 let x = x.0;
-                x
-                // LLVMBuildLoad(upper_context.builder, x, c_str!("loadi"))
+                Build::load(x, upper_context.builder)
+
             }
 
             Expr::BinOperation(opcode, lhs, rhs) => {
                 let lhs_value = lhs.codegen(upper_context.clone());
                 let rhs_value = rhs.codegen(upper_context.clone());
-                opcode.calculate_codegen(lhs_value, rhs_value,upper_context.clone())
+                opcode.calculate_codegen(lhs_value, rhs_value, upper_context.clone())
             }
 
             Expr::If {
@@ -196,88 +199,58 @@ impl Expr {
                 else_body,
             } => {
                 let condition_value = condition.codegen(upper_context.clone());
-                let int_type = LLVMInt32TypeInContext(upper_context.llvm_context);
-                let zero = LLVMConstInt(int_type, 0, 0);
-                let is_not_zero = LLVMBuildICmp(
-                    upper_context.builder,
-                    LLVMIntPredicate::LLVMIntNE,
-                    condition_value,
-                    zero,
-                    c_str!("is_not_zero"),
-                );
+                let zero = Literal::int32(0, upper_context.llvm_context);
 
-                let then_block = LLVMAppendBasicBlockInContext(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    c_str!("entry"),
-                );
-                let else_block = LLVMAppendBasicBlockInContext(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    c_str!("entry"),
-                );
-                let merge_block = LLVMAppendBasicBlockInContext(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    c_str!("entry"),
-                );
-                LLVMBuildCondBr(upper_context.builder, is_not_zero, then_block, else_block);
+                let is_not_zero = Build::cmp(LLVMIntPredicate::LLVMIntNE, condition_value, zero, "is_not_zero", upper_context.builder);
 
-                LLVMPositionBuilderAtEnd(upper_context.builder, then_block);
+                let then_block = Build::append_block(upper_context.llvm_context, upper_context.function.unwrap(), "then_entry");
+                let else_block = Build::append_block(upper_context.llvm_context, upper_context.function.unwrap(), "else_entry");
+                let merge_block = Build::append_block(upper_context.llvm_context, upper_context.function.unwrap(), "merge_entry");
+
+                Build::cond_br(upper_context.builder, is_not_zero, then_block, else_block);
+
+                Build::position_at_end(upper_context.builder, then_block);
                 let then_return = then_body.codegen(upper_context.clone());
-                LLVMBuildBr(upper_context.builder, merge_block);
+                Build::goto(upper_context.builder, merge_block);
 
-                LLVMPositionBuilderAtEnd(upper_context.builder, else_block);
+                Build::position_at_end(upper_context.builder, else_block);
                 let else_return = else_body.codegen(upper_context.clone());
-                LLVMBuildBr(upper_context.builder, merge_block);
+                Build::goto(upper_context.builder, merge_block);
 
-                LLVMPositionBuilderAtEnd(upper_context.builder, merge_block);
-                let phi = LLVMBuildPhi(upper_context.builder, int_type, c_str!("iftmp"));
-                let mut values = vec![then_return, else_return];
-                let mut blocks = vec![then_block, else_block];
-                LLVMAddIncoming(phi, values.as_mut_ptr(), blocks.as_mut_ptr(), 2);
-                phi
+                Build::position_at_end(upper_context.builder, merge_block);
+
+                let incoming = vec![
+                    (then_return, then_block),
+                    (else_return, else_block),
+                ];
+                Build::phi(upper_context.builder, Typ::int32(upper_context.llvm_context), incoming)
             }
             Expr::StructAssign(ident, fields) => {
                 debug!("struct {} assign codegen: {:?}", &ident, &fields);
-                let arc = upper_context.get_type_from_name(ident.clone()).expect("cannot find type");
-                let x1 = arc.generate_type(upper_context.clone());
-                let name = CString::new(format!("{}_assign", ident).as_str()).unwrap();
-
-                let alloca = LLVMBuildAlloca(upper_context.builder.clone(), x1, name.as_ptr());
+                let struct_ty = upper_context.get_type_from_name(ident.clone()).expect("cannot find type");
+                let struct_llvm_ty = struct_ty.generate_type(upper_context.clone());
 
                 // store fields
                 // todo check uninitial field
                 // todo check field type is equals to expr type
-                for (ident, expr) in fields {
-                    let field_idx = arc.get_type_field_idx(ident).expect("field is not in struct define");
-                    debug!("struct {} field {}:{} assign codegen", &ident, &field_idx, &ident);
-                    // for single struct or element, slice_idx should be always zero
-                    let slice_idx = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), 0, 0);
-                    let field_dix_t = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), field_idx as u64, 0);
-                    let mut vec1 = vec![slice_idx, field_dix_t];
-                    let expr_t = expr.codegen(upper_context.clone());
-                    let gep = LLVMBuildGEP(upper_context.builder, alloca, vec1.as_mut_ptr(), vec1.len() as u32, c_str!("struct_gep_ptr"));
-                    LLVMBuildStore(upper_context.builder, expr_t, gep);
-                }
+                let mut fields_idx_value = fields.into_iter().map(|(field_ident, expr)| {
+                    let field_idx = struct_ty.get_type_field_idx(field_ident).expect("field is not in struct define");
+                    let expr_llvm_value = expr.codegen(upper_context.clone());
+                    (field_idx, expr_llvm_value)
+                }).collect();
 
-                alloca
+                Build::declare_struct(ident, struct_llvm_ty, &mut fields_idx_value, upper_context.builder, upper_context.llvm_context)
             }
-            Expr::IdentifierWithAccess(ident, item) => {
+            Expr::IdentifierWithAccess(ident, field) => {
+                // {ident}.{field}
                 let ident_type = ident.get_type(upper_context.clone());
-                let field_idx = ident_type.get_type_field_idx(item).expect("struct has not item");
-                let field_type = ident_type.get_field_type(upper_context.clone(), item).expect("");
-
-                let slice_idx = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), 0, 0);
-                let field_dix_t = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), field_idx as u64, 0);
-                let mut vec1 = vec![slice_idx, field_dix_t];
-                let expr_t = ident.codegen(upper_context.clone());
-                let gep = LLVMBuildGEP(upper_context.builder, expr_t, vec1.as_mut_ptr(), vec1.len() as u32, c_str!("struct_gep_ptr"));
-
-                let x2 = field_type.generate_type(upper_context.clone());
+                let ident_codegen = ident.codegen(upper_context.clone());
+                let field_idx = ident_type.get_type_field_idx(field).expect("struct has not item");
+                let gep = Build::gep(ident_codegen, field_idx, upper_context.builder, upper_context.llvm_context);
+                // Build::load(gep, upper_context.builder)
                 gep
-                // LLVMBuildLoad(upper_context.builder,gep, c_str!("loadi"))
             }
+
         }
     }
 }

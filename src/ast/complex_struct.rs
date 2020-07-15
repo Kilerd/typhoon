@@ -4,6 +4,8 @@ use std::sync::Arc;
 use llvm_sys::core::{LLVMStructCreateNamed, LLVMStructSetBody};
 use std::ffi::{CString};
 use llvm_sys::prelude::LLVMTypeRef;
+use crate::llvm_wrapper::build::Build;
+use crate::llvm_wrapper::typ::Typ;
 
 #[derive(Debug)]
 pub enum ModuleItem {
@@ -13,7 +15,7 @@ pub enum ModuleItem {
 
 
 impl ModuleItem {
-    pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) {
+    pub  fn codegen(&self, upper_context: Arc<TyphoonContext>) {
         match self {
             ModuleItem::Function(func) => {
                 func.codegen(upper_context)
@@ -29,11 +31,10 @@ impl ModuleItem {
                         arc.generate_type(upper_context.clone())
                     })
                     .collect();
-                let name = CString::new(defined_struct.name.as_str()).unwrap();
-                let named_struct = LLVMStructCreateNamed(upper_context.llvm_context, name.as_ptr());
-                LLVMStructSetBody(named_struct, fields_llvm_types.as_mut_ptr(), fields_llvm_types.len() as u32, 0);
 
-                upper_context.define_struct(defined_struct, named_struct);
+                let struct_ty = Typ::struct_(&defined_struct.name.clone(), &mut fields_llvm_types, upper_context.llvm_context);
+
+                upper_context.define_struct(defined_struct, struct_ty);
             }
         }
     }

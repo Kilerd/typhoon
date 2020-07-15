@@ -4,6 +4,7 @@ use llvm_sys::{
     prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef},
 };
 use std::sync::{Arc};
+use crate::llvm_wrapper::build::Build;
 
 // stmt
 #[derive(Debug)]
@@ -18,15 +19,14 @@ impl Module {
 }
 
 impl Module {
-    pub unsafe fn codegen(
+    pub fn codegen(
         &mut self,
         context: LLVMContextRef,
         builder: LLVMBuilderRef,
     ) -> LLVMModuleRef {
         println!("module codegen");
-        let module = LLVMModuleCreateWithName(c_str!("typhoon"));
+        let module = Build::module("typhoon");
         let typhoon_context = Arc::new(TyphoonContext::new(context, builder, module));
-
         for item in self.items.iter_mut() {
             item.codegen(typhoon_context.clone())
         }

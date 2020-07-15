@@ -9,6 +9,8 @@ use std::{
     ptr,
     sync::{Arc},
 };
+use crate::llvm_wrapper::typ::Typ;
+use crate::llvm_wrapper::build::Build;
 
 
 // stmt
@@ -34,29 +36,20 @@ impl Function {
 }
 
 impl Function {
-    pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) {
+    pub fn codegen(&self, upper_context: Arc<TyphoonContext>) {
         debug!("function codegen: {}", &self.name);
 
         let return_type = upper_context.get_type_from_name(self.return_type.clone()).expect("cannot get type");
         let llvm_return_type = return_type.generate_type(upper_context.clone());
-
-        let function_type = core::LLVMFunctionType(llvm_return_type, ptr::null_mut(), 0, 0);
-        let function_name = CString::new(self.name.as_str()).unwrap();
-        let function =
-            core::LLVMAddFunction(upper_context.module, function_name.as_ptr(), function_type);
+        let function_type = Typ::func(&mut vec![], llvm_return_type);
+        let function = Build::add_func_to_module(upper_context.module, self.name.as_str(), function_type);
+        let block = Build::append_block(upper_context.llvm_context, function, "entry");
+        Build::position_at_end(upper_context.builder, block);
 
         let context = Arc::new(TyphoonContext::new_with_upper(
             upper_context.clone(),
             function,
         ));
-
-        let bb = core::LLVMAppendBasicBlockInContext(
-            upper_context.llvm_context,
-            function,
-            c_str!("entry"),
-        );
-        core::LLVMPositionBuilderAtEnd(upper_context.builder, bb);
-
         for x in &self.stats {
             match x.as_ref() {
                 Statement::Return(expr) => {

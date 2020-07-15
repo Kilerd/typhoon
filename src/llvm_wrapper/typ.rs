@@ -34,4 +34,8 @@ impl Typ {
     pub fn ptr(typ: LLVMTypeRef) -> LLVMTypeRef {
         unsafe { LLVMPointerType(typ, 0) }
     }
+
+    pub fn func(params: &mut Vec<LLVMTypeRef>, ret: LLVMTypeRef) -> LLVMTypeRef {
+        unsafe { LLVMFunctionType(ret, params.as_mut_ptr(), params.len() as u32, 0) }
+    }
 }
