@@ -1,7 +1,6 @@
 use structopt::StructOpt;
 use typhoon::program::Program;
 use typhoon::error::TyphoonError;
-use log::Level::Error;
 
 extern crate typhoon;
 

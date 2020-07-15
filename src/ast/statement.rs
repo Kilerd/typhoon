@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use llvm_sys::{
-    core::{LLVMBuildAlloca, LLVMBuildRet, LLVMBuildStore, LLVMInt32TypeInContext}, LLVMValue,
+    core::{LLVMBuildAlloca, LLVMBuildRet, LLVMBuildStore}, LLVMValue,
 };
 
 use crate::ast::{Expr, Identifier, TypeName, TyphoonContext};

@@ -15,7 +15,7 @@ use llvm_sys::{
 };
 use std::sync::{Arc};
 use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore};
-use std::ffi::{CStr, CString};
+use std::ffi::{CString};
 
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]

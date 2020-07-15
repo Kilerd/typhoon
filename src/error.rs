@@ -1,6 +1,4 @@
 use thiserror::Error;
-use lalrpop_util::ParseError;
-use std::path::Path;
 use std::process::ExitStatus;
 
 #[derive(Error, Debug)]

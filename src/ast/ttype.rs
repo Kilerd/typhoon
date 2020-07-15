@@ -5,7 +5,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 use uuid::Uuid;
-use std::ops::Index;
 
 pub type Identifier = String;
 

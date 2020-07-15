@@ -1,4 +1,4 @@
-use crate::ast::{function::Function, TyphoonContext, ModuleItem};
+use crate::ast::{TyphoonContext, ModuleItem};
 use llvm_sys::{
     core::LLVMModuleCreateWithName,
     prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef},

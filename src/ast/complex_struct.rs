@@ -1,8 +1,8 @@
 use crate::ast::{Function, Identifier, TyphoonContext};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap};
 use std::sync::Arc;
-use llvm_sys::core::{LLVMStructCreateNamed, LLVMStructSetBody, LLVMInt32TypeInContext, LLVMStructType, LLVMStructTypeInContext, LLVMInt32Type, LLVMGetStructName};
-use std::ffi::{CString, CStr};
+use llvm_sys::core::{LLVMStructCreateNamed, LLVMStructSetBody};
+use std::ffi::{CString};
 use llvm_sys::prelude::LLVMTypeRef;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl ModuleItem {
                 let mut fields_llvm_types: Vec<LLVMTypeRef> = defined_struct
                     .fields
                     .iter()
-                    .map(|(field_key, field_value)| {
+                    .map(|(_field_key, field_value)| {
                         let arc = upper_context.get_type_from_name(field_value.clone()).expect("cannot found type");
                         arc.generate_type(upper_context.clone())
                     })
