@@ -80,3 +80,21 @@ fn load_struct_value_as_return_code() {
     "#;
     run_test_with_expected("load_struct_value_as_return_code", t, 4, "", "");
 }
+
+#[test]
+fn load_nested_struct_value_as_return_code() {
+    let t = r#"
+    struct A {
+        inner: i32,
+    }
+    struct B {
+        inner: A,
+    }
+    fn main() -> i32 {
+        let a: A = A {inner: 4};
+        let b: B = B {inner: a};
+        return b.inner.inner;
+    }
+    "#;
+    run_test_with_expected("load_nested_struct_value_as_return_code", t, 4, "", "");
+}

@@ -35,33 +35,33 @@ pub Statement: Box<Statement> = {
 
 // expr
 pub Expr: Box<Expr> = {
-    <l:Expr> "|" <r:XorExpr> => Box::new(Expr::Or(l, r)),
+    <l:Expr> "|" <r:XorExpr> => Box::new(Expr::BinOperation(Opcode::Or, l, r)),
     XorExpr,
 }
 pub XorExpr : Box<Expr> = {
-    <l:XorExpr> "^" <r:AndExpr> => Box::new(Expr::Xor(l, r)),
+    <l:XorExpr> "^" <r:AndExpr> => Box::new(Expr::BinOperation(Opcode::Xor, l, r)),
     AndExpr,
 }
 pub AndExpr : Box<Expr> = {
-    <l:AndExpr> "&" <r:ShiftExpr> => Box::new(Expr::And(l, r)),
+    <l:AndExpr> "&" <r:ShiftExpr> => Box::new(Expr::BinOperation(Opcode::And, l, r)),
     ShiftExpr,
 }
 pub ShiftExpr: Box<Expr> = {
-    <l:ShiftExpr> "<<" <r:ArithExpr> => Box::new(Expr::LShift(l,r)),
-    <l:ShiftExpr> ">>" <r:ArithExpr> => Box::new(Expr::RShift(l,r)),
+    <l:ShiftExpr> "<<" <r:ArithExpr> => Box::new(Expr::BinOperation(Opcode::LShift, l,r)),
+    <l:ShiftExpr> ">>" <r:ArithExpr> => Box::new(Expr::BinOperation(Opcode::RShift, l,r)),
     ArithExpr,
 }
 
 pub ArithExpr : Box<Expr> = {
-    <l:ArithExpr> "+" <r:TermExpr> => Box::new(Expr::Add(l,r)),
-    <l:ArithExpr> "-" <r:TermExpr> => Box::new(Expr::Sub(l,r)),
+    <l:ArithExpr> "+" <r:TermExpr> => Box::new(Expr::BinOperation(Opcode::Add, l,r)),
+    <l:ArithExpr> "-" <r:TermExpr> => Box::new(Expr::BinOperation(Opcode::Sub, l,r)),
     TermExpr,
 }
 
 pub TermExpr : Box<Expr> = {
-    <l:TermExpr> "*" <r:Factor> => Box::new(Expr::Mul(l,r)),
-    <l:TermExpr> "/" <r:Factor> => Box::new(Expr::Div(l,r)),
-    <l:TermExpr> "%" <r:Factor> => Box::new(Expr::Mod(l,r)),
+    <l:TermExpr> "*" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Mul, l,r)),
+    <l:TermExpr> "/" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Div, l,r)),
+    <l:TermExpr> "%" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Mod, l,r)),
     Factor,
 }
 
@@ -91,11 +91,10 @@ Num: Number = {
     <r"-?[0-9][0-9_]*(i8)?"> => Number::Integer8(i8::from_str(&<>.replace("i8", "").replace("_", "")).unwrap()),
     <r"-?[0-9][0-9_]*(i16)>"> => Number::Integer16(i16::from_str(&<>.replace("i16","").replace("_", "")).unwrap()),
     <r"-?[0-9][0-9_]*(i32)?"> => Number::Integer32(i32::from_str(&<>.replace("i32","").replace("_", "")).unwrap()),
-    <r"-?[0-9][0-9_]*(i64)?">  => Number::Integer64(i64::from_str(&<>.replace("i64","").replace("_", "")).unwrap()),
+    //<r"-?[0-9][0-9_]*(i64)?">  => Number::Integer64(i64::from_str(&<>.replace("i64","").replace("_", "")).unwrap()),
     <r"-?[0-9][0-9_]*"> => Number::Integer32(i32::from_str(&<>.replace("_", "")).unwrap()),
     <r"[0-9][0-9_]*(u8)?"> => Number::UnSignInteger8(u8::from_str(&<>.replace("u8", "").replace("_", "")).unwrap()),
     <r"[0-9][0-9_]*(u16)?">  => Number::UnSignInteger16(u16::from_str(&<>.replace("u16", "").replace("_", "")).unwrap()),
     <r"[0-9][0-9_]*(u32)?">  => Number::UnSignInteger32(u32::from_str(&<>.replace("u32", "").replace("_", "")).unwrap()),
-    <r"[0-9][0-9_]*(u64)?">  => Number::UnSignInteger64(u64::from_str(&<>.replace("u64", "").replace("_", "")).unwrap()),
-    <r"[0-9][0-9_]*"> => Number::UnSignInteger32(u32::from_str(&<>.replace("_", "")).unwrap()),
+    //<r"[0-9][0-9_]*(u64)?">  => Number::UnSignInteger64(u64::from_str(&<>.replace("u64", "").replace("_", "")).unwrap()),
 }

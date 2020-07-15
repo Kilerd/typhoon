@@ -13,6 +13,8 @@ macro_rules! c_str {
 
 lalrpop_mod!(pub parser);
 
+pub mod llvm_wrapper;
+
 pub mod ast;
 pub mod program;
 pub mod error;

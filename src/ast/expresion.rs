@@ -17,37 +17,78 @@ use std::sync::{Arc};
 use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore, LLVMBuildLoad2};
 use std::ffi::{CString};
 use llvm_sys::LLVMOpcode::LLVMAlloca;
+use crate::llvm_wrapper::literal::Literal;
 
 
-#[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Opcode {
-    Mul,
-    Div,
     Add,
     Sub,
+    Mul,
+    Div,
+
+    Mod,
+    Pow,
+
+    Or,
+    And,
+    Xor,
+
+    LShift,
+    RShift,
 }
+
+impl Opcode {
+    pub fn calculate_codegen(&self, lhs: LLVMValueRef, rhs: LLVMValueRef, upper_context: Arc<TyphoonContext>) -> LLVMValueRef {
+        unsafe {
+            match self {
+                Opcode::Add => {
+                    LLVMBuildAdd(upper_context.builder, lhs, rhs, c_str!("addtmp"))
+                }
+                Opcode::Sub => {
+                    LLVMBuildSub(upper_context.builder, lhs, rhs, c_str!("subtmp"))
+                }
+                Opcode::Mul => {
+                    LLVMBuildMul(upper_context.builder, lhs, rhs, c_str!("multmp"))
+                }
+                Opcode::Div => {
+                    LLVMBuildSDiv(upper_context.builder, lhs, rhs, c_str!("udivtmp"))
+                }
+                Opcode::Mod => {
+                    let div = LLVMBuildSDiv(upper_context.builder, lhs, rhs, c_str!("mod_inner_div_tmp"));
+                    let mul = LLVMBuildMul(upper_context.builder, div, rhs, c_str!("mod_inner_mul_tmp"));
+                    LLVMBuildSub(upper_context.builder, lhs.clone(), mul, c_str!("modtmp"))
+                }
+                Opcode::Pow => { todo!() }
+                Opcode::Or => {
+                    LLVMBuildOr(upper_context.builder, lhs, rhs, c_str!("ortmp"))
+                }
+                Opcode::And => {
+                    LLVMBuildAnd(upper_context.builder, lhs, rhs, c_str!("andtmp"))
+                }
+                Opcode::Xor => {
+                    LLVMBuildXor(upper_context.builder, lhs, rhs, c_str!("xortmp"))
+                }
+                Opcode::LShift => {
+                    LLVMBuildShl(upper_context.builder, lhs, rhs, c_str!("lshifttmp"))
+                }
+                Opcode::RShift => {
+                    LLVMBuildAShr(upper_context.builder, lhs, rhs, c_str!("rshifttmp"))
+                }
+            }
+        }
+    }
+}
+
 
 // mathematical
 #[derive(Debug)]
 pub enum Expr {
     StructAssign(Identifier, Vec<(Identifier, Box<Expr>)>),
-
     Identifier(Identifier),
-
     IdentifierWithAccess(Box<Expr>, Identifier),
     Number(Number),
-    Or(Box<Expr>, Box<Expr>),
-    Xor(Box<Expr>, Box<Expr>),
-    And(Box<Expr>, Box<Expr>),
-    LShift(Box<Expr>, Box<Expr>),
-    RShift(Box<Expr>, Box<Expr>),
-    Mod(Box<Expr>, Box<Expr>),
-    Mul(Box<Expr>, Box<Expr>),
-    Div(Box<Expr>, Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
-    Pow(Box<Expr>, Box<Expr>),
-
+    BinOperation(Opcode, Box<Expr>, Box<Expr>),
     If {
         condition: Box<Expr>,
         then_body: Box<Expr>,
@@ -60,64 +101,33 @@ pub enum Number {
     Integer8(i8),
     Integer16(i16),
     Integer32(i32),
-    Integer64(i64),
     UnSignInteger8(u8),
     UnSignInteger16(u16),
     UnSignInteger32(u32),
-    UnSignInteger64(u64),
 }
 
 impl Number {
-    pub unsafe fn codegen(&self, upper_context: Arc<TyphoonContext>) -> *mut LLVMValue {
+    pub unsafe fn codegen(&self, context: Arc<TyphoonContext>) -> *mut LLVMValue {
         match self {
-            Number::Integer8(n) => {
-                let int_type = LLVMInt8TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 1)
-
-            }
-            Number::Integer16(n) => {
-                let int_type = LLVMInt16TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 1)
-            }
-            Number::Integer32(n) => {
-                let int_type = LLVMInt32TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 1)
-            }
-            Number::Integer64(n) => {
-                let int_type = LLVMInt64TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 1)
-            }
-            Number::UnSignInteger8(n) => {
-                let int_type = LLVMInt8TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 0)
-            }
-            Number::UnSignInteger16(n) => {
-                let int_type = LLVMInt16TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 0)
-            }
-            Number::UnSignInteger32(n) => {
-                let int_type = LLVMInt32TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 0)
-            }
-            Number::UnSignInteger64(n) => {
-                let int_type = LLVMInt8TypeInContext(upper_context.llvm_context);
-                LLVMConstInt(int_type, *n as u64, 0)
-            }
+            Number::Integer8(n) => Literal::int8(*n, context.llvm_context),
+            Number::Integer16(n) => Literal::int16(*n, context.llvm_context),
+            Number::Integer32(n) => Literal::int32(*n, context.llvm_context),
+            Number::UnSignInteger8(n) => Literal::uint8(*n, context.llvm_context),
+            Number::UnSignInteger16(n) => Literal::uint16(*n, context.llvm_context),
+            Number::UnSignInteger32(n) => Literal::uint32(*n, context.llvm_context),
         }
     }
-    pub fn get_type(&self, upper_context: Arc<TyphoonContext>) -> Arc<Type> {
+    pub fn get_type(&self, context: Arc<TyphoonContext>) -> Arc<Type> {
         let number_name = match self {
             Number::Integer8(_) => "i8",
             Number::Integer16(_) => { "i16" }
             Number::Integer32(_) => { "i32" }
-            Number::Integer64(_) => { "i64" }
             Number::UnSignInteger8(_) => { "u8" }
             Number::UnSignInteger16(_) => { "u16" }
             Number::UnSignInteger32(_) => { "u32" }
-            Number::UnSignInteger64(_) => { "u64" }
         };
         let number_type_name = String::from(number_name);
-        upper_context.get_type_from_name(number_type_name).expect("cannot find type")
+        context.get_type_from_name(number_type_name).expect("cannot find type")
     }
 }
 
@@ -130,35 +140,10 @@ impl Expr {
             Expr::Identifier(identifier) => {
                 upper_context.get_variable_type(identifier.clone()).expect("cannot find type")
             }
-            Expr::Add(lhs, rhs) => {
+            Expr::BinOperation(opcode, lhs, rhs) => {
                 let lhs_type = lhs.get_type(upper_context.clone());
                 let rhs_type = rhs.get_type(upper_context.clone());
-                let option = lhs_type.get_operand_type(Opcode::Add, rhs_type);
-
-                //todo unwrap -> Option
-                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
-            }
-            Expr::Sub(lhs, rhs) => {
-                let lhs_type = lhs.get_type(upper_context.clone());
-                let rhs_type = rhs.get_type(upper_context.clone());
-                let option = lhs_type.get_operand_type(Opcode::Sub, rhs_type);
-
-                //todo unwrap -> Option
-                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
-            }
-            Expr::Mul(lhs, rhs) => {
-                let lhs_type = lhs.get_type(upper_context.clone());
-                let rhs_type = rhs.get_type(upper_context.clone());
-                let option = lhs_type.get_operand_type(Opcode::Mul, rhs_type);
-
-                //todo unwrap -> Option
-                upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
-            }
-            Expr::Div(lhs, rhs) => {
-                let lhs_type = lhs.get_type(upper_context.clone());
-                let rhs_type = rhs.get_type(upper_context.clone());
-                let option = lhs_type.get_operand_type(Opcode::Div, rhs_type);
-
+                let option = lhs_type.get_operand_type(opcode.clone(), rhs_type);
                 //todo unwrap -> Option
                 upper_context.get_type_from_id(option.expect("cannot get operanded type")).expect("cannot find type")
             }
@@ -175,15 +160,6 @@ impl Expr {
             Expr::StructAssign(ident, _fields) => {
                 upper_context.get_type_from_name(ident.clone()).expect(format!("cannot get type {}", ident).as_str())
             }
-
-
-            Expr::Or(_, _) => {todo!()}
-            Expr::Xor(_, _) => {todo!()}
-            Expr::And(_, _) => {todo!()}
-            Expr::LShift(_, _) => {todo!()}
-            Expr::RShift(_, _) => {todo!()}
-            Expr::Mod(_, _) => {todo!()}
-            Expr::Pow(_, _) => {todo!()}
 
             Expr::IdentifierWithAccess(ident, item) => {
                 let arc = ident.get_type(upper_context.clone());
@@ -207,121 +183,13 @@ impl Expr {
                 x
                 // LLVMBuildLoad(upper_context.builder, x, c_str!("loadi"))
             }
-            Expr::Or(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildOr(upper_context.builder, lhs_value, rhs_value, c_str!("ortmp"))
-            }
-            Expr::Xor(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildXor(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("xortmp"),
-                )
-            }
-            Expr::And(lhs, rhs) => {
-                let lhs_type = lhs.get_type(upper_context.clone());
-                let rhs_type = rhs.get_type(upper_context.clone());
-                if !lhs_type.can_be_operand(Opcode::Add, rhs_type.clone()) {
-                    panic!(format!("type {} cannot apply to typ {} with operand +", lhs_type.name, rhs_type.name));
-                }
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildAnd(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("andtmp"),
-                )
-            }
-            Expr::LShift(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildShl(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("lshifttmp"),
-                )
-            }
-            Expr::RShift(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildAShr(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("rshifttmp"),
-                )
-            }
-            Expr::Mod(lhs, rhs) => {
-                let lhs_value_1 = lhs.codegen(upper_context.clone());
 
+            Expr::BinOperation(opcode, lhs, rhs) => {
                 let lhs_value = lhs.codegen(upper_context.clone());
                 let rhs_value = rhs.codegen(upper_context.clone());
+                opcode.calculate_codegen(lhs_value, rhs_value,upper_context.clone())
+            }
 
-                let div = LLVMBuildSDiv(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("modinnerdivtmp"),
-                );
-                let mul = LLVMBuildMul(
-                    upper_context.builder,
-                    div,
-                    rhs_value,
-                    c_str!("modinnermultmp"),
-                );
-                LLVMBuildSub(upper_context.builder, lhs_value_1, mul, c_str!("modtmp"))
-            }
-            Expr::Mul(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildMul(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("multmp"),
-                )
-            }
-            Expr::Div(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildSDiv(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("udivtmp"),
-                )
-            }
-            Expr::Add(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildAdd(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("addtmp"),
-                )
-            }
-            Expr::Sub(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let rhs_value = rhs.codegen(upper_context.clone());
-                LLVMBuildSub(
-                    upper_context.builder,
-                    lhs_value,
-                    rhs_value,
-                    c_str!("subtmp"),
-                )
-            }
-            Expr::Pow(lhs, rhs) => {
-                let lhs_value = lhs.codegen(upper_context.clone());
-                let _rhs_value = rhs.codegen(upper_context.clone());
-                lhs_value
-            }
             Expr::If {
                 condition,
                 then_body,
@@ -398,15 +266,17 @@ impl Expr {
             Expr::IdentifierWithAccess(ident, item) => {
                 let ident_type = ident.get_type(upper_context.clone());
                 let field_idx = ident_type.get_type_field_idx(item).expect("struct has not item");
-                let option = ident_type.get_field_type(upper_context.clone(), item).expect("");
+                let field_type = ident_type.get_field_type(upper_context.clone(), item).expect("");
+
                 let slice_idx = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), 0, 0);
                 let field_dix_t = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), field_idx as u64, 0);
                 let mut vec1 = vec![slice_idx, field_dix_t];
                 let expr_t = ident.codegen(upper_context.clone());
                 let gep = LLVMBuildGEP(upper_context.builder, expr_t, vec1.as_mut_ptr(), vec1.len() as u32, c_str!("struct_gep_ptr"));
 
-                let x2 = option.generate_type(upper_context.clone());
-                LLVMBuildLoad2(upper_context.builder, x2,gep, c_str!("loadi"))
+                let x2 = field_type.generate_type(upper_context.clone());
+                gep
+                // LLVMBuildLoad(upper_context.builder,gep, c_str!("loadi"))
             }
         }
     }
