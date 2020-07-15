@@ -68,6 +68,7 @@ pub TermExpr : Box<Expr> = {
 pub Factor: Box<Expr> = {
     <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}" => Box::new(Expr::StructAssign(type_identifier, v)),
     <Identifier> => Box::new(Expr::Identifier(<>)),
+    <f: Factor> r"\." <item: Identifier> => Box::new(Expr::IdentifierWithAccess(f, item)),
     <Num> => Box::new(Expr::Number(<>)),
     "(" <Expr> ")",
 

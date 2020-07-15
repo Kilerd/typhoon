@@ -13,6 +13,9 @@ struct Opt {
     #[structopt(short, long)]
     debug: bool,
 
+    #[structopt(short, long)]
+    ast: bool,
+
     /// File name: only required when `out` is set to `file`
     #[structopt(name = "FILE")]
     file_name: String,
@@ -24,12 +27,15 @@ fn main() -> Result<(), TyphoonError> {
 
     let mut program = Program::new(opt.file_name)?;
 
+    if opt.ast {
+        dbg!(&program.token_tree);
+    }
     if opt.debug {
         let llir = program.as_llir();
         println!("\nllir: \n{}", llir);
     }
 
-    match program.as_binary_output() {
+    match program.as_binary_output("out") {
         Ok((ec, stdout, stderr)) => {
 
             println!("\nExitCode: {}", ec);

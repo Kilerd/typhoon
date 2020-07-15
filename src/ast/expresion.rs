@@ -14,8 +14,9 @@ use llvm_sys::{
     LLVMIntPredicate, LLVMValue,
 };
 use std::sync::{Arc};
-use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore};
+use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildGEP, LLVMBuildStore, LLVMBuildLoad2};
 use std::ffi::{CString};
+use llvm_sys::LLVMOpcode::LLVMAlloca;
 
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash)]
@@ -32,6 +33,8 @@ pub enum Expr {
     StructAssign(Identifier, Vec<(Identifier, Box<Expr>)>),
 
     Identifier(Identifier),
+
+    IdentifierWithAccess(Box<Expr>, Identifier),
     Number(Number),
     Or(Box<Expr>, Box<Expr>),
     Xor(Box<Expr>, Box<Expr>),
@@ -70,6 +73,7 @@ impl Number {
             Number::Integer8(n) => {
                 let int_type = LLVMInt8TypeInContext(upper_context.llvm_context);
                 LLVMConstInt(int_type, *n as u64, 1)
+
             }
             Number::Integer16(n) => {
                 let int_type = LLVMInt16TypeInContext(upper_context.llvm_context);
@@ -171,8 +175,19 @@ impl Expr {
             Expr::StructAssign(ident, _fields) => {
                 upper_context.get_type_from_name(ident.clone()).expect(format!("cannot get type {}", ident).as_str())
             }
-            _ => {
-                todo!()
+
+
+            Expr::Or(_, _) => {todo!()}
+            Expr::Xor(_, _) => {todo!()}
+            Expr::And(_, _) => {todo!()}
+            Expr::LShift(_, _) => {todo!()}
+            Expr::RShift(_, _) => {todo!()}
+            Expr::Mod(_, _) => {todo!()}
+            Expr::Pow(_, _) => {todo!()}
+
+            Expr::IdentifierWithAccess(ident, item) => {
+                let arc = ident.get_type(upper_context.clone());
+                arc.get_field_type(upper_context.clone(), item).expect("cannot found type")
             }
         }
     }
@@ -189,7 +204,8 @@ impl Expr {
                     .get(identifier)
                     .expect(&format!("variable '{}' is undefined", identifier));
                 let x = x.0;
-                LLVMBuildLoad(upper_context.builder, x, c_str!("loadi"))
+                x
+                // LLVMBuildLoad(upper_context.builder, x, c_str!("loadi"))
             }
             Expr::Or(lhs, rhs) => {
                 let lhs_value = lhs.codegen(upper_context.clone());
@@ -378,6 +394,19 @@ impl Expr {
                 }
 
                 alloca
+            }
+            Expr::IdentifierWithAccess(ident, item) => {
+                let ident_type = ident.get_type(upper_context.clone());
+                let field_idx = ident_type.get_type_field_idx(item).expect("struct has not item");
+                let option = ident_type.get_field_type(upper_context.clone(), item).expect("");
+                let slice_idx = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), 0, 0);
+                let field_dix_t = LLVMConstInt(LLVMInt32TypeInContext(upper_context.llvm_context), field_idx as u64, 0);
+                let mut vec1 = vec![slice_idx, field_dix_t];
+                let expr_t = ident.codegen(upper_context.clone());
+                let gep = LLVMBuildGEP(upper_context.builder, expr_t, vec1.as_mut_ptr(), vec1.len() as u32, c_str!("struct_gep_ptr"));
+
+                let x2 = option.generate_type(upper_context.clone());
+                LLVMBuildLoad2(upper_context.builder, x2,gep, c_str!("loadi"))
             }
         }
     }

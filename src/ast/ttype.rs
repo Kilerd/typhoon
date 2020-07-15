@@ -53,6 +53,22 @@ impl Type {
         }
     }
 
+    pub fn get_field_type(&self, context: Arc<TyphoonContext>, field: &Identifier) -> Option<Arc<Type>> {
+        self.llvm_type_ref.as_ref()
+            .map(|t_ref| &t_ref.0)
+            .and_then(|struct_detail| {
+                struct_detail
+                    .fields
+                    .iter()
+                    .filter(|(k, v)| k.eq(&field))
+                    .map(|(k,v)| v)
+                    .next()
+            })
+            .and_then(|v| {
+                context.get_type_from_name(v.clone())
+            })
+    }
+
     pub fn get_type_field_idx(&self, ident: &Identifier) -> Option<u32> {
         self.llvm_type_ref.as_ref()
             .map(|t_ref| &t_ref.0)

@@ -30,12 +30,14 @@ impl Statement {
                 }
 
                 let assigned_llvm_type = assigned_type.generate_type(upper_context.clone());
-                let alloca = LLVMBuildAlloca(upper_context.builder, assigned_llvm_type, c_str!("assign_type"));
-                let store = LLVMBuildStore(upper_context.builder, expr_value, alloca);
-                let x = alloca.clone();
 
-                upper_context.new_assign(identifier.clone(), x, expr_type.type_id);
-                store
+
+                // let alloca = LLVMBuildAlloca(upper_context.builder, assigned_llvm_type, c_str!("assign_type"));
+                // let store = LLVMBuildStore(upper_context.builder, expr_value, alloca);
+                // let x = alloca.clone();
+
+                upper_context.new_assign(identifier.clone(), expr_value, expr_type.type_id);
+                expr_value
             }
             Statement::Return(expr) => {
                 let x1 = expr.codegen(upper_context.clone());

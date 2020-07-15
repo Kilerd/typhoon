@@ -9,9 +9,10 @@ use std::ffi::{CStr, CString};
 use std::ptr;
 use std::path::Path;
 use std::process::ExitStatus;
+use std::alloc::dealloc;
 
 pub struct Program {
-    token_tree: Box<Module>
+    pub token_tree: Box<Module>
 }
 
 
@@ -50,12 +51,15 @@ impl Program {
         }
     }
 
-    pub fn as_binary_output(&mut self) -> Result<(ExitStatus, String, String), TyphoonError> {
+    pub fn as_binary_output(&mut self, output_name: &str) -> Result<(ExitStatus, String, String), TyphoonError> {
+
+
         unsafe {
             let context = core::LLVMContextCreate();
             let builder = core::LLVMCreateBuilderInContext(context);
             let module = self.token_tree.codegen(context, builder);
 
+            debug!("init target message");
             let triple = LLVMGetDefaultTargetTriple();
             LLVM_InitializeAllTargetInfos();
             LLVM_InitializeAllTargets();
@@ -70,6 +74,7 @@ impl Program {
 
             let name = LLVMGetTargetName(target);
             let _x = CStr::from_ptr(name as *mut i8);
+            debug!("creating target machine");
             let target_machine = LLVMCreateTargetMachine(
                 target,
                 triple,
@@ -82,16 +87,19 @@ impl Program {
             let file_type = LLVMCodeGenFileType::LLVMObjectFile;
 
 
+            let o_file_ = format!("{}.o", output_name);
+            let o_file = CString::new(o_file_).unwrap();
             let mut error_str = ptr::null_mut();
-            let output_file_name = CString::new("out.o").unwrap();
+
+            debug!("output object file {:?}", &o_file);
             let ret = LLVMTargetMachineEmitToFile(
                 target_machine,
                 module,
-                output_file_name.as_ptr() as *mut i8,
+                o_file.as_ptr() as *mut i8,
                 file_type,
                 &mut error_str,
             );
-
+            debug!("clean up llvm module");
             core::LLVMDisposeBuilder(builder);
             core::LLVMDisposeModule(module);
             core::LLVMContextDispose(context);
@@ -101,15 +109,19 @@ impl Program {
 
                 return Err(TyphoonError::CompileError(x.to_str().unwrap().to_string()));
             }
+
+            debug!("link object file as binary {}", &output_name);
             let output = std::process::Command::new("cc")
-                .arg("out.o")
+                .arg(format!("{}.o", output_name))
                 .arg("-o")
-                .arg("out")
+                .arg(output_name)
                 .output()
                 .expect("error on executing linker cc");
 
             if output.status.success() {
-                let output = std::process::Command::new("./out")
+
+                debug!("running binary file {}", &output_name);
+                let output = std::process::Command::new(format!("./{}", output_name))
                     .output()
                     .expect("error on executing output file");
 
