@@ -13,6 +13,7 @@ llvm-sys = "100.0.1"
 structopt = "0.3.14"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 log = "0.4.8"
+thiserror = "1.0.20"
 
 [build-dependencies]
 lalrpop = {version="0.18.1", features=["lexer"]}
