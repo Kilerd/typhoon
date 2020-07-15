@@ -17,7 +17,7 @@ impl Statement {
             Statement::Assign(identifier, _id_type, expr) => {
 
                 // let {identifier} : {_id_type} = {expr}
-                let arc = expr.get_type(upper_context.clone());
+                let expr_type = expr.get_type(upper_context.clone());
 
                 let expr_value = expr.codegen(upper_context.clone());
 
@@ -27,7 +27,7 @@ impl Statement {
                 let store = LLVMBuildStore(upper_context.builder, expr_value, alloca);
                 let x = alloca.clone();
 
-                upper_context.new_assign(identifier.clone(), x, arc.type_id);
+                upper_context.new_assign(identifier.clone(), x, expr_type.type_id);
                 store
             }
             Statement::Return(expr) => {

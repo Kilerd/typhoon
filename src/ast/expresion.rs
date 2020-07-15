@@ -358,7 +358,7 @@ impl Expr {
                 debug!("struct {} assign codegen: {:?}", &ident, &fields);
                 let arc = upper_context.get_type_from_name(ident.clone()).expect("cannot find type");
                 let x1 = arc.generate_type(upper_context.clone());
-                let name = CString::new(ident.as_str()).unwrap();
+                let name = CString::new(format!("{}_assign", ident).as_str()).unwrap();
 
                 let alloca = LLVMBuildAlloca(upper_context.builder.clone(), x1, name.as_ptr());
 

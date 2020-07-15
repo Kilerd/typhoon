@@ -3,8 +3,11 @@ struct A {
     b:i8,
 }
 
+struct B { d: A}
+
 fn main() -> i32 {
     let a:i32 = 1i32;
-    let b: A = A{b:1i8, c: 100i32};
+    let aa: A= A{c: 1i32, b: 8i8};
+    let b: B = B{ d: aa};
     return a;
 }
