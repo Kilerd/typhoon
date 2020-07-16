@@ -22,7 +22,7 @@ impl Statement {
                 // let {identifier} : {_id_type} = {expr}
                 let expr_type = init.get_type(upper_context.clone());
 
-                let expr_value = init.codegen(upper_context.clone());
+                let expr_value = init.codegen(upper_context.clone()).unwrap();
 
                 let assigned_type = upper_context.get_type_from_name(_id_type.clone()).expect("cannot get type");
 
@@ -43,7 +43,7 @@ impl Statement {
                 a
             }
             Statement::Return(expr) => {
-                let x1 = expr.codegen(upper_context.clone());
+                let x1 = expr.codegen(upper_context.clone()).get_value(upper_context.builder);
                 Build::ret(x1, upper_context.builder)
             }
         }

@@ -35,15 +35,16 @@ fn main() -> Result<(), TyphoonError> {
         println!("\nllir: \n{}", llir);
     }
 
-    match program.as_binary_output("out") {
-        Ok((ec, stdout, stderr)) => {
-
-            println!("\nExitCode: {}", ec);
-            println!("\nSTDOUT:\n {}", stdout);
-            println!("\nSTDERR:\n {}", stderr);
-
-            Ok(())
-        }
-        Err(e) => Err(e)
-    }
+    // match program.as_binary_output("out") {
+    //     Ok((ec, stdout, stderr)) => {
+    //
+    //         println!("\nExitCode: {}", ec);
+    //         println!("\nSTDOUT:\n {}", stdout);
+    //         println!("\nSTDERR:\n {}", stderr);
+    //
+    //         Ok(())
+    //     }
+    //     Err(e) => Err(e)
+    // }
+    Ok(())
 }
