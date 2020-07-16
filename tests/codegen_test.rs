@@ -1,26 +1,27 @@
 use typhoon::program::Program;
+use std::process::Command;
 
 
 fn run_test_with_expected(name: &str, program_text: &str, exit_code: i32, stdout: &str, stderr: &str)
 {
     env_logger::try_init();
-    let test_name = format!("output/{}", name);
     let mut program = Program::new_with_string(program_text.to_string()).unwrap();
-    println!("llir: \n{}", program.as_llir());
-    let result = program.as_binary_output(test_name.as_str()).unwrap();
-    assert_eq!(exit_code, result.0.code().unwrap());
-    assert_eq!(stdout, result.1);
-    assert_eq!(stderr, result.2);
 
-    delete_output_file(test_name.as_str());
-}
+    let llir = program.as_llir();
+    let llir_file = format!("output/{}.ll", name);
+    std::fs::write(&llir_file, llir).unwrap();
 
-fn delete_output_file(name: &str) {
-    let string = format!("{}.o", name);
-    let path1 = std::path::Path::new(string.as_str());
-    std::fs::remove_file(path1);
-    let path1 = std::path::Path::new(name);
-    std::fs::remove_file(path1);
+    let output = Command::new("lli")
+        .arg(&llir_file)
+        .output()
+        .expect("failed to execute llir");
+    let runtime_exit_code = output.status.code().unwrap();
+    let runtime_stdout = String::from_utf8(output.stdout).unwrap();
+    let runtime_stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert_eq!(exit_code, runtime_exit_code);
+    assert_eq!(stdout, runtime_stdout);
+    assert_eq!(stderr, runtime_stderr);
 }
 
 #[test]
