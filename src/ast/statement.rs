@@ -22,7 +22,7 @@ impl Statement {
                 // let {identifier} : {_id_type} = {expr}
                 let expr_type = init.get_type(upper_context.clone());
 
-                let expr_value = init.codegen(upper_context.clone()).unwrap();
+                let expr_value = init.codegen(upper_context.clone());
 
                 let assigned_type = upper_context.get_type_from_name(_id_type.clone()).expect("cannot get type");
 
@@ -34,9 +34,10 @@ impl Statement {
                 let assigned_llvm_type = assigned_type.generate_type(upper_context.clone());
 
                 let a = if assigned_type.is_primitive() {
-                    Build::declare(identifier, assigned_llvm_type, expr_value, upper_context.builder)
+
+                    Build::declare(identifier, assigned_llvm_type, expr_value.get_value(upper_context.builder), upper_context.builder)
                 } else {
-                    expr_value
+                    expr_value.unwrap()
                 };
 
                 upper_context.new_assign(identifier.clone(), a, expr_type.type_id);
