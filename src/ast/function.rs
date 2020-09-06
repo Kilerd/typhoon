@@ -1,17 +1,9 @@
-use crate::ast::{statement::Statement, Identifier, TyphoonContext};
-use llvm_sys::{
-    core,
-    prelude::{LLVMValueRef},
+use crate::{
+    ast::{statement::Statement, Identifier, TyphoonContext},
+    llvm_wrapper::{build::Build, typ::Typ},
 };
-use std::{
-    collections::HashMap,
-    ffi::CString,
-    ptr,
-    sync::{Arc},
-};
-use crate::llvm_wrapper::typ::Typ;
-use crate::llvm_wrapper::build::Build;
-
+use llvm_sys::{prelude::LLVMValueRef};
+use std::{collections::HashMap,sync::Arc};
 
 // stmt
 #[derive(Debug)]
@@ -39,10 +31,13 @@ impl Function {
     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) {
         debug!("function codegen: {}", &self.name);
 
-        let return_type = upper_context.get_type_from_name(self.return_type.clone()).expect("cannot get type");
+        let return_type = upper_context
+            .get_type_from_name(self.return_type.clone())
+            .expect("cannot get type");
         let llvm_return_type = return_type.generate_type(upper_context.clone());
         let function_type = Typ::func(&mut vec![], llvm_return_type);
-        let function = Build::add_func_to_module(upper_context.module, self.name.as_str(), function_type);
+        let function =
+            Build::add_func_to_module(upper_context.module, self.name.as_str(), function_type);
         let block = Build::append_block(upper_context.llvm_context, function, "entry");
         Build::position_at_end(upper_context.builder, block);
 
@@ -55,14 +50,16 @@ impl Function {
                 Statement::Return(expr) => {
                     let x1 = expr.get_type(context.clone());
                     if !x1.equals(return_type.clone()) {
-                        panic!(format!("return stats type {} is not adjusted to function return type {}", x1.name, return_type.name));
+                        panic!(format!(
+                            "return stats type {} is not adjusted to function return type {}",
+                            x1.name, return_type.name
+                        ));
                     }
                     x.codegen(context.clone());
                 }
                 Statement::Assign(..) => {
                     let _x1 = x.codegen(context.clone());
                 }
-
             }
         }
     }

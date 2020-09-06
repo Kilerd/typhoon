@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
 use llvm_sys::{
-    core::{LLVMBuildAlloca, LLVMBuildRet, LLVMBuildStore}, LLVMValue,
+    LLVMValue,
 };
 
-use crate::ast::{Expr, Identifier, TypeName, TyphoonContext};
-use crate::llvm_wrapper::build::Build;
+use crate::{
+    ast::{Expr, Identifier, TypeName, TyphoonContext},
+    llvm_wrapper::build::Build,
+};
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug)]
@@ -17,8 +19,9 @@ pub enum Statement {
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Assign(ident, type_name, expr) =>
-                write!(f, "let {}: {} = {}", ident, type_name, expr),
+            Statement::Assign(ident, type_name, expr) => {
+                write!(f, "let {}: {} = {}", ident, type_name, expr)
+            }
             Statement::Return(expr) => write!(f, "return {}", expr),
         }
     }
@@ -29,24 +32,31 @@ impl Statement {
         debug!("statement codegen: {}", &self);
         match self {
             Statement::Assign(identifier, _id_type, init) => {
-
                 // let {identifier} : {_id_type} = {expr}
                 let expr_type = init.get_type(upper_context.clone());
 
                 let expr_value = init.codegen(upper_context.clone());
 
-                let assigned_type = upper_context.get_type_from_name(_id_type.clone()).expect("cannot get type");
-
+                let assigned_type = upper_context
+                    .get_type_from_name(_id_type.clone())
+                    .expect("cannot get type");
 
                 if !assigned_type.equals(expr_type.clone()) {
-                    panic!(" expr type {} is not equals to assigned type {}", &expr_type.name, &assigned_type.name)
+                    panic!(
+                        " expr type {} is not equals to assigned type {}",
+                        &expr_type.name, &assigned_type.name
+                    )
                 }
 
                 let assigned_llvm_type = assigned_type.generate_type(upper_context.clone());
 
                 let a = if assigned_type.is_primitive() {
-
-                    Build::declare(identifier, assigned_llvm_type, expr_value.get_value(upper_context.builder), upper_context.builder)
+                    Build::declare(
+                        identifier,
+                        assigned_llvm_type,
+                        expr_value.get_value(upper_context.builder),
+                        upper_context.builder,
+                    )
                 } else {
                     expr_value.unwrap()
                 };
@@ -55,7 +65,9 @@ impl Statement {
                 a
             }
             Statement::Return(expr) => {
-                let x1 = expr.codegen(upper_context.clone()).get_value(upper_context.builder);
+                let x1 = expr
+                    .codegen(upper_context.clone())
+                    .get_value(upper_context.builder);
                 Build::ret(x1, upper_context.builder)
             }
         }

@@ -1,10 +1,11 @@
-use crate::ast::{TyphoonContext, ModuleItem};
+use crate::{
+    ast::{ModuleItem, TyphoonContext},
+    llvm_wrapper::build::Build,
+};
 use llvm_sys::{
-    core::LLVMModuleCreateWithName,
     prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef},
 };
-use std::sync::{Arc};
-use crate::llvm_wrapper::build::Build;
+use std::sync::Arc;
 
 // stmt
 #[derive(Debug)]
@@ -19,11 +20,7 @@ impl Module {
 }
 
 impl Module {
-    pub fn codegen(
-        &mut self,
-        context: LLVMContextRef,
-        builder: LLVMBuilderRef,
-    ) -> LLVMModuleRef {
+    pub fn codegen(&mut self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMModuleRef {
         println!("module codegen");
         let module = Build::module("typhoon");
         let typhoon_context = Arc::new(TyphoonContext::new(context, builder, module));

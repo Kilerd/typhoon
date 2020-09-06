@@ -1,9 +1,7 @@
 use structopt::StructOpt;
-use typhoon::program::Program;
-use typhoon::error::TyphoonError;
+use typhoon::{error::TyphoonError, program::Program};
 
 extern crate typhoon;
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "typhoon")]

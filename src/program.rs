@@ -1,20 +1,28 @@
-use crate::ast::Module;
-use crate::parser;
-use crate::error::TyphoonError;
-use llvm_sys::core::LLVMPrintModuleToString;
-use llvm_sys::core;
-use llvm_sys::target_machine::{LLVMGetDefaultTargetTriple, LLVMTargetRef, LLVMGetTargetFromTriple, LLVMCodeGenOptLevel, LLVMRelocMode, LLVMCodeModel, LLVMGetTargetName, LLVMCreateTargetMachine, LLVMCodeGenFileType, LLVMTargetMachineEmitToFile};
-use llvm_sys::target::{LLVM_InitializeAllTargetInfos, LLVM_InitializeAllTargets, LLVM_InitializeAllTargetMCs, LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters};
-use std::ffi::{CStr, CString};
-use std::ptr;
-use std::path::Path;
-use std::process::ExitStatus;
-use std::alloc::dealloc;
+use crate::{ast::Module, error::TyphoonError, parser};
+use llvm_sys::{
+    core,
+    core::LLVMPrintModuleToString,
+    target::{
+        LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
+        LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
+    },
+    target_machine::{
+        LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
+        LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode,
+        LLVMTargetMachineEmitToFile, LLVMTargetRef,
+    },
+};
+use std::{
+    ffi::{CStr, CString},
+    path::Path,
+    process::ExitStatus,
+    ptr,
+};
+use std::mem::MaybeUninit;
 
 pub struct Program {
-    pub token_tree: Box<Module>
+    pub token_tree: Box<Module>,
 }
-
 
 impl Program {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, TyphoonError> {
@@ -23,15 +31,13 @@ impl Program {
             .map_err(|e| TyphoonError::FileError(path.to_str().unwrap().to_string(), e))?;
         Program::new_with_string(file_content)
     }
+
     pub fn new_with_string(source: String) -> Result<Self, TyphoonError> {
         let token_tree: Box<Module> = parser::ModuleParser::new()
-            .parse(&source).map_err(|e| TyphoonError::ParserError(e.to_string()))?;
+            .parse(&source)
+            .map_err(|e| TyphoonError::ParserError(e.to_string()))?;
 
-        Ok(
-            Self {
-                token_tree
-            }
-        )
+        Ok(Self { token_tree })
     }
 
     pub fn as_llir(&mut self) -> String {
@@ -51,9 +57,10 @@ impl Program {
         }
     }
 
-    pub fn as_binary_output(&mut self, output_name: &str) -> Result<(ExitStatus, String, String), TyphoonError> {
-
-
+    pub fn as_binary_output(
+        &mut self,
+        output_name: &str,
+    ) -> Result<(ExitStatus, String, String), TyphoonError> {
         unsafe {
             let context = core::LLVMContextCreate();
             let builder = core::LLVMCreateBuilderInContext(context);
@@ -66,8 +73,9 @@ impl Program {
             LLVM_InitializeAllTargetMCs();
             LLVM_InitializeAllAsmParsers();
             LLVM_InitializeAllAsmPrinters();
-            let mut target: LLVMTargetRef = std::mem::uninitialized();
-            LLVMGetTargetFromTriple(triple, &mut target, ptr::null_mut());
+            let mut target: MaybeUninit<LLVMTargetRef> = std::mem::MaybeUninit::uninit();
+            LLVMGetTargetFromTriple(triple, target.as_mut_ptr(), ptr::null_mut());
+            let target = target.assume_init();
             let opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
             let reloc_mode = LLVMRelocMode::LLVMRelocDefault;
             let code_model = LLVMCodeModel::LLVMCodeModelDefault;
@@ -85,7 +93,6 @@ impl Program {
                 code_model,
             );
             let file_type = LLVMCodeGenFileType::LLVMObjectFile;
-
 
             let o_file_ = format!("{}.o", output_name);
             let o_file = CString::new(o_file_).unwrap();
@@ -119,7 +126,6 @@ impl Program {
                 .expect("error on executing linker cc");
 
             if output.status.success() {
-
                 debug!("running binary file {}", &output_name);
                 let output = std::process::Command::new(format!("./{}", output_name))
                     .output()

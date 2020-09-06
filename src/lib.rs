@@ -3,7 +3,6 @@ extern crate log;
 
 use lalrpop_util::lalrpop_mod;
 
-
 #[macro_export]
 macro_rules! c_str {
     ($s:expr) => {
@@ -16,5 +15,5 @@ lalrpop_mod!(pub parser);
 pub mod llvm_wrapper;
 
 pub mod ast;
-pub mod program;
 pub mod error;
+pub mod program;

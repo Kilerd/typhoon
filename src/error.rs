@@ -1,5 +1,5 @@
-use thiserror::Error;
 use std::process::ExitStatus;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TyphoonError {
@@ -10,6 +10,5 @@ pub enum TyphoonError {
     #[error("Error on opening file {}", .0)]
     CompileError(String),
     #[error("Error on linking output file as binary ({}) \nSTDOUT: {}\nSTDERR: {}", .0, .1, .2)]
-    LinkError(ExitStatus, String ,String)
+    LinkError(ExitStatus, String, String),
 }
-

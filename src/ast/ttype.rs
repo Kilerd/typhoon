@@ -1,11 +1,13 @@
-use crate::ast::{Opcode, StructDetail};
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMValueRef, LLVMTypeRef};
+use crate::{
+    ast::{Opcode, StructDetail},
+    llvm_wrapper::typ::Typ,
+};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 use std::{
-    collections::{HashMap},
+    collections::HashMap,
     sync::{Arc, RwLock},
 };
 use uuid::Uuid;
-use crate::llvm_wrapper::typ::Typ;
 
 pub type Identifier = String;
 
@@ -58,24 +60,28 @@ impl Type {
         self.llvm_type_ref.is_none()
     }
 
-    pub fn get_field_type(&self, context: Arc<TyphoonContext>, field: &Identifier) -> Option<Arc<Type>> {
-        self.llvm_type_ref.as_ref()
+    pub fn get_field_type(
+        &self,
+        context: Arc<TyphoonContext>,
+        field: &Identifier,
+    ) -> Option<Arc<Type>> {
+        self.llvm_type_ref
+            .as_ref()
             .map(|t_ref| &t_ref.0)
             .and_then(|struct_detail| {
                 struct_detail
                     .fields
                     .iter()
-                    .filter(|(k, v)| k.eq(&field))
-                    .map(|(k,v)| v)
+                    .filter(|(k, _v)| k.eq(&field))
+                    .map(|(_k, v)| v)
                     .next()
             })
-            .and_then(|v| {
-                context.get_type_from_name(v.clone())
-            })
+            .and_then(|v| context.get_type_from_name(v.clone()))
     }
 
     pub fn get_type_field_idx(&self, ident: &Identifier) -> Option<u32> {
-        self.llvm_type_ref.as_ref()
+        self.llvm_type_ref
+            .as_ref()
             .map(|t_ref| &t_ref.0)
             .and_then(|struct_detail| {
                 struct_detail
@@ -121,19 +127,34 @@ impl TyphoonContext {
         builder: LLVMBuilderRef,
         module: LLVMModuleRef,
     ) -> TyphoonContext {
-
         // todo
         let mut i8_type = Type::new("i8".to_string());
         let mut i32_type = Type::new("i32".to_string());
 
-        i8_type.operands.insert((Opcode::Add, i8_type.type_id), i8_type.type_id);
-        i8_type.operands.insert((Opcode::Mul, i8_type.type_id), i8_type.type_id);
-        i8_type.operands.insert((Opcode::Div, i8_type.type_id), i8_type.type_id);
-        i8_type.operands.insert((Opcode::Sub, i8_type.type_id), i8_type.type_id);
-        i32_type.operands.insert((Opcode::Add, i32_type.type_id), i32_type.type_id);
-        i32_type.operands.insert((Opcode::Mul, i32_type.type_id), i32_type.type_id);
-        i32_type.operands.insert((Opcode::Div, i32_type.type_id), i32_type.type_id);
-        i32_type.operands.insert((Opcode::Sub, i32_type.type_id), i32_type.type_id);
+        i8_type
+            .operands
+            .insert((Opcode::Add, i8_type.type_id), i8_type.type_id);
+        i8_type
+            .operands
+            .insert((Opcode::Mul, i8_type.type_id), i8_type.type_id);
+        i8_type
+            .operands
+            .insert((Opcode::Div, i8_type.type_id), i8_type.type_id);
+        i8_type
+            .operands
+            .insert((Opcode::Sub, i8_type.type_id), i8_type.type_id);
+        i32_type
+            .operands
+            .insert((Opcode::Add, i32_type.type_id), i32_type.type_id);
+        i32_type
+            .operands
+            .insert((Opcode::Mul, i32_type.type_id), i32_type.type_id);
+        i32_type
+            .operands
+            .insert((Opcode::Div, i32_type.type_id), i32_type.type_id);
+        i32_type
+            .operands
+            .insert((Opcode::Sub, i32_type.type_id), i32_type.type_id);
 
         let arc = Arc::new(i8_type);
         let arc1 = Arc::new(i32_type);
@@ -155,7 +176,6 @@ impl TyphoonContext {
             types: RwLock::new(type_map),
             types_id: RwLock::new(type_id_map),
             function: None,
-
         }
     }
 
@@ -199,35 +219,31 @@ impl TyphoonContext {
             .get(&name)
             .map(|d| d.1)
             .and_then(|t| self.get_type_from_id(t))
-            .or_else(|| {
-                self.upper.as_ref().and_then(|f| {
-                    f.get_variable_type(name)
-                })
-            })
+            .or_else(|| self.upper.as_ref().and_then(|f| f.get_variable_type(name)))
     }
 
     #[inline]
     pub fn get_type_from_name(&self, name: Identifier) -> Option<Arc<Type>> {
         debug!("get type from name {}", &name);
-        self.types.read().expect("cannot get lock")
+        self.types
+            .read()
+            .expect("cannot get lock")
             .get(&name)
             .map(|d| d.clone())
-            .or_else(|| {
-                self.upper.as_ref().and_then(|f| {
-                    f.get_type_from_name(name)
-                })
-            })
+            .or_else(|| self.upper.as_ref().and_then(|f| f.get_type_from_name(name)))
     }
 
     pub fn get_type_from_id(&self, type_id: TypeId) -> Option<Arc<Type>> {
         debug!("get type from id {}", &type_id);
-        self.types_id.read().expect("cannot get lock")
+        self.types_id
+            .read()
+            .expect("cannot get lock")
             .get(&type_id)
             .map(|d| d.clone())
             .or_else(|| {
-                self.upper.as_ref().and_then(|f| {
-                    f.get_type_from_id(type_id)
-                })
+                self.upper
+                    .as_ref()
+                    .and_then(|f| f.get_type_from_id(type_id))
             })
     }
 }
