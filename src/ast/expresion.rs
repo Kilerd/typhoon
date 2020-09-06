@@ -22,6 +22,7 @@ use crate::llvm_wrapper::build::Build;
 use env_logger::builder;
 use crate::llvm_wrapper::typ::Typ;
 use llvm_sys::prelude::LLVMBuilderRef;
+use std::fmt::{Display, Formatter};
 
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
@@ -40,6 +41,24 @@ pub enum Opcode {
 
     LShift,
     RShift,
+}
+
+impl Display for Opcode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Opcode::Add => write!(f, "+"),
+            Opcode::Sub => {write!(f, "-")}
+            Opcode::Mul => {write!(f, "*")}
+            Opcode::Div => {write!(f, "/")}
+            Opcode::Mod => {write!(f, "%")}
+            Opcode::Pow => {write!(f, "**")}
+            Opcode::Or => {write!(f, "|")}
+            Opcode::And => {write!(f, "&")}
+            Opcode::Xor => {write!(f, "^")}
+            Opcode::LShift => {write!(f, "<<")}
+            Opcode::RShift => {write!(f, ">>")}
+        }
+    }
 }
 
 impl Opcode {
@@ -100,6 +119,29 @@ pub enum Expr {
     },
 }
 
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::StructAssign(ident, fields) => {
+                write!(f, "struct {} {{}}", ident)
+            }
+            Expr::Identifier(ident) => {write!(f, "{}", ident)}
+            Expr::IdentifierWithAccess(ident, field) => {
+                write!(f, "{}.{}", ident, field)
+            }
+            Expr::Number(num) => {write!(f, "{}", num)}
+            Expr::BinOperation(opcode, lhs, rhs) => {
+                write!(f, "{} {} {}", lhs, opcode, rhs)
+            }
+            Expr::If { condition, then_body, else_body } => {
+                write!(f, "if {} {{ {} }} else {{ {} }}", condition, then_body, else_body)
+            }
+        }
+    }
+}
+
+
+
 #[derive(Debug)]
 pub enum Number {
     Integer8(i8),
@@ -108,6 +150,19 @@ pub enum Number {
     UnSignInteger8(u8),
     UnSignInteger16(u16),
     UnSignInteger32(u32),
+}
+
+impl Display for Number {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Number::Integer8(n) => write!(f, "{}i8", n),
+            Number::Integer16(n) => {write!(f, "{}i16", n)}
+            Number::Integer32(n) => {write!(f, "{}i32", n)}
+            Number::UnSignInteger8(n) => {write!(f, "{}u8", n)}
+            Number::UnSignInteger16(n) => {write!(f, "{}u16", n)}
+            Number::UnSignInteger32(n) => {write!(f, "{}u32", n)}
+        }
+    }
 }
 
 impl Number {
@@ -194,7 +249,7 @@ impl Expr {
     }
 
     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) -> VariableType {
-        debug!("expr codegen: {:?}", &self);
+        debug!("expr codegen: {}", &self);
 
         trace!("show context data {:#?}", upper_context);
         match self {
@@ -248,7 +303,7 @@ impl Expr {
                 VariableType::Literal(Build::phi(upper_context.builder, Typ::int32(upper_context.llvm_context), incoming))
             }
             Expr::StructAssign(ident, fields) => {
-                debug!("struct {} assign codegen: {:?}", &ident, &fields);
+
                 let struct_ty = upper_context.get_type_from_name(ident.clone()).expect("cannot find type");
                 let struct_llvm_ty = struct_ty.generate_type(upper_context.clone());
 

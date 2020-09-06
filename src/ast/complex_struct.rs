@@ -16,13 +16,12 @@ pub enum ModuleItem {
 
 impl ModuleItem {
     pub  fn codegen(&self, upper_context: Arc<TyphoonContext>) {
+        debug!("module item codegen {:?}", self);
         match self {
             ModuleItem::Function(func) => {
                 func.codegen(upper_context)
             }
             ModuleItem::StructDefine(defined_struct) => {
-                debug!("struct codegen {:?}", defined_struct);
-
                 let mut fields_llvm_types: Vec<LLVMTypeRef> = defined_struct
                     .fields
                     .iter()

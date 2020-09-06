@@ -1,10 +1,11 @@
 use typhoon::program::Program;
 use std::process::Command;
+use log::info;
 
 
 fn run_test_with_expected(name: &str, program_text: &str, exit_code: i32, stdout: &str, stderr: &str)
 {
-    env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init();
     let mut program = Program::new_with_string(program_text.to_string()).unwrap();
 
     let llir = program.as_llir();
