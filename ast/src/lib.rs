@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 mod complex_struct;
 mod expresion;
 mod function;

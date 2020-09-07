@@ -1,0 +1,10 @@
+[package]
+name = "llvm_wrapper"
+version = "0.1.0"
+authors = ["Kilerd Chan <blove694@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+llvm-sys = "100.2.0"

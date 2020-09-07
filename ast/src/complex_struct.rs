@@ -1,10 +1,6 @@
-use crate::{
-    ast::{Function, Identifier, TyphoonContext},
-    llvm_wrapper::{typ::Typ},
-};
-use llvm_sys::{
-    prelude::LLVMTypeRef,
-};
+use crate::{Function, Identifier, TyphoonContext};
+use llvm_sys::prelude::LLVMTypeRef;
+use llvm_wrapper::typ::Typ;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Debug)]

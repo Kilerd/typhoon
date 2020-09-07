@@ -1,4 +1,4 @@
-use crate::llvm_wrapper::literal::Literal;
+use crate::literal::Literal;
 use llvm_sys::{
     core::{
         LLVMAddFunction, LLVMAddIncoming, LLVMAppendBasicBlockInContext, LLVMBuildAlloca,

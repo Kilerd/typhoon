@@ -1,4 +1,4 @@
-use crate::llvm_wrapper::typ::Typ;
+use crate::typ::Typ;
 use llvm_sys::{
     core::LLVMConstInt,
     prelude::{LLVMContextRef, LLVMValueRef},

@@ -1,11 +1,11 @@
 struct A {
-        inner: i32,
-    }
-    struct B {
-        inner: A,
-    }
-    fn main() -> i32 {
-        let a: A = A{inner: 10};
-        let b: A = a;
-        return 1;
-    }
+    inner: i32,
+}
+struct B {
+    inner: A,
+}
+fn main() -> i32 {
+    let a: A = A{inner: 10};
+    let b: A = a;
+    return 1;
+}

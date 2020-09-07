@@ -1,10 +1,6 @@
-use crate::{
-    ast::{ModuleItem, TyphoonContext},
-    llvm_wrapper::build::Build,
-};
-use llvm_sys::{
-    prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef},
-};
+use crate::{ModuleItem, TyphoonContext};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef};
+use llvm_wrapper::build::Build;
 use std::sync::Arc;
 
 // stmt

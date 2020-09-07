@@ -1,13 +1,9 @@
 use std::sync::Arc;
 
-use llvm_sys::{
-    LLVMValue,
-};
+use llvm_sys::LLVMValue;
 
-use crate::{
-    ast::{Expr, Identifier, TypeName, TyphoonContext},
-    llvm_wrapper::build::Build,
-};
+use crate::{Expr, Identifier, TypeName, TyphoonContext};
+use llvm_wrapper::build::Build;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug)]

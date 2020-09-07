@@ -1,8 +1,6 @@
-use crate::{
-    ast::{Opcode, StructDetail},
-    llvm_wrapper::typ::Typ,
-};
+use crate::{Opcode, StructDetail};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
+use llvm_wrapper::typ::Typ;
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},

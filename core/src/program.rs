@@ -1,4 +1,5 @@
-use crate::{ast::Module, error::TyphoonError, parser};
+use crate::error::TyphoonError;
+use ast::Module;
 use llvm_sys::{
     core,
     core::LLVMPrintModuleToString,
@@ -12,13 +13,15 @@ use llvm_sys::{
         LLVMTargetMachineEmitToFile, LLVMTargetRef,
     },
 };
+use llvm_wrapper::c_str;
+use parser::parser::ModuleParser;
+use std::mem::MaybeUninit;
 use std::{
     ffi::{CStr, CString},
     path::Path,
     process::ExitStatus,
     ptr,
 };
-use std::mem::MaybeUninit;
 
 pub struct Program {
     pub token_tree: Box<Module>,
@@ -33,7 +36,7 @@ impl Program {
     }
 
     pub fn new_with_string(source: String) -> Result<Self, TyphoonError> {
-        let token_tree: Box<Module> = parser::ModuleParser::new()
+        let token_tree: Box<Module> = ModuleParser::new()
             .parse(&source)
             .map_err(|e| TyphoonError::ParserError(e.to_string()))?;
 
