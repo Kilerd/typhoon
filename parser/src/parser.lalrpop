@@ -67,13 +67,13 @@ pub TermExpr : Box<Expr> = {
 }
 
 pub Factor: Box<Expr> = {
-    <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}" => Box::new(Expr::StructAssign(type_identifier, v)),
-    <Identifier> => Box::new(Expr::Identifier(<>)),
-    <f: Factor> r"\." <item: Identifier> => Box::new(Expr::IdentifierWithAccess(f, item)),
-    <Num> => Box::new(Expr::Number(<>)),
+    <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}"                     => Box::new(Expr::StructAssign(type_identifier, v)),
+    <Identifier>                                                                            => Box::new(Expr::Identifier(<>)),
+    <f: Factor> r"\." <item: Identifier>                                                    => Box::new(Expr::IdentifierWithAccess(f, item)),
+    <Num>                                                                                   => Box::new(Expr::Number(<>)),
     "(" <Expr> ")",
 
-    // "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}" => Box::new(Expr::If{condition, then_body, else_body})
+    "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}"       => Box::new(Expr::If{condition, then_body, else_body})
 }
 pub AssignStructField: (String, Box<Expr>) = {
     <k: Identifier> ":" <v: Expr> => (k ,v)
