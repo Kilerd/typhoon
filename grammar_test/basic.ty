@@ -5,7 +5,8 @@ struct B {
     inner: A,
 }
 fn main() -> i32 {
-    let a : i32 = 1;
+    let a : B = B{inner : A{inner: 1}};
     a = 2;
-    return a;
+    let b: i32 = a.method(1+1).call(c,b,d,e,e,);
+    return a.inner.inner;
 }

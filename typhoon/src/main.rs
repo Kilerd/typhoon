@@ -27,14 +27,18 @@ fn main() -> Result<(), TyphoonError> {
 
     if opt.ast {
         dbg!(&program.token_tree);
+    }else {
+        if opt.debug {
+            let llir = program.as_llir();
+            println!("\nllir: \n{}", llir);
+        }else {
+            let option = Path::new(&opt.file_name).file_name().unwrap().to_str().unwrap();
+            let x = program.as_binary_output(option);
+            dbg!(x);
+        }
     }
-    if opt.debug {
-        let llir = program.as_llir();
-        println!("\nllir: \n{}", llir);
-    }
-    let option = Path::new(&opt.file_name).file_name().unwrap().to_str().unwrap();
-    let x = program.as_binary_output(option);
-    dbg!(x);
+
+
 
 
     // match program.as_binary_output("out") {

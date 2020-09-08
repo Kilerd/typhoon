@@ -28,17 +28,46 @@ pub StructDefineField: (String, String) = {
 }
 
 pub Statement: Box<Statement> = {
-    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> ";" => Box::new(Statement::Declare(i, t, e)),
-    <i:Identifier> "=" <e:Expr> ";" => Box::new(Statement::Assignment(i, e)),
-    "return" <e:Expr> ";" => Box::new(Statement::Return(e)),
+    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expression> ";" => Box::new(Statement::Declare(i, t, e)),
+    <i:Identifier> "=" <e:Expression> ";" => Box::new(Statement::Assignment(i, e)),
+    "return" <e:Expression> ";" => Box::new(Statement::Return(e)),
 }
 
 
 // expr
-pub Expr: Box<Expr> = {
-    <l:Expr> "|" <r:XorExpr> => Box::new(Expr::BinOperation(Opcode::Or, l, r)),
+
+pub PathExpression: Box<Expr> = {
+    <Identifier>         => Box::new(Expr::Identifier(<>)),
+
+}
+
+pub LiteralExpression: Box<Expr> = {
+    <Num>       => Box::new(Expr::Number(<>)),
+}
+
+
+pub StructExpression: Box<Expr> = {
+   <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}"   => Box::new(Expr::StructAssign(type_identifier, v)),
+}
+
+pub FieldAccessExpression: Box<Expr> = {
+    <ident:Factor> r"\." <field: Identifier>     => Box::new(Expr::IdentifierWithAccess(ident, field)),
+}
+
+pub GroupedExpression : Box<Expr> = {
+    "(" <Expression> ")"
+}
+
+
+pub Expression: Box<Expr> = {
+    OrExpr
+}
+
+pub OrExpr: Box<Expr> = {
+    <l:OrExpr> "|" <r:XorExpr> => Box::new(Expr::BinOperation(Opcode::Or, l, r)),
     XorExpr,
 }
+
 pub XorExpr : Box<Expr> = {
     <l:XorExpr> "^" <r:AndExpr> => Box::new(Expr::BinOperation(Opcode::Xor, l, r)),
     AndExpr,
@@ -67,16 +96,27 @@ pub TermExpr : Box<Expr> = {
 }
 
 pub Factor: Box<Expr> = {
-    <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}"                     => Box::new(Expr::StructAssign(type_identifier, v)),
-    <Identifier>                                                                            => Box::new(Expr::Identifier(<>)),
-    <f: Factor> r"\." <item: Identifier>                                                    => Box::new(Expr::IdentifierWithAccess(f, item)),
-    <Num>                                                                                   => Box::new(Expr::Number(<>)),
-    "(" <Expr> ")",
-
-    "if" <condition: Expr> "{" <then_body: Expr> "}" "else" "{" <else_body: Expr> "}"       => Box::new(Expr::If{condition, then_body, else_body})
+    PathExpression,
+    LiteralExpression,
+    StructExpression,
+    FieldAccessExpression,
+    GroupedExpression,
+    CallExpression,
+    IfExpression,
 }
-pub AssignStructField: (String, Box<Expr>) = {
-    <k: Identifier> ":" <v: Expr> => (k ,v)
+
+pub CallExpression: Box<Expr> = {
+    <e: Factor> "(" <f: Comma<Expression>> ")" => Box::new(Expr::Call(e, f)),
+}
+
+pub IfExpression: Box<Expr> = {
+    "if" <condition: Expression> "{" <then_body: Expression> "}" "else" "{" <else_body: Expression> "}" => Box::new(Expr::If(condition,then_body ,else_body))
+}
+
+
+
+pub AssignStructField: (Box<Expr>, Box<Expr>) = {
+    <k: PathExpression> ":" <v: Expression> => (k ,v)
 }
 
 Identifier : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();

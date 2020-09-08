@@ -94,7 +94,7 @@ impl Opcode {
 // mathematical
 #[derive(Debug)]
 pub enum Expr {
-    StructAssign(Identifier, Vec<(Identifier, Box<Expr>)>),
+    StructAssign(Identifier, Vec<(Box<Expr>, Box<Expr>)>),
     Identifier(Identifier),
     IdentifierWithAccess(Box<Expr>, Identifier),
     Number(Number),
@@ -104,26 +104,30 @@ pub enum Expr {
         then_body: Box<Expr>,
         else_body: Box<Expr>,
     },
+
+    Call(Box<Expr>, Vec<Box<Expr>>),
+    Block()
 }
 
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::StructAssign(ident, _fields) => write!(f, "struct {} {{}}", ident),
-            Expr::Identifier(ident) => write!(f, "{}", ident),
-            Expr::IdentifierWithAccess(ident, field) => write!(f, "{}.{}", ident, field),
-            Expr::Number(num) => write!(f, "{}", num),
-            Expr::BinOperation(opcode, lhs, rhs) => write!(f, "{} {} {}", lhs, opcode, rhs),
-            Expr::If {
-                condition,
-                then_body,
-                else_body,
-            } => write!(
-                f,
-                "if {} {{ {} }} else {{ {} }}",
-                condition, then_body, else_body
-            ),
-        }
+        // match self {
+        //     Expr::StructAssign(ident, _fields) => write!(f, "struct {} {{}}", ident),
+        //     Expr::Identifier(ident) => write!(f, "{}", ident),
+        //     Expr::IdentifierWithAccess(ident, field) => write!(f, "{}.{}", ident, field),
+        //     Expr::Number(num) => write!(f, "{}", num),
+        //     Expr::BinOperation(opcode, lhs, rhs) => write!(f, "{} {} {}", lhs, opcode, rhs),
+        //     Expr::If {
+        //         condition,
+        //         then_body,
+        //         else_body,
+        //     } => write!(
+        //         f,
+        //         "if {} {{ {} }} else {{ {} }}",
+        //         condition, then_body, else_body
+        //     ),
+        // }
+        todo!()
     }
 }
 
@@ -201,180 +205,182 @@ impl VariableType {
 
 impl Expr {
     pub fn get_type(&self, upper_context: Arc<TyphoonContext>) -> Arc<Type> {
-        match self {
-            Expr::Number(number) => number.get_type(upper_context.clone()),
-            Expr::Identifier(identifier) => upper_context
-                .get_variable_type(identifier.clone())
-                .expect("cannot find type"),
-            Expr::BinOperation(opcode, lhs, rhs) => {
-                let lhs_type = lhs.get_type(upper_context.clone());
-                let rhs_type = rhs.get_type(upper_context.clone());
-                let option = lhs_type.get_operand_type(opcode.clone(), rhs_type);
-                // todo unwrap -> Option
-                upper_context
-                    .get_type_from_id(option.expect("cannot get operand type"))
-                    .expect("cannot find type")
-            }
-
-            Expr::If {
-                condition: _,
-                then_body,
-                else_body,
-            } => {
-                let then_ret_type = then_body.get_type(upper_context.clone());
-                let else_ret_type = else_body.get_type(upper_context.clone());
-                if !then_ret_type.equals(else_ret_type) {
-                    panic!("the return type of then body is not equal to its of else body");
-                }
-                then_ret_type
-            }
-
-            Expr::StructAssign(ident, _fields) => upper_context
-                .get_type_from_name(ident.clone())
-                .expect(format!("cannot get type {}", ident).as_str()),
-
-            Expr::IdentifierWithAccess(ident, item) => {
-                let arc = ident.get_type(upper_context.clone());
-                arc.get_field_type(upper_context.clone(), item)
-                    .expect("cannot found type")
-            }
-        }
+        todo!()
+        // match self {
+        //     Expr::Number(number) => number.get_type(upper_context.clone()),
+        //     Expr::Identifier(identifier) => upper_context
+        //         .get_variable_type(identifier.clone())
+        //         .expect("cannot find type"),
+        //     Expr::BinOperation(opcode, lhs, rhs) => {
+        //         let lhs_type = lhs.get_type(upper_context.clone());
+        //         let rhs_type = rhs.get_type(upper_context.clone());
+        //         let option = lhs_type.get_operand_type(opcode.clone(), rhs_type);
+        //         // todo unwrap -> Option
+        //         upper_context
+        //             .get_type_from_id(option.expect("cannot get operand type"))
+        //             .expect("cannot find type")
+        //     }
+        //
+        //     Expr::If {
+        //         condition: _,
+        //         then_body,
+        //         else_body,
+        //     } => {
+        //         let then_ret_type = then_body.get_type(upper_context.clone());
+        //         let else_ret_type = else_body.get_type(upper_context.clone());
+        //         if !then_ret_type.equals(else_ret_type) {
+        //             panic!("the return type of then body is not equal to its of else body");
+        //         }
+        //         then_ret_type
+        //     }
+        //
+        //     Expr::StructAssign(ident, _fields) => upper_context
+        //         .get_type_from_name(ident.clone())
+        //         .expect(format!("cannot get type {}", ident).as_str()),
+        //
+        //     Expr::IdentifierWithAccess(ident, item) => {
+        //         let arc = ident.get_type(upper_context.clone());
+        //         arc.get_field_type(upper_context.clone(), item)
+        //             .expect("cannot found type")
+        //     }
+        // }
     }
 
     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) -> VariableType {
-        debug!("expr codegen: {}", &self);
-
-        trace!("show context data {:#?}", upper_context);
-        match self {
-            Expr::Number(n) => VariableType::Literal(n.codegen(upper_context.clone())),
-            Expr::Identifier(identifier) => {
-                let guard = upper_context.variables.read().unwrap();
-                let x = guard
-                    .get(identifier)
-                    .expect(&format!("variable '{}' is undefined", identifier));
-                let x = x.0;
-                VariableType::Ptr(x)
-            }
-
-            Expr::BinOperation(opcode, lhs, rhs) => {
-                let lhs_value = lhs
-                    .codegen(upper_context.clone())
-                    .get_value(upper_context.builder);
-                let rhs_value = rhs
-                    .codegen(upper_context.clone())
-                    .get_value(upper_context.builder);
-
-                VariableType::Literal(opcode.calculate_codegen(
-                    lhs_value,
-                    rhs_value,
-                    upper_context.clone(),
-                ))
-            }
-
-            Expr::If {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                let condition_value = condition
-                    .codegen(upper_context.clone())
-                    .get_value(upper_context.builder);
-                let zero = Literal::int32(0, upper_context.llvm_context);
-
-                let is_not_zero = Build::cmp(
-                    LLVMIntPredicate::LLVMIntNE,
-                    condition_value,
-                    zero,
-                    "is_not_zero",
-                    upper_context.builder,
-                );
-
-                let then_block = Build::append_block(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    "then_entry",
-                );
-                let else_block = Build::append_block(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    "else_entry",
-                );
-                let merge_block = Build::append_block(
-                    upper_context.llvm_context,
-                    upper_context.function.unwrap(),
-                    "merge_entry",
-                );
-
-                Build::cond_br(upper_context.builder, is_not_zero, then_block, else_block);
-
-                Build::position_at_end(upper_context.builder, then_block);
-                let then_return = then_body
-                    .codegen(upper_context.clone())
-                    .get_value(upper_context.builder);
-                Build::goto(upper_context.builder, merge_block);
-
-                Build::position_at_end(upper_context.builder, else_block);
-                let else_return = else_body
-                    .codegen(upper_context.clone())
-                    .get_value(upper_context.builder);
-                Build::goto(upper_context.builder, merge_block);
-
-                Build::position_at_end(upper_context.builder, merge_block);
-
-                let incoming = vec![(then_return, then_block), (else_return, else_block)];
-                VariableType::Literal(Build::phi(
-                    upper_context.builder,
-                    Typ::int32(upper_context.llvm_context),
-                    incoming,
-                ))
-            }
-            Expr::StructAssign(ident, fields) => {
-                let struct_ty = upper_context
-                    .get_type_from_name(ident.clone())
-                    .expect("cannot find type");
-                let struct_llvm_ty = struct_ty.generate_type(upper_context.clone());
-
-                // store fields
-                // todo check un initial field
-                // todo check field type is equals to expr type
-                let mut fields_idx_value = fields
-                    .into_iter()
-                    .map(|(field_ident, expr)| {
-                        let field_idx = struct_ty
-                            .get_type_field_idx(field_ident)
-                            .expect("field is not in struct define");
-                        let expr_llvm_value = expr
-                            .codegen(upper_context.clone())
-                            .get_value(upper_context.builder);
-                        (field_idx, expr_llvm_value)
-                    })
-                    .collect();
-
-                VariableType::Literal(Build::declare_struct(
-                    ident,
-                    struct_llvm_ty,
-                    &mut fields_idx_value,
-                    upper_context.builder,
-                    upper_context.llvm_context,
-                ))
-            }
-            Expr::IdentifierWithAccess(ident, field) => {
-                // {ident}.{field}
-                let ident_type = ident.get_type(upper_context.clone());
-                let ident_codegen = ident.codegen(upper_context.clone()).unwrap();
-
-                let field_idx = ident_type
-                    .get_type_field_idx(field)
-                    .expect("struct has not item");
-                let gep = Build::gep(
-                    ident_codegen,
-                    field_idx,
-                    upper_context.builder,
-                    upper_context.llvm_context,
-                );
-                // Build::load(gep, upper_context.builder)
-                VariableType::Ptr(gep)
-            }
-        }
+        // debug!("expr codegen: {}", &self);
+        //
+        // trace!("show context data {:#?}", upper_context);
+        // match self {
+        //     Expr::Number(n) => VariableType::Literal(n.codegen(upper_context.clone())),
+        //     Expr::Identifier(identifier) => {
+        //         let guard = upper_context.variables.read().unwrap();
+        //         let x = guard
+        //             .get(identifier)
+        //             .expect(&format!("variable '{}' is undefined", identifier));
+        //         let x = x.0;
+        //         VariableType::Ptr(x)
+        //     }
+        //
+        //     Expr::BinOperation(opcode, lhs, rhs) => {
+        //         let lhs_value = lhs
+        //             .codegen(upper_context.clone())
+        //             .get_value(upper_context.builder);
+        //         let rhs_value = rhs
+        //             .codegen(upper_context.clone())
+        //             .get_value(upper_context.builder);
+        //
+        //         VariableType::Literal(opcode.calculate_codegen(
+        //             lhs_value,
+        //             rhs_value,
+        //             upper_context.clone(),
+        //         ))
+        //     }
+        //
+        //     Expr::If {
+        //         condition,
+        //         then_body,
+        //         else_body,
+        //     } => {
+        //         let condition_value = condition
+        //             .codegen(upper_context.clone())
+        //             .get_value(upper_context.builder);
+        //         let zero = Literal::int32(0, upper_context.llvm_context);
+        //
+        //         let is_not_zero = Build::cmp(
+        //             LLVMIntPredicate::LLVMIntNE,
+        //             condition_value,
+        //             zero,
+        //             "is_not_zero",
+        //             upper_context.builder,
+        //         );
+        //
+        //         let then_block = Build::append_block(
+        //             upper_context.llvm_context,
+        //             upper_context.function.unwrap(),
+        //             "then_entry",
+        //         );
+        //         let else_block = Build::append_block(
+        //             upper_context.llvm_context,
+        //             upper_context.function.unwrap(),
+        //             "else_entry",
+        //         );
+        //         let merge_block = Build::append_block(
+        //             upper_context.llvm_context,
+        //             upper_context.function.unwrap(),
+        //             "merge_entry",
+        //         );
+        //
+        //         Build::cond_br(upper_context.builder, is_not_zero, then_block, else_block);
+        //
+        //         Build::position_at_end(upper_context.builder, then_block);
+        //         let then_return = then_body
+        //             .codegen(upper_context.clone())
+        //             .get_value(upper_context.builder);
+        //         Build::goto(upper_context.builder, merge_block);
+        //
+        //         Build::position_at_end(upper_context.builder, else_block);
+        //         let else_return = else_body
+        //             .codegen(upper_context.clone())
+        //             .get_value(upper_context.builder);
+        //         Build::goto(upper_context.builder, merge_block);
+        //
+        //         Build::position_at_end(upper_context.builder, merge_block);
+        //
+        //         let incoming = vec![(then_return, then_block), (else_return, else_block)];
+        //         VariableType::Literal(Build::phi(
+        //             upper_context.builder,
+        //             Typ::int32(upper_context.llvm_context),
+        //             incoming,
+        //         ))
+        //     }
+        //     Expr::StructAssign(ident, fields) => {
+        //         let struct_ty = upper_context
+        //             .get_type_from_name(ident.clone())
+        //             .expect("cannot find type");
+        //         let struct_llvm_ty = struct_ty.generate_type(upper_context.clone());
+        //
+        //         // store fields
+        //         // todo check un initial field
+        //         // todo check field type is equals to expr type
+        //         let mut fields_idx_value = fields
+        //             .into_iter()
+        //             .map(|(field_ident, expr)| {
+        //                 let field_idx = struct_ty
+        //                     .get_type_field_idx(field_ident)
+        //                     .expect("field is not in struct define");
+        //                 let expr_llvm_value = expr
+        //                     .codegen(upper_context.clone())
+        //                     .get_value(upper_context.builder);
+        //                 (field_idx, expr_llvm_value)
+        //             })
+        //             .collect();
+        //
+        //         VariableType::Literal(Build::declare_struct(
+        //             ident,
+        //             struct_llvm_ty,
+        //             &mut fields_idx_value,
+        //             upper_context.builder,
+        //             upper_context.llvm_context,
+        //         ))
+        //     }
+        //     Expr::IdentifierWithAccess(ident, field) => {
+        //         // {ident}.{field}
+        //         let ident_type = ident.get_type(upper_context.clone());
+        //         let ident_codegen = ident.codegen(upper_context.clone()).unwrap();
+        //
+        //         let field_idx = ident_type
+        //             .get_type_field_idx(field)
+        //             .expect("struct has not item");
+        //         let gep = Build::gep(
+        //             ident_codegen,
+        //             field_idx,
+        //             upper_context.builder,
+        //             upper_context.llvm_context,
+        //         );
+        //         // Build::load(gep, upper_context.builder)
+        //         VariableType::Ptr(gep)
+        //     }
+        // }
+        todo!()
     }
 }
