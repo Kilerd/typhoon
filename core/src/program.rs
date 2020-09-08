@@ -63,7 +63,7 @@ impl Program {
     pub fn as_binary_output(
         &mut self,
         output_name: &str,
-    ) -> Result<(ExitStatus, String, String), TyphoonError> {
+    ) -> Result<(i32, String, String), TyphoonError> {
         unsafe {
             let context = core::LLVMContextCreate();
             let builder = core::LLVMCreateBuilderInContext(context);
@@ -137,7 +137,7 @@ impl Program {
                 let stdout = String::from_utf8(output.stdout).unwrap();
                 let stderr = String::from_utf8(output.stderr).unwrap();
 
-                Ok((output.status, stdout, stderr))
+                Ok((output.status.code().unwrap(), stdout, stderr))
             } else {
                 println!("cannot emit executing file");
                 let stdout = String::from_utf8(output.stdout).unwrap();

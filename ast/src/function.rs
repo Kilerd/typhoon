@@ -57,7 +57,7 @@ impl Function {
                     }
                     x.codegen(context.clone());
                 }
-                Statement::Declare(..) => {
+                _ => {
                     let _x1 = x.codegen(context.clone());
                 }
             }

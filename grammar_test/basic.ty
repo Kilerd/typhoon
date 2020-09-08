@@ -5,7 +5,7 @@ struct B {
     inner: A,
 }
 fn main() -> i32 {
-    let a: A = A{inner: 10};
-    let b: A = a;
-    return 1;
+    let a : i32 = 1;
+    a = 2;
+    return a;
 }

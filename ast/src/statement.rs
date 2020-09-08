@@ -9,7 +9,7 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Debug)]
 pub enum Statement {
     Declare(Identifier, TypeName, Box<Expr>),
-
+    Assignment(Identifier, Box<Expr>),
     Return(Box<Expr>),
 }
 
@@ -20,6 +20,9 @@ impl Display for Statement {
                 write!(f, "let {}: {} = {}", ident, type_name, expr)
             }
             Statement::Return(expr) => write!(f, "return {}", expr),
+            Statement::Assignment(ident, expr) => {
+                write!(f, "{} = {}", ident, expr)
+            }
         }
     }
 }
@@ -66,6 +69,13 @@ impl Statement {
                     .codegen(upper_context.clone())
                     .get_value(upper_context.builder);
                 Build::ret(x1, upper_context.builder)
+            }
+            Statement::Assignment(ident, expr) => {
+                let guard = upper_context.variables.read().unwrap();
+                let x = guard.get(ident).expect("cannot get variable");
+                let variable_type = expr.codegen(upper_context.clone());
+                let x2 = variable_type.get_value(upper_context.builder);
+                Build::store(x.0, x2, upper_context.builder)
             }
         }
     }
