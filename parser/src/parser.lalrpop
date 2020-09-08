@@ -28,7 +28,7 @@ pub StructDefineField: (String, String) = {
 }
 
 pub Statement: Box<Statement> = {
-    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> ";" => Box::new(Statement::Assign(i, t, e)),
+    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expr> ";" => Box::new(Statement::Declare(i, t, e)),
     "return" <e:Expr> ";" => Box::new(Statement::Return(e)),
 }
 

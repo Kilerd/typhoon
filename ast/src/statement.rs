@@ -8,14 +8,15 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug)]
 pub enum Statement {
-    Assign(Identifier, TypeName, Box<Expr>),
+    Declare(Identifier, TypeName, Box<Expr>),
+
     Return(Box<Expr>),
 }
 
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Assign(ident, type_name, expr) => {
+            Statement::Declare(ident, type_name, expr) => {
                 write!(f, "let {}: {} = {}", ident, type_name, expr)
             }
             Statement::Return(expr) => write!(f, "return {}", expr),
@@ -27,7 +28,7 @@ impl Statement {
     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) -> *mut LLVMValue {
         debug!("statement codegen: {}", &self);
         match self {
-            Statement::Assign(identifier, _id_type, init) => {
+            Statement::Declare(identifier, _id_type, init) => {
                 // let {identifier} : {_id_type} = {expr}
                 let expr_type = init.get_type(upper_context.clone());
 
