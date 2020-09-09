@@ -86,10 +86,10 @@ pub GroupedExpression:      Box<Expr> = {
     "(" <ExpressionWithoutBlock> ")" => Box::new(Expr::Group(<>)) }
 
 pub ArithmeticExpression:   Box<Expr> = {
-    <lhs: ExpressionWithoutBlock> "+" <rhs: ExpressionWithoutBlockWithoutArithmetic>           => Box::new(Expr::BinOperation(Opcode::Add, lhs,rhs))  ,
-
-   // ExpressionWithoutBlockWithoutArithmetic,
+    <lhs: ExpressionWithoutBlock> "+" <rhs: ExpressionWithoutBlockWithoutArithmetic>           => Box::new(Expr::BinOperation(Opcode::Add, lhs,rhs)),
+    <lhs: ExpressionWithoutBlock> "-" <rhs: ExpressionWithoutBlockWithoutArithmetic>           => Box::new(Expr::BinOperation(Opcode::Sub, lhs,rhs)),
 }
+
 
 
 
