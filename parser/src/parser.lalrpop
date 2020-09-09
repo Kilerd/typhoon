@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use ast::*;
+#[LALR]
 grammar;
 
 
@@ -14,128 +15,100 @@ Comma<T>: Vec<T> = { // (1)
     }
 };
 
+
+
 pub Module: Box<Module> = {
     <m: (<ModuleItem>)*> => Box::new(Module::new(m)),
 }
 
+
 pub ModuleItem: Box<ModuleItem> = {
-     "fn" <name:Identifier> "(" ")" "->" <ret:Identifier> "{" <v: (<Statement> r"\n"*)*> "}" => Box::new(ModuleItem::Function(Function::new(name, ret, v))),
-     "struct" <name:Identifier> "{" <v: Comma<StructDefineField>> "}" => Box::new(ModuleItem::StructDefine(StructDetail::new(name, v))),
+    FunctionDeclare,
+    StructDeclare,
 }
 
+pub FunctionDeclare: Box<ModuleItem> = { "fn" <name: Identifier> "(" ")" "->" <ret: Type> <content:BlockExpression<ExpressionWithoutBlock>> => Box::new(ModuleItem::FunctionDeclare(name, ret, content)) }
+
+pub StructDeclare: Box<ModuleItem> = { "struct" <name:Identifier> "{" <v: Comma<StructDefineField>> "}" => Box::new(ModuleItem::StructDeclare(StructDetail::new(name, v))) }
+
+
+
+BlockExpression<T>: Box<Expr> = { "{"   <s: (Statement)*> <e: (Expression<T>)?>    "}"  => Box::new(Expr::Block(s, e)) }
+
+
 pub StructDefineField: (String, String) = {
-    <k: Identifier> ":" <v: Identifier> => (k ,v)
+    <k: Identifier> ":" <v: Type> => (k ,v)
 }
 
 pub Statement: Box<Statement> = {
-    "let" <i:Identifier>  ":" <t: Identifier> "=" <e:Expression> ";" => Box::new(Statement::Declare(i, t, e)),
-    <i:Identifier> "=" <e:Expression> ";" => Box::new(Statement::Assignment(i, e)),
-    "return" <e:Expression> ";" => Box::new(Statement::Return(e)),
+    "let" <i:Identifier>  ":" <t: Type> "=" <e:Expression<ExpressionWithoutBlock>> ";" => Box::new(Statement::Declare(i, t, e)),
+    ReturnStatement,
+    <ExpressionStatement> ";",
 }
 
+pub ReturnStatement: Box<Statement>  =  { "return" <Expression<ExpressionWithoutBlock>> ";" => Box::new(Statement::Return(<>)) }
+pub ExpressionStatement: Box<Statement> = { <e: Expression<ExpressionWithoutBlock>> ";" => Box::new(Statement::Expr(e)) }
 
-// expr
 
-pub PathExpression: Box<Expr> = {
-    <Identifier>         => Box::new(Expr::Identifier(<>)),
 
+
+Expression<T>: Box<Expr> = {  ExpressionWithBlock, T  }
+
+pub ExpressionWithBlock: Box<Expr> = {  BlockExpression<ExpressionWithoutBlock> }
+
+pub ExpressionWithoutBlock: Box<Expr> = {
+    ExpressionWithoutBlockWithoutArithmetic,
+    ArithmeticExpression,
 }
-
-pub LiteralExpression: Box<Expr> = {
-    <Num>       => Box::new(Expr::Number(<>)),
-}
-
-
-pub StructExpression: Box<Expr> = {
-   <type_identifier: Identifier> "{" <v: Comma<AssignStructField>> "}"   => Box::new(Expr::StructAssign(type_identifier, v)),
-}
-
-pub FieldAccessExpression: Box<Expr> = {
-    <ident:Factor> r"\." <field: Identifier>     => Box::new(Expr::IdentifierWithAccess(ident, field)),
-}
-
-pub GroupedExpression : Box<Expr> = {
-    "(" <Expression> ")"
-}
-
-
-pub Expression: Box<Expr> = {
-    OrExpr
-}
-
-pub OrExpr: Box<Expr> = {
-    <l:OrExpr> "|" <r:XorExpr> => Box::new(Expr::BinOperation(Opcode::Or, l, r)),
-    XorExpr,
-}
-
-pub XorExpr : Box<Expr> = {
-    <l:XorExpr> "^" <r:AndExpr> => Box::new(Expr::BinOperation(Opcode::Xor, l, r)),
-    AndExpr,
-}
-pub AndExpr : Box<Expr> = {
-    <l:AndExpr> "&" <r:ShiftExpr> => Box::new(Expr::BinOperation(Opcode::And, l, r)),
-    ShiftExpr,
-}
-pub ShiftExpr: Box<Expr> = {
-    <l:ShiftExpr> "<<" <r:ArithExpr> => Box::new(Expr::BinOperation(Opcode::LShift, l,r)),
-    <l:ShiftExpr> ">>" <r:ArithExpr> => Box::new(Expr::BinOperation(Opcode::RShift, l,r)),
-    ArithExpr,
-}
-
-pub ArithExpr : Box<Expr> = {
-    <l:ArithExpr> "+" <r:TermExpr> => Box::new(Expr::BinOperation(Opcode::Add, l,r)),
-    <l:ArithExpr> "-" <r:TermExpr> => Box::new(Expr::BinOperation(Opcode::Sub, l,r)),
-    TermExpr,
-}
-
-pub TermExpr : Box<Expr> = {
-    <l:TermExpr> "*" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Mul, l,r)),
-    <l:TermExpr> "/" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Div, l,r)),
-    <l:TermExpr> "%" <r:Factor> => Box::new(Expr::BinOperation(Opcode::Mod, l,r)),
-    Factor,
-}
-
-pub Factor: Box<Expr> = {
+pub ExpressionWithoutBlockWithoutArithmetic: Box<Expr> = {
+    FieldAccessExpression,
     PathExpression,
     LiteralExpression,
-    StructExpression,
-    FieldAccessExpression,
-    GroupedExpression,
     CallExpression,
-    IfExpression,
-}
-
-pub CallExpression: Box<Expr> = {
-    <e: Factor> "(" <f: Comma<Expression>> ")" => Box::new(Expr::Call(e, f)),
-}
-
-pub IfExpression: Box<Expr> = {
-    "if" <condition: Expression> "{" <then_body: Expression> "}" "else" "{" <else_body: Expression> "}" => Box::new(Expr::If(condition,then_body ,else_body))
+    GroupedExpression,
 }
 
 
-
-pub AssignStructField: (Box<Expr>, Box<Expr>) = {
-    <k: PathExpression> ":" <v: Expression> => (k ,v)
+pub LiteralExpression:      Box<Expr> = {
+    <Num> => Box::new(Expr::Number(<>))
 }
+pub FieldAccessExpression:  Box<Expr> = {
+    <ident:Expression<ExpressionWithoutBlockWithoutArithmetic>> "." <field: Identifier>        => Box::new(Expr::Field(ident, field))}
+
+pub PathExpression:         Box<Expr> = {
+    <Identifier>                                      => Box::new(Expr::Identifier(<>)),}
+
+pub CallIdentifier: Box<Expr> = { GroupedExpression , PathExpression}
+pub CallExpression:         Box<Expr> = {
+    <e: ExpressionWithoutBlockWithoutArithmetic> "(" <f: Comma<ExpressionWithoutBlock>> ")"    => Box::new(Expr::Call(e, f))}
+
+pub GroupedExpression:      Box<Expr> = {
+    "(" <ExpressionWithoutBlock> ")" => Box::new(Expr::Group(<>)) }
+
+pub ArithmeticExpression:   Box<Expr> = {
+    <lhs: ExpressionWithoutBlock> "+" <rhs: ExpressionWithoutBlockWithoutArithmetic>           => Box::new(Expr::BinOperation(Opcode::Add, lhs,rhs))  ,
+
+   // ExpressionWithoutBlockWithoutArithmetic,
+}
+
+
 
 Identifier : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();
 
-match {
-    r"-?[0-9][0-9_]*"
-} else {
-    r"[0-9][0-9_]*",
-    _
-}
+Type : String = <r"[a-zA-z_][a-zA-z0-9_]*"> => <>.to_string();
+
+
 
 Num: Number = {
-    <r"-?[0-9][0-9_]*(i8)?"> => Number::Integer8(i8::from_str(&<>.replace("i8", "").replace("_", "")).unwrap()),
-    <r"-?[0-9][0-9_]*(i16)>"> => Number::Integer16(i16::from_str(&<>.replace("i16","").replace("_", "")).unwrap()),
-    <r"-?[0-9][0-9_]*(i32)?"> => Number::Integer32(i32::from_str(&<>.replace("i32","").replace("_", "")).unwrap()),
-    //<r"-?[0-9][0-9_]*(i64)?">  => Number::Integer64(i64::from_str(&<>.replace("i64","").replace("_", "")).unwrap()),
-    <r"-?[0-9][0-9_]*"> => Number::Integer32(i32::from_str(&<>.replace("_", "")).unwrap()),
-    <r"[0-9][0-9_]*(u8)?"> => Number::UnSignInteger8(u8::from_str(&<>.replace("u8", "").replace("_", "")).unwrap()),
-    <r"[0-9][0-9_]*(u16)?">  => Number::UnSignInteger16(u16::from_str(&<>.replace("u16", "").replace("_", "")).unwrap()),
-    <r"[0-9][0-9_]*(u32)?">  => Number::UnSignInteger32(u32::from_str(&<>.replace("u32", "").replace("_", "")).unwrap()),
-    //<r"[0-9][0-9_]*(u64)?">  => Number::UnSignInteger64(u64::from_str(&<>.replace("u64", "").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*">         => Number::Integer32(i32::from_str(&<>.replace("_", "")).unwrap()),
+
+    <r"-?[0-9][0-9_]*i8">       => Number::Integer8(i8::from_str(&<>.replace("i8", "").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*i16">      => Number::Integer16(i16::from_str(&<>.replace("i16","").replace("_", "")).unwrap()),
+    <r"-?[0-9][0-9_]*i32">      => Number::Integer32(i32::from_str(&<>.replace("i32","").replace("_", "")).unwrap()),
+    //<r"-?[0-9][0-9_]*i64">    => Number::Integer64(i64::from_str(&<>.replace("i64","").replace("_", "")).unwrap()),
+
+    <r"[0-9][0-9_]*u8">         => Number::UnSignInteger8(u8::from_str(&<>.replace("u8", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*u16">        => Number::UnSignInteger16(u16::from_str(&<>.replace("u16", "").replace("_", "")).unwrap()),
+    <r"[0-9][0-9_]*u32">        => Number::UnSignInteger32(u32::from_str(&<>.replace("u32", "").replace("_", "")).unwrap()),
+    //<r"[0-9][0-9_]*u64">      => Number::UnSignInteger64(u64::from_str(&<>.replace("u64", "").replace("_", "")).unwrap()),
 }

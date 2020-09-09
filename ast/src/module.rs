@@ -20,9 +20,9 @@ impl Module {
         println!("module codegen");
         let module = Build::module("typhoon");
         let typhoon_context = Arc::new(TyphoonContext::new(context, builder, module));
-        for item in self.items.iter_mut() {
-            item.codegen(typhoon_context.clone())
-        }
+        // for item in self.items.iter_mut() {
+        //     item.codegen(typhoon_context.clone())
+        // }
         return module;
     }
 }
