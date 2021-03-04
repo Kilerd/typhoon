@@ -6,9 +6,9 @@ struct B {
 }
 fn main() -> i32 {
     let a: i32 = {
-        let b : i8 = 1i8;
-        b+1-(1)
-    };
-    return (a).b(hello.b);
-    c
+                let b : i8 = 1i8+{1};
+                b+1-1
+            };
+    return a.b(1,{a},);
+        {c}
 }

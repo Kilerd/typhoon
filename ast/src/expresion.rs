@@ -91,7 +91,7 @@ pub enum Opcode {
 pub enum Expr {
     StructAssign(Identifier, Vec<(Box<Expr>, Box<Expr>)>),
     Identifier(Identifier),
-    Field(Box<Expr>, Identifier),
+    Field(Box<Expr>, Box<Expr>),
     Number(Number),
     BinOperation(Opcode, Box<Expr>, Box<Expr>),
     If {
@@ -103,7 +103,7 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Box<Expr>>),
     Block(Vec<Box<Statement>>, Option<Box<Expr>>),
     Group(Box<Expr>),
-
+    Negative(Box<Number>)
 }
 
 // }
