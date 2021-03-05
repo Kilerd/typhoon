@@ -12,4 +12,4 @@ ast = {path="../ast"}
 
 
 [build-dependencies]
-lalrpop = {version="0.18.1", features=["lexer"]}
+lalrpop = {version="0.19.5", features=["lexer"]}
