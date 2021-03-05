@@ -353,7 +353,7 @@ dependencies = [
  "docopt",
  "ena",
  "itertools",
- "lalrpop-util",
+ "lalrpop-util 0.18.1",
  "petgraph",
  "regex",
  "regex-syntax",
@@ -370,6 +370,15 @@ name = "lalrpop-util"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6e9bc1801eb54529fd6a020aaf9514e8193bb6b42d96d0fe7da99187efa93d"
+dependencies = [
+ "regex",
+]
+
+[[package]]
+name = "lalrpop-util"
+version = "0.19.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a708007b751af124d09e9c5d97515257902bc6b486a56b40bcafd939e8ff467"
 dependencies = [
  "regex",
 ]
@@ -451,7 +460,7 @@ version = "0.1.0"
 dependencies = [
  "ast",
  "lalrpop",
- "lalrpop-util",
+ "lalrpop-util 0.19.5",
 ]
 
 [[package]]
