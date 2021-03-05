@@ -10,7 +10,7 @@ edition = "2018"
 thiserror = "1.0.20"
 ast = {path="../ast"}
 parser = {path="../parser"}
-llvm-sys = "100.2.0"
+llvm-sys = "110.0.1"
 log = "0.4.11"
 llvm_wrapper = {path="../llvm_wrapper"}
 uuid = { version = "0.8", features = ["serde", "v4"] }
