@@ -1,7 +1,5 @@
-use crate::{Expr, Function, Identifier, TyphoonContext};
-use llvm_sys::prelude::LLVMTypeRef;
-use llvm_wrapper::typ::Typ;
-use std::{collections::BTreeMap, sync::Arc};
+use crate::{Expr, Identifier};
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub enum ModuleItem {

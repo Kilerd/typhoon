@@ -1,8 +1,7 @@
-use crate::{statement::Statement, Identifier, TyphoonContext};
+use crate::{statement::Statement, Identifier};
 
 use llvm_sys::prelude::LLVMValueRef;
-use llvm_wrapper::{build::Build, typ::Typ};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 // stmt
 #[derive(Debug)]

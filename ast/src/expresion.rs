@@ -1,21 +1,6 @@
-use crate::{
-    ttype::{Identifier, Type},
-    Statement, TyphoonContext,
-};
-use llvm_sys::{
-    core::{
-        LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildMul, LLVMBuildOr, LLVMBuildSDiv,
-        LLVMBuildShl, LLVMBuildSub, LLVMBuildXor,
-    },
-    prelude::{LLVMBuilderRef, LLVMValueRef},
-    LLVMIntPredicate, LLVMValue,
-};
-use std::{
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+use crate::{ttype::Identifier, Statement};
 
-use llvm_wrapper::{build::Build, c_str, literal::Literal, typ::Typ};
+use llvm_wrapper::build::Build;
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Opcode {

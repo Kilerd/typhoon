@@ -45,12 +45,10 @@ impl Type {
             Typ::int8(context.llvm_context)
         } else if self.name.eq("i32") {
             Typ::int32(context.llvm_context)
+        } else if let Some((_, b)) = self.llvm_type_ref.as_ref() {
+            b.clone()
         } else {
-            if let Some((_, b)) = self.llvm_type_ref.as_ref() {
-                b.clone()
-            } else {
-                Typ::int32(context.llvm_context)
-            }
+            Typ::int32(context.llvm_context)
         }
     }
 
