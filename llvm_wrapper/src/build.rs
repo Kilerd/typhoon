@@ -96,7 +96,7 @@ impl Build {
         unsafe {
             let struct_al = LLVMBuildAlloca(builder, typ, name.as_ptr());
 
-            for (idx, field_value) in fields.into_iter() {
+            for (idx, field_value) in fields.iter_mut() {
                 let slice_idx = Literal::int32(0, context);
                 let field_dix_t = Literal::int32(*idx as i32, context);
                 let mut vec1 = vec![slice_idx, field_dix_t];
