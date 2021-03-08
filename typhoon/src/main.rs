@@ -1,7 +1,6 @@
-use structopt::StructOpt;
-use core::error::TyphoonError;
-use core::program::Program;
+use core::{error::TyphoonError, program::Program};
 use std::path::Path;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "typhoon")]
@@ -27,19 +26,20 @@ fn main() -> Result<(), TyphoonError> {
 
     if opt.ast {
         dbg!(&program.token_tree);
-    }else {
+    } else {
         if opt.debug {
             let llir = program.as_llir();
             println!("\nllir: \n{}", llir);
-        }else {
-            let option = Path::new(&opt.file_name).file_name().unwrap().to_str().unwrap();
+        } else {
+            let option = Path::new(&opt.file_name)
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap();
             let x = program.as_binary_output(option);
             dbg!(x);
         }
     }
-
-
-
 
     // match program.as_binary_output("out") {
     //     Ok((ec, stdout, stderr)) => {

@@ -1,9 +1,12 @@
-use crate::{ttype::{Identifier, Type}, TyphoonContext, Statement};
-use llvm_sys::core::{
-    LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildMul, LLVMBuildOr, LLVMBuildSDiv,
-    LLVMBuildShl, LLVMBuildSub, LLVMBuildXor,
+use crate::{
+    ttype::{Identifier, Type},
+    Statement, TyphoonContext,
 };
 use llvm_sys::{
+    core::{
+        LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildMul, LLVMBuildOr, LLVMBuildSDiv,
+        LLVMBuildShl, LLVMBuildSub, LLVMBuildXor,
+    },
     prelude::{LLVMBuilderRef, LLVMValueRef},
     LLVMIntPredicate, LLVMValue,
 };
@@ -12,10 +15,7 @@ use std::{
     sync::Arc,
 };
 
-use llvm_wrapper::build::Build;
-use llvm_wrapper::c_str;
-use llvm_wrapper::literal::Literal;
-use llvm_wrapper::typ::Typ;
+use llvm_wrapper::{build::Build, c_str, literal::Literal, typ::Typ};
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Opcode {
@@ -34,7 +34,6 @@ pub enum Opcode {
     LShift,
     RShift,
 }
-//
 // impl Display for Opcode {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         match self {
@@ -103,7 +102,7 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Box<Expr>>),
     Block(Vec<Box<Statement>>, Option<Box<Expr>>),
     Group(Box<Expr>),
-    Negative(Box<Number>)
+    Negative(Box<Number>),
 }
 
 // }
@@ -138,9 +137,8 @@ pub enum Number {
     UnSignInteger8(u8),
     UnSignInteger16(u16),
     UnSignInteger32(u32),
-    Row
+    Row,
 }
-//
 // impl Display for Number {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         match self {
@@ -202,7 +200,6 @@ impl VariableType {
         }
     }
 }
-//
 // impl Expr {
 //     pub fn get_type(&self, upper_context: Arc<TyphoonContext>) -> Arc<Type> {
 //         todo!()

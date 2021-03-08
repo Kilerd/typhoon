@@ -15,9 +15,9 @@ use llvm_sys::{
 };
 use llvm_wrapper::c_str;
 use parser::parser::ModuleParser;
-use std::mem::MaybeUninit;
 use std::{
     ffi::{CStr, CString},
+    mem::MaybeUninit,
     path::Path,
     process::ExitStatus,
     ptr,

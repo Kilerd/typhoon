@@ -1,8 +1,7 @@
 use crate::{statement::Statement, Identifier, TyphoonContext};
 
 use llvm_sys::prelude::LLVMValueRef;
-use llvm_wrapper::build::Build;
-use llvm_wrapper::typ::Typ;
+use llvm_wrapper::{build::Build, typ::Typ};
 use std::{collections::HashMap, sync::Arc};
 
 // stmt
@@ -26,7 +25,6 @@ impl Function {
         }
     }
 }
-//
 // impl Function {
 //     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) {
 //         debug!("function codegen: {}", &self.name);

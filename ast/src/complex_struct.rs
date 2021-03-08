@@ -1,4 +1,4 @@
-use crate::{Function, Identifier, TyphoonContext, Expr};
+use crate::{Expr, Function, Identifier, TyphoonContext};
 use llvm_sys::prelude::LLVMTypeRef;
 use llvm_wrapper::typ::Typ;
 use std::{collections::BTreeMap, sync::Arc};
@@ -8,7 +8,6 @@ pub enum ModuleItem {
     FunctionDeclare(Identifier, Identifier, Box<Expr>),
     StructDeclare(StructDetail),
 }
-//
 // impl ModuleItem {
 //     pub fn codegen(&self, upper_context: Arc<TyphoonContext>) {
 //         debug!("module item codegen {:?}", self);
