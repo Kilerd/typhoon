@@ -7,9 +7,9 @@ build="build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lalrpop-util = {version="0.18.1", features=["lexer"]}
+lalrpop-util = { version = "0.19.5", features = ["lexer"] }
 ast = {path="../ast"}
 
 
 [build-dependencies]
-lalrpop = {version="0.18.1", features=["lexer"]}
+lalrpop = { version = "0.19.5", features = ["lexer"] }
