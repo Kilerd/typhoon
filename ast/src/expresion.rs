@@ -1,7 +1,7 @@
 use crate::{ttype::Identifier, Statement};
 
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 use llvm_wrapper::build::Build;
-use llvm_sys::prelude::{LLVMValueRef, LLVMBuilderRef};
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Opcode {
