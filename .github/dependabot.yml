@@ -1,0 +1,27 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "21:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: lalrpop
+    versions:
+    - 0.19.5
+  - dependency-name: thiserror
+    versions:
+    - 1.0.24
+  - dependency-name: uuid
+    versions:
+    - 0.8.2
+  - dependency-name: lalrpop-util
+    versions:
+    - 0.19.5
+  - dependency-name: env_logger
+    versions:
+    - 0.8.3
+  - dependency-name: structopt
+    versions:
+    - 0.3.21
