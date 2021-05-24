@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 llvm_wrapper = {path="../llvm_wrapper"}
 # todo remove llvm-sys
-llvm-sys = "110.0.1"
+llvm-sys = "120.0.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 log = "0.4.14"
 
