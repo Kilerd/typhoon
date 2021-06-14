@@ -28,7 +28,14 @@ pub ModuleItem: Box<ModuleItem> = {
     StructDeclare,
 }
 
-pub FunctionDeclare: Box<ModuleItem> = { "fn" <name: Identifier> "(" ")" "->" <ret: Type> <content:BlockExpression> => Box::new(ModuleItem::FunctionDeclare(name, ret, content)) }
+pub FunctionDeclare: Box<ModuleItem> = {
+  "fn" <name: Identifier> "(" <args:Comma<FunctionArg>> ")" "->" <ret: Type> <content:BlockExpression> => Box::new(ModuleItem::FunctionDeclare(FunctionDeclare::new(name, args, ret, content)))
+}
+
+
+pub FunctionArg: (Identifier, String) = {
+    <name: Identifier> ":" <t:Type> => (name, t)
+}
 
 pub StructDeclare: Box<ModuleItem> = { "struct" <name:Identifier> "{" <v: Comma<StructDefineField>> "}" =>  struct_declare_handler(name, v) }
 

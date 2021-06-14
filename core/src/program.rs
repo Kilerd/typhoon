@@ -43,7 +43,7 @@ impl Program {
         Ok(Self { token_tree })
     }
 
-    pub fn as_llir(&mut self) -> String {
+    pub fn as_llir(self) -> String {
         unsafe {
             let context = core::LLVMContextCreate();
             let builder = core::LLVMCreateBuilderInContext(context);
@@ -61,7 +61,7 @@ impl Program {
     }
 
     pub fn as_binary_output(
-        &mut self,
+        self,
         output_name: &str,
     ) -> Result<(i32, String, String), TyphoonError> {
         unsafe {

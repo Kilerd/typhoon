@@ -16,13 +16,13 @@ impl Module {
 }
 
 impl Module {
-    pub fn codegen(&mut self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMModuleRef {
+    pub fn codegen(self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMModuleRef {
         println!("module codegen");
         let module = Build::module("typhoon");
         let typhoon_context = Arc::new(TyphoonContext::new(context, builder, module));
-        // for item in self.items.iter_mut() {
-        //     item.codegen(typhoon_context.clone())
-        // }
-        return module;
+        for item in self.items {
+            item.codegen(typhoon_context.clone())
+        }
+        module
     }
 }
