@@ -20,7 +20,7 @@ mod ttype;
 
 pub use complex_struct::*;
 pub use expresion::{Expr, Number, Opcode};
-pub use function::FunctionDeclare;
+pub use function::{FunctionDeclare};
 pub use module::Module;
 pub use statement::Statement;
 pub use ttype::*;

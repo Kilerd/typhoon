@@ -1,4 +1,4 @@
-use ast::{Opcode, StructDetail};
+use ast::{Opcode, StructDeclare};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 use llvm_wrapper::typ::Typ;
 use std::{
@@ -17,7 +17,7 @@ pub struct Type {
     pub name: Identifier,
     pub type_id: TypeId,
     pub operands: HashMap<(Opcode, TypeId), TypeId>,
-    pub llvm_type_ref: Option<(StructDetail, LLVMTypeRef)>,
+    pub llvm_type_ref: Option<(StructDeclare, LLVMTypeRef)>,
 }
 
 impl Type {
@@ -30,7 +30,7 @@ impl Type {
         }
     }
 
-    pub fn new_struct(struct_detail: &StructDetail, llvm_type: LLVMTypeRef) -> Self {
+    pub fn new_struct(struct_detail: &StructDeclare, llvm_type: LLVMTypeRef) -> Self {
         Self {
             name: struct_detail.name.clone(),
             type_id: Uuid::new_v4(),
@@ -194,7 +194,7 @@ impl TyphoonContext {
         guard.insert(name, (value, type_id));
     }
 
-    pub fn define_struct(&self, struct_detail: &StructDetail, llvm_type: LLVMTypeRef) {
+    pub fn define_struct(&self, struct_detail: &StructDeclare, llvm_type: LLVMTypeRef) {
         // todo define struct duplicated check
         let named_struct = Arc::new(Type::new_struct(struct_detail, llvm_type));
         {
