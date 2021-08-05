@@ -90,6 +90,7 @@ pub enum Expr {
     Block(Vec<Box<Statement>>, Option<Box<Expr>>),
     Group(Box<Expr>),
     Negative(Box<Number>),
+    String(String),
 }
 
 impl Display for Expr {
