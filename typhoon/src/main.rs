@@ -31,7 +31,7 @@ fn main() -> Result<(), TyphoonError> {
             Ok(())
         }
         Opts::Ast { filename } => {
-            let program = Program::new(filename)?;
+            let program = Program::new(filename).unwrap();
             dbg!(program.token_tree);
             Ok(())
         }
