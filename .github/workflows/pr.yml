@@ -61,7 +61,7 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          args: '--ignore-tests --ciserver github-ci --out Lcov'
+          args: '--ignore-tests --ciserver github-ci --out Xml'
         env:
           LLVM_SYS_120_PREFIX: ${{ runner.temp }}/llvm
 
@@ -69,4 +69,4 @@ jobs:
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: './lcov.info'
+          path-to-lcov: './lcov.xml'
