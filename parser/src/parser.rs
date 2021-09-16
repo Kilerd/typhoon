@@ -9,12 +9,20 @@ pub struct TyphoonParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+
+pub fn parse_module(input_str: &str) -> Result<Module> {
+    let inputs = TyphoonParser::parse(Rule::module, input_str)?;
+    let input = inputs.single()?;
+    TyphoonParser::module(input)
+}
+
+
 #[pest_consume::parser]
 impl TyphoonParser {
     fn EOI(_input: Node) -> Result<()> {
         Ok(())
     }
-    fn module(input:Node) -> Result<Module> {
+    pub(crate) fn module(input:Node) -> Result<Module> {
         let items: Vec<ModuleItem> = match_nodes!(input.into_children();
             [module_item(items).., _] => {
                 items.collect()
@@ -362,47 +370,5 @@ impl TyphoonParser {
         return Ok(Number::Integer32(
             i32::from_str(&value.replace("i8", "")).unwrap(),
         ))
-    }
-}
-
-pub fn parse_module(input_str: &str) -> Result<Module> {
-    let inputs = TyphoonParser::parse(Rule::module, input_str)?;
-    let input = inputs.single()?;
-    TyphoonParser::module(input)
-}
-
-
-#[cfg(test)]
-mod test {
-    use crate::parser::parse_module;
-
-    #[test]
-    fn test() {
-        let result = parse_module(r#"
-            struct A {
-                inner: i32,
-            }
-            struct B {
-                inner: A,
-            }
-            fn main() -> i32 {
-                let a: i32 = {
-                            let b : i8 = 1i8+{1};
-                            b+1-1
-                        };
-                return a.b.c(1,{a},);
-                    {c}
-            }
-        "#);
-        dbg!(result);
-    }
-    #[test]
-    fn test_print() {
-        let result = parse_module(r#"
-            fn main() -> () {
-                print("hello world");
-            }
-        "#);
-        dbg!(result);
     }
 }
