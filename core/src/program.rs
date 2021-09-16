@@ -12,7 +12,6 @@ use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
     path::Path,
-    process::ExitStatus,
     ptr,
 };
 
