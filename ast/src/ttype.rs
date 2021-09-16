@@ -27,7 +27,7 @@ impl Type {
             type_id: Uuid::new_v4(),
         }
     }
-    pub fn void() ->Self {
+    pub fn void() -> Self {
         Type::new("".to_owned())
     }
 }
