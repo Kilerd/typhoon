@@ -1,5 +1,4 @@
 use core::{error::TyphoonError};
-use std::path::Path;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
