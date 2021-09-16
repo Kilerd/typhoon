@@ -4,7 +4,7 @@ use crate::llvm_wrapper::types::BasicType;
 use ast::{FunctionDeclare, Module, ModuleItem, StructDeclare, Type, Expr, Statement};
 
 pub trait Codegen {
-    fn codegen(self, context: TyphoonContext);
+    fn codegen(self, context: TyphoonContext) -> TyphoonModule;
 }
 
 pub trait ModuleCodegen {
@@ -12,11 +12,12 @@ pub trait ModuleCodegen {
 }
 
 impl Codegen for Module {
-    fn codegen(self, context: TyphoonContext) {
+    fn codegen(self, context: TyphoonContext) -> TyphoonModule {
         let module = context.create_module("typhoon");
         for item in self.items {
             item.module_codegen(&context, &module);
         }
+        module
     }
 }
 

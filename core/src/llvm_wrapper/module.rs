@@ -18,6 +18,10 @@ impl TyphoonModule {
             unsafe { LLVMAddFunction(self.module, name.as_ptr(), func.as_llvm_type_ref()) };
         FunctionValue::new(llvm_value_ref)
     }
+
+    pub fn to_llvm_module_ref(&self) -> LLVMModuleRef {
+        self.module
+    }
 }
 
 impl Drop for TyphoonModule {

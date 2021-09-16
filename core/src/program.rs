@@ -43,7 +43,7 @@ impl Program {
         output_name: &str,
     ) -> Result<(i32, String, String), TyphoonError> {
         let context = TyphoonContext::new();
-        self.token_tree.codegen(context);
+        let module = self.token_tree.codegen(context);
         unsafe {
             // unsafe {
             //     let context = core::LLVMContextCreate();
@@ -86,7 +86,7 @@ impl Program {
             debug!("output object file {:?}", &o_file);
             let ret = LLVMTargetMachineEmitToFile(
                 target_machine,
-                module,
+                module.to_llvm_module_ref(),
                 o_file.as_ptr() as *mut i8,
                 file_type,
                 &mut error_str,
