@@ -64,3 +64,9 @@ jobs:
           args: '--ignore-tests --ciserver github-ci --out Lcov'
         env:
           LLVM_SYS_120_PREFIX: ${{ runner.temp }}/llvm
+
+      - name: upload to Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: './lcov.info'
