@@ -37,7 +37,7 @@ impl ModuleCodegen for ModuleItem {
 impl ModuleCodegen for StructDeclare {
     fn module_codegen(self, context: &TyphoonContext, module: &TyphoonModule) {
         // let struct_type = context.opaque_struct_type(&self.name);
-        for it in self.fields {}
+        for it in self.fields { }
         // struct_type.set_body()
     }
 }
