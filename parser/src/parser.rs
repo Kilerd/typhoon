@@ -109,6 +109,9 @@ impl TyphoonParser {
             },
             [expression(expr)] => {
                 (vec![], Some(expr))
+            },
+            [] => {
+                (vec![], None)
             }
         );
         let stats = stats.into_iter().map(Box::new).collect();

@@ -2,12 +2,19 @@ use crate::codegen::Codegen;
 use crate::error::TyphoonError;
 use crate::llvm_wrapper::context::TyphoonContext;
 use ast::Module;
+use llvm_sys::core::LLVMPrintModuleToString;
 use llvm_sys::target::{
     LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
     LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets,
 };
-use llvm_sys::target_machine::{LLVMCodeGenFileType, LLVMCreateTargetMachine, LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMTargetMachineEmitToFile, LLVMTargetRef, LLVMCodeGenOptLevel, LLVMRelocMode, LLVMCodeModel};
+use llvm_sys::target_machine::{
+    LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetMachine,
+    LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMGetTargetName, LLVMRelocMode,
+    LLVMTargetMachineEmitToFile, LLVMTargetRef,
+};
 use parser::parser::parse_module;
+use std::path::PathBuf;
+use std::time::SystemTime;
 use std::{
     ffi::{CStr, CString},
     mem::MaybeUninit,
@@ -40,15 +47,33 @@ impl Program {
     pub fn as_binary_output(
         self,
         output_name: &str,
+        debug: bool,
     ) -> Result<(i32, String, String), TyphoonError> {
+        let build_folder = PathBuf::from("typhoon_build");
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let buf = PathBuf::from(output_name);
+        let target_build_folder = build_folder.join(format!(
+            "{}_{}",
+            timestamp,
+            buf.file_name().unwrap().to_str().unwrap()
+        ));
+
+        std::fs::create_dir_all(&target_build_folder).expect("Cannot create build folder");
+        if debug {
+            debug!("output ast file");
+            std::fs::write(
+                target_build_folder.join("ast"),
+                format!("{:#?}", &self.token_tree),
+            ).expect("cannot output ast file");
+        }
+
         let context = TyphoonContext::new();
         let module = self.token_tree.codegen(context);
         unsafe {
-            // unsafe {
-            //     let context = core::LLVMContextCreate();
-            //     let builder = core::LLVMCreateBuilderInContext(context);
-            //     let module = self.token_tree.codegen(context, builder);
-            //
             debug!("init target message");
 
             let triple = LLVMGetDefaultTargetTriple();
@@ -66,6 +91,20 @@ impl Program {
 
             let name = LLVMGetTargetName(target);
             let _x = CStr::from_ptr(name as *mut i8);
+
+            // llir
+            if debug {
+                debug!("output llir file");
+                let string = LLVMPrintModuleToString(module.to_llvm_module_ref());
+
+                let x = CStr::from_ptr(string).to_str().unwrap();
+                let llir = x.to_string();
+                std::fs::write(
+                    target_build_folder.join("llir"),
+                    format!("{}", llir),
+                ).expect("cannot output llir file");
+            }
+
             debug!("creating target machine");
             let target_machine = LLVMCreateTargetMachine(
                 target,
@@ -78,8 +117,8 @@ impl Program {
             );
             let file_type = LLVMCodeGenFileType::LLVMObjectFile;
 
-            let o_file_ = format!("{}.o", output_name);
-            let o_file = CString::new(o_file_).unwrap();
+            let o_file_ = target_build_folder.join(format!("{}.o", output_name)).to_str().unwrap().to_string();
+            let o_file = CString::new(o_file_.as_str()).unwrap();
             let mut error_str = ptr::null_mut();
 
             debug!("output object file {:?}", &o_file);
@@ -99,16 +138,17 @@ impl Program {
             }
 
             debug!("link object file as binary {}", &output_name);
+            let execute_file_path = target_build_folder.join(output_name);
             let output = std::process::Command::new("cc")
-                .arg(format!("{}.o", output_name))
+                .arg(o_file_)
                 .arg("-o")
-                .arg(output_name)
+                .arg(execute_file_path.to_str().unwrap())
                 .output()
                 .expect("error on executing linker cc");
 
             if output.status.success() {
                 debug!("running binary file {}", &output_name);
-                let output = std::process::Command::new(format!("./{}", output_name))
+                let output = std::process::Command::new(execute_file_path)
                     .output()
                     .expect("error on executing output file");
 

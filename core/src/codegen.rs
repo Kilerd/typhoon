@@ -46,6 +46,8 @@ fn to_basic_type(ty: &Type, context: &TyphoonContext) -> BasicType {
     match ty.name.as_str() {
         "i8" => context.i8_type().as_basic_type(),
         "i16" => context.i16_type().as_basic_type(),
+        "i32" => context.i32_type().as_basic_type(),
+        "i64" => context.i32_type().as_basic_type(),
         _ => {
             unimplemented!()
         }

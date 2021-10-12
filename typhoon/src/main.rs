@@ -1,9 +1,17 @@
 use core::{error::TyphoonError};
 use structopt::StructOpt;
+use core::program::Program;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "typhoon")]
 enum Opts {
+    Build {
+        #[structopt(name = "FILE")]
+        filename: String,
+        #[structopt(short, long)]
+        debug: bool
+    },
+
     LLIR {
         #[structopt(name = "FILE")]
         filename: String,
@@ -21,6 +29,19 @@ enum Opts {
 fn main() -> Result<(), TyphoonError> {
     env_logger::init();
     let opt: Opts = Opts::from_args();
+
+    match opt {
+        Opts::Build {filename, debug} => {
+            let program = Program::new(filename);
+            let result = program.as_binary_output("run", debug);
+            match result {
+                Ok(ret) => {dbg!(ret);}
+                Err(e) => {eprintln!("{}", e);}
+            };
+        }
+        _ => unimplemented!()
+    }
+
     //
     // match opt {
     //     Opts::LLIR { filename } => {
