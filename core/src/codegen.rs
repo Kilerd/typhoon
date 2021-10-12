@@ -1,7 +1,8 @@
 use crate::llvm_wrapper::context::TyphoonContext;
 use crate::llvm_wrapper::module::TyphoonModule;
 use crate::llvm_wrapper::types::BasicType;
-use ast::{FunctionDeclare, Module, ModuleItem, StructDeclare, Type, Expr, Statement};
+use ast::{Expr, FunctionDeclare, Module, ModuleItem, Statement, StructDeclare, Type};
+use llvm_sys::core::LLVMBuildRetVoid;
 
 pub trait Codegen {
     fn codegen(self, context: TyphoonContext) -> TyphoonModule;
@@ -9,6 +10,10 @@ pub trait Codegen {
 
 pub trait ModuleCodegen {
     fn module_codegen(self, context: &TyphoonContext, module: &TyphoonModule);
+}
+
+pub trait ExprCodegen {
+    fn expr_codegen(self, context: &TyphoonContext, module: &TyphoonModule);
 }
 
 impl Codegen for Module {
@@ -37,7 +42,7 @@ impl ModuleCodegen for ModuleItem {
 impl ModuleCodegen for StructDeclare {
     fn module_codegen(self, context: &TyphoonContext, module: &TyphoonModule) {
         // let struct_type = context.opaque_struct_type(&self.name);
-        for it in self.fields { }
+        for it in self.fields {}
         // struct_type.set_body()
     }
 }
@@ -47,7 +52,8 @@ fn to_basic_type(ty: &Type, context: &TyphoonContext) -> BasicType {
         "i8" => context.i8_type().as_basic_type(),
         "i16" => context.i16_type().as_basic_type(),
         "i32" => context.i32_type().as_basic_type(),
-        "i64" => context.i32_type().as_basic_type(),
+        "i64" => context.i64_type().as_basic_type(),
+        "" => context.void_type(),
         _ => {
             unimplemented!()
         }
@@ -66,6 +72,8 @@ impl ModuleCodegen for FunctionDeclare {
         let function_value = module.add_function(&self.name, function_type);
         let block = context.append_basic_block(function_value, "entry");
         let builder = context.create_builder();
+        // let x = self.stats.expr_codegen(context, module);
+        unsafe { LLVMBuildRetVoid(builder.as_llvm_ref()) };
     }
 }
 
@@ -80,10 +88,8 @@ impl ModuleCodegen for Statement {
     }
 }
 
-
-
-impl ModuleCodegen for Expr {
-    fn module_codegen(self, context: &TyphoonContext, module: &TyphoonModule) {
+impl ExprCodegen for Expr {
+    fn expr_codegen(self, context: &TyphoonContext, module: &TyphoonModule) {
         match self {
             Expr::Identifier(_) => {}
             Expr::Field(_, _) => {}
@@ -91,12 +97,12 @@ impl ModuleCodegen for Expr {
             Expr::BinOperation(_, _, _) => {}
             Expr::If { .. } => {}
             Expr::Call(_, _) => {}
-            Expr::Block(_, _) => {}
+            Expr::Block(stats, ret) => {
+
+            }
             Expr::Group(_) => {}
             Expr::Negative(_) => {}
             Expr::String(_) => {}
         }
     }
 }
-
-

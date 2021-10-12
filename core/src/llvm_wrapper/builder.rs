@@ -9,6 +9,10 @@ impl TyphoonBuilder {
     pub fn new(b: LLVMBuilderRef) -> Self {
         TyphoonBuilder { b }
     }
+
+    pub fn as_llvm_ref(&self) -> LLVMBuilderRef {
+        self.b
+    }
 }
 
 impl Drop for TyphoonBuilder {

@@ -3,9 +3,10 @@ use crate::llvm_wrapper::builder::TyphoonBuilder;
 use crate::llvm_wrapper::module::TyphoonModule;
 use crate::llvm_wrapper::types::int_type::IntType;
 use crate::llvm_wrapper::values::function_value::FunctionValue;
-use llvm_sys::core::{LLVMAppendBasicBlockInContext, LLVMContextCreate, LLVMCreateBuilderInContext, LLVMInt16TypeInContext, LLVMInt8Type, LLVMInt8TypeInContext, LLVMModuleCreateWithNameInContext, LLVMContextDispose, LLVMInt32TypeInContext, LLVMInt64TypeInContext};
+use llvm_sys::core::{LLVMAppendBasicBlockInContext, LLVMContextCreate, LLVMCreateBuilderInContext, LLVMInt16TypeInContext, LLVMInt8Type, LLVMInt8TypeInContext, LLVMModuleCreateWithNameInContext, LLVMContextDispose, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMVoidTypeInContext};
 use llvm_sys::prelude::LLVMContextRef;
 use std::ffi::CString;
+use crate::llvm_wrapper::types::BasicType;
 
 pub struct TyphoonContext {
     ctx: LLVMContextRef,
@@ -52,6 +53,9 @@ impl TyphoonContext {
     }
     pub fn i64_type(&self) -> IntType {
         IntType::new(unsafe { LLVMInt64TypeInContext(self.ctx) })
+    }
+    pub fn void_type(&self) -> BasicType {
+        BasicType::new(unsafe { LLVMVoidTypeInContext(self.ctx) })
     }
 }
 

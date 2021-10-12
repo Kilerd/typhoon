@@ -33,7 +33,7 @@ fn main() -> Result<(), TyphoonError> {
     match opt {
         Opts::Build {filename, debug} => {
             let program = Program::new(filename);
-            let result = program.as_binary_output("run", debug);
+            let result = program.as_binary_output(debug);
             match result {
                 Ok(ret) => {dbg!(ret);}
                 Err(e) => {eprintln!("{}", e);}
