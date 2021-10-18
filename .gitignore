@@ -2,3 +2,4 @@
 **/*.rs.bk
 typhoon_build
 .idea
+.env

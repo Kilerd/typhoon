@@ -345,33 +345,33 @@ impl TyphoonParser {
         }
         if value.ends_with("i16") {
             return Ok(Number::Integer16(
-                i16::from_str(&value.replace("i8", "")).unwrap(),
+                i16::from_str(&value.replace("i16", "")).unwrap(),
             ))
         }
         if value.ends_with("i32") {
             return Ok(Number::Integer32(
-                i32::from_str(&value.replace("i8", "")).unwrap(),
+                i32::from_str(&value.replace("i32", "")).unwrap(),
             ))
         }
 
         if value.ends_with("u8") {
             return Ok(Number::UnSignInteger8(
-                u8::from_str(&value.replace("i8", "")).unwrap(),
+                u8::from_str(&value.replace("u8", "")).unwrap(),
             ))
         }
         if value.ends_with("u16") {
             return Ok(Number::UnSignInteger16(
-                u16::from_str(&value.replace("i8", "")).unwrap(),
+                u16::from_str(&value.replace("u16", "")).unwrap(),
             ))
         }
         if value.ends_with("u32") {
             return Ok(Number::UnSignInteger32(
-                u32::from_str(&value.replace("i8", "")).unwrap(),
+                u32::from_str(&value.replace("u32", "")).unwrap(),
             ))
         }
 
         return Ok(Number::Integer32(
-            i32::from_str(&value.replace("i8", "")).unwrap(),
+            i32::from_str(&value.replace("i32", "")).unwrap(),
         ))
     }
 }

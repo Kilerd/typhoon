@@ -62,6 +62,7 @@ impl TyphoonContext {
 
 impl Drop for TyphoonContext {
     fn drop(&mut self) {
+        trace!("dispose context");
         unsafe { LLVMContextDispose(self.ctx) }
     }
 }

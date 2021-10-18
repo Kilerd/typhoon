@@ -26,6 +26,7 @@ impl TyphoonModule {
 
 impl Drop for TyphoonModule {
     fn drop(&mut self) {
+        trace!("dispose module");
         unsafe {
             LLVMDisposeModule(self.module);
         }

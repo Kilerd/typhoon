@@ -80,7 +80,7 @@ impl Program {
         }
 
         let context = TyphoonContext::new();
-        let module = self.token_tree.codegen(context);
+        let (module, builder) = self.token_tree.codegen(&context);
         unsafe {
             debug!("init target message");
 
@@ -98,7 +98,8 @@ impl Program {
             let code_model = LLVMCodeModel::LLVMCodeModelDefault;
 
             let name = LLVMGetTargetName(target);
-            let _x = CStr::from_ptr(name as *mut i8);
+            let name = CStr::from_ptr(name as *mut i8);
+            debug!("name is {}", name.to_str().unwrap());
 
             // llir
             if debug {

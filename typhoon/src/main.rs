@@ -36,7 +36,7 @@ fn main() -> Result<(), TyphoonError> {
             let result = program.as_binary_output(debug);
             match result {
                 Ok(ret) => {dbg!(ret);}
-                Err(e) => {eprintln!("{}", e);}
+                Err(e) => {eprintln!("got error: {}", e);}
             };
         }
         _ => unimplemented!()
