@@ -1,8 +1,10 @@
 use crate::llvm_wrapper::builder::TyphoonBuilder;
 use crate::llvm_wrapper::context::TyphoonContext;
 use crate::llvm_wrapper::module::TyphoonModule;
+use crate::llvm_wrapper::types::void_type::VoidType;
 use crate::llvm_wrapper::types::BasicType;
-use ast::{Expr, FunctionDeclare, Module, ModuleItem, Statement, StructDeclare, Type};
+use crate::llvm_wrapper::values::BasicValue;
+use ast::{Expr, FunctionDeclare, Module, ModuleItem, Number, Statement, StructDeclare, Type};
 use llvm_sys::core::{LLVMBuildRet, LLVMBuildRetVoid};
 
 pub trait Codegen {
@@ -24,7 +26,7 @@ pub trait ExprCodegen {
         context: &TyphoonContext,
         builder: &TyphoonBuilder,
         module: &TyphoonModule,
-    );
+    ) -> BasicValue;
 }
 
 impl Codegen for Module {
@@ -76,7 +78,7 @@ fn to_basic_type(ty: &Type, context: &TyphoonContext) -> BasicType {
         "i16" => context.i16_type().as_basic_type(),
         "i32" => context.i32_type().as_basic_type(),
         "i64" => context.i64_type().as_basic_type(),
-        "" => context.void_type(),
+        "" => context.void_type().as_basic_type(),
         _ => {
             unimplemented!()
         }
@@ -101,10 +103,9 @@ impl ModuleCodegen for FunctionDeclare {
         let function_type = return_type.fn_type(&args, false);
         let function_value = module.add_function(&self.name, function_type);
         let block = context.append_basic_block(function_value, "entry");
-        // let x = self.stats.expr_codegen(context, module);
         builder.position_at_end(&block);
-        let value = context.i32_type().const_int(10, false);
-        unsafe { LLVMBuildRet(builder.as_llvm_ref(), value.as_llvm_ref()) };
+        let x = self.stats.expr_codegen(context, builder, module);
+        dbg!(x);
     }
 }
 
@@ -119,7 +120,12 @@ impl ModuleCodegen for Statement {
             Statement::Declare(_, _, _) => {}
             Statement::Assignment(_, _) => {}
             Statement::Expr(_) => {}
-            Statement::Return(_) => {}
+            Statement::Return(expr) => {
+                trace!("build return");
+                let value = expr.expr_codegen(&context, &builder, &module);
+                dbg!(&value);
+                builder.build_return(value);
+            }
         }
     }
 }
@@ -130,18 +136,62 @@ impl ExprCodegen for Expr {
         context: &TyphoonContext,
         builder: &TyphoonBuilder,
         module: &TyphoonModule,
-    ) {
+    ) -> BasicValue {
         match self {
-            Expr::Identifier(_) => {}
-            Expr::Field(_, _) => {}
-            Expr::Number(_) => {}
-            Expr::BinOperation(_, _, _) => {}
-            Expr::If { .. } => {}
-            Expr::Call(_, _) => {}
-            Expr::Block(stats, ret) => {}
-            Expr::Group(_) => {}
-            Expr::Negative(_) => {}
-            Expr::String(_) => {}
+            Expr::Identifier(_) => {
+                unimplemented!()
+            }
+            Expr::Field(_, _) => {
+                unimplemented!()
+            }
+            Expr::Number(n) => {
+                trace!("build number");
+                let number_int_value = match n {
+                    Number::Integer8(inner) => context.i8_type().const_int(inner as u64, true),
+                    Number::Integer16(inner) => context.i16_type().const_int(inner as u64, true),
+                    Number::Integer32(inner) => context.i32_type().const_int(inner as u64, true),
+                    Number::UnSignInteger8(inner) => {
+                        unimplemented!()
+                    }
+                    Number::UnSignInteger16(inner) => {
+                        unimplemented!()
+                    }
+                    Number::UnSignInteger32(inner) => {
+                        unimplemented!()
+                    }
+                };
+                number_int_value.into_basic_value()
+            }
+            Expr::BinOperation(_, _, _) => {
+                unimplemented!()
+            }
+            Expr::If { .. } => {
+                unimplemented!()
+            }
+            Expr::Call(_, _) => {
+                unimplemented!()
+            }
+            Expr::Block(stats, ret) => {
+                for statement in stats {
+                    statement.module_codegen(&context, &builder, &module);
+                }
+
+                if let Some(ret_expr) = ret {
+                    ret_expr.expr_codegen(&context, &builder, &module)
+                } else {
+                    let value = context.void_type().const_value();
+                    value.into_basic_value()
+                }
+            }
+            Expr::Group(_) => {
+                unimplemented!()
+            }
+            Expr::Negative(_) => {
+                unimplemented!()
+            }
+            Expr::String(_) => {
+                unimplemented!()
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ use llvm_sys::core::{LLVMAppendBasicBlockInContext, LLVMContextCreate, LLVMCreat
 use llvm_sys::prelude::LLVMContextRef;
 use std::ffi::CString;
 use crate::llvm_wrapper::types::BasicType;
+use crate::llvm_wrapper::types::void_type::VoidType;
 
 pub struct TyphoonContext {
     ctx: LLVMContextRef,
@@ -54,8 +55,8 @@ impl TyphoonContext {
     pub fn i64_type(&self) -> IntType {
         IntType::new(unsafe { LLVMInt64TypeInContext(self.ctx) })
     }
-    pub fn void_type(&self) -> BasicType {
-        BasicType::new(unsafe { LLVMVoidTypeInContext(self.ctx) })
+    pub fn void_type(&self) -> VoidType {
+        VoidType::new(unsafe { LLVMVoidTypeInContext(self.ctx) })
     }
 }
 

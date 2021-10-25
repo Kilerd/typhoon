@@ -108,7 +108,7 @@ impl Program {
 
                 let x = CStr::from_ptr(string).to_str().unwrap();
                 let llir = x.to_string();
-                std::fs::write(self.build_folder.join("llir"), format!("{}", llir))
+                std::fs::write(self.build_folder.join("llir.ll"), format!("{}", llir))
                     .expect("cannot output llir file");
             }
 

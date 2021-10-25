@@ -10,6 +10,7 @@ pub mod function_type;
 pub mod pointer_type;
 pub mod vector_type;
 pub mod int_type;
+pub mod void_type;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum AddressSpace {

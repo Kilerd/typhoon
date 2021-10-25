@@ -1,7 +1,9 @@
+use crate::llvm_wrapper::values::BasicValue;
 use llvm_sys::prelude::LLVMValueRef;
 
-pub struct IntValue{
-    value: LLVMValueRef
+#[derive(Debug)]
+pub struct IntValue {
+    value: LLVMValueRef,
 }
 
 impl IntValue {
@@ -11,5 +13,8 @@ impl IntValue {
     pub fn as_llvm_ref(&self) -> LLVMValueRef {
         self.value
     }
-}
 
+    pub fn into_basic_value(self) -> BasicValue {
+        BasicValue::new(self.value)
+    }
+}
