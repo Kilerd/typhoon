@@ -119,7 +119,9 @@ impl ModuleCodegen for Statement {
         match self {
             Statement::Declare(_, _, _) => {}
             Statement::Assignment(_, _) => {}
-            Statement::Expr(_) => {}
+            Statement::Expr(expr) => {
+                let value1 = expr.expr_codegen(context, builder, module);
+            }
             Statement::Return(expr) => {
                 trace!("build return");
                 let value = expr.expr_codegen(&context, &builder, &module);
