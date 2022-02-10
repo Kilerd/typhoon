@@ -51,3 +51,7 @@ impl StructDeclare {
         }
     }
 }
+
+macro_rules! struct_decl {
+    ($name:tt, {  }) => {};
+}

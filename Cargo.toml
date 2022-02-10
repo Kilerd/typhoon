@@ -1,3 +1,2 @@
-
 [workspace]
-members = ["parser", "core", "ast", "typhoon", "llvm_wrapper"]
+members = ["parser", "core", "ast", "typhoon"]
