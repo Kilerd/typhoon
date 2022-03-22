@@ -10,6 +10,6 @@ edition = "2021"
 thiserror = "1.0.24"
 ast = {path="../ast"}
 parser = {path="../parser"}
-log = "0.4.14"
+log = "0.4.16"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 llvm-sys = "120.2.1"
