@@ -1,7 +1,15 @@
-typhoon
+# typhoon
+a tentitive language to provide powerful development efficiency.
 
-## modules
+## language goals
+ - static typed and strongly typed
+ - ownership model and easy lifetime controll provided by GC
+ - gentle learning curve
+ - fast performance
+
+## project modules
  - `ast` the abstract syntax tree for typhoon
  - `typhoon` Command line tool to execute compiler
  - `core` compile AST into LLIR or binary code
- - `parser` using peg parser to parse text-formatted typhoon code into AST
+ - `parser` peg parser of typhoon
+ - `llvm-wrapper` provide a simple and safe wrapper for llvm
