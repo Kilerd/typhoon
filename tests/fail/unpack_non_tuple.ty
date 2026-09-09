@@ -1,0 +1,9 @@
+# Only a tuple can be unpacked: a list has no statically known arity
+# (DESIGN 4.1).
+# milestone: M2
+# error: cannot unpack a `list<int>`
+
+fn main():
+    xs: list<int> = [1, 2]
+    a, b = xs
+    print(1)

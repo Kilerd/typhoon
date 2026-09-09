@@ -1,0 +1,80 @@
+# Negative list indices: reads and writes, an index computed from a variable,
+# `xs[-len(xs)]`, a one-element list, how they track append and pop, and
+# `insert` with an out-of-range index, which clamps to the ends like Python.
+# milestone: M2
+# expect: 4 3 1 1
+# expect: 2 3
+# expect: [10, 2, 3, 40]
+# expect: [10, 2, 30, 40] 40 30
+# expect: 50 40 5
+# expect: 50 40 4
+# expect: 9 9 True
+# expect: [99] 99 99
+# expect: [0, 1, 2, 3]
+# expect: [0, 1, 25, 2, 3]
+# expect: [0, 1, 25, 2, 3, 9]
+# expect: [0, 1, 25, 2, 3, 8, 9]
+# expect: [2, 1, 3] 3 3
+# expect: c a
+# expect: ["a", "B", "c"]
+# expect: 1.5 0.5
+
+fn main():
+    # -1 is the last element, -len(xs) the first
+    xs = [1, 2, 3, 4]
+    print(xs[-1], xs[-2], xs[-4], xs[-len(xs)])
+
+    # the index may be computed at run time
+    k = 3
+    j = len(xs) - 2
+    print(xs[-k], xs[-j])
+
+    # a negative index also names the slot an element write targets
+    xs[-1] = 40
+    xs[-4] = 10
+    print(xs)
+    m = 2
+    xs[-m] = 30
+    print(xs, xs[-1], xs[-2])
+
+    # append and pop move the element -1 refers to
+    xs.append(50)
+    print(xs[-1], xs[-2], len(xs))
+    popped = xs.pop()
+    print(popped, xs[-1], len(xs))
+
+    # on a one-element list, 0 and -1 are the same slot
+    one = [9]
+    print(one[0], one[-1], one[0] == one[-1])
+    one[-1] = 99
+    print(one, one[-1], one[-len(one)])
+
+    # insert clamps an index that is too far left to the front
+    ys: list<int> = [1, 2, 3]
+    ys.insert(-99, 0)
+    print(ys)
+
+    # -2 puts the new element just before the last one
+    ys.insert(-2, 25)
+    print(ys)
+
+    # an index past the end clamps to the back, -1 to just before the last
+    ys.insert(99, 9)
+    print(ys)
+    ys.insert(-1, 8)
+    print(ys)
+
+    # inserting into an empty list from either end lands at position 0
+    zs: list<int> = []
+    zs.insert(-5, 2)
+    zs.insert(5, 3)
+    zs.insert(-1, 1)
+    print(zs, len(zs), zs[-1])
+
+    # negative indices work the same for the other element types
+    ss = ["a", "b", "c"]
+    print(ss[-1], ss[-3])
+    ss[-2] = "B"
+    print(ss)
+    fs = [0.5, 1.5]
+    print(fs[-1], fs[-2])

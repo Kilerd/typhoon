@@ -1,7 +1,7 @@
-# `str(x)` joins the language with the rest of the string API in M2; an
-# f-string does the same job today.
-# milestone: M1
-# error: the builtin `str` is not supported yet (planned for M2)
+# `str(x)` renders a scalar; a repr protocol for containers arrives in M3.
+# milestone: M2
+# error: `str` is not defined for `list<int>`
 
 fn main():
-    print(str(1))
+    xs: list<int> = [1]
+    print(str(xs))

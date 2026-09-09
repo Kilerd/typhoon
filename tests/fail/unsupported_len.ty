@@ -1,6 +1,6 @@
-# `len` is defined on containers and `str`, which land in M2 (DESIGN 4.6).
-# milestone: M1
-# error: the builtin `len` is not supported yet (planned for M2)
+# `len` is defined on `str`, `list<T>` and `tuple<...>` only (DESIGN 4.6).
+# milestone: M2
+# error: `len` is not defined for `int`
 
 fn main():
-    print(len("typhoon"))
+    print(len(5))

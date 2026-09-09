@@ -1,0 +1,103 @@
+# Functions returning tuple<...>: two and three elements, mixed types, a
+# result indexed or unpacked at the call site, collected into a list, a
+# function that both takes and returns a tuple, recursion, and an early return.
+# milestone: M2
+# expect: (3, 2) (-4, 3)
+# expect: (1, 9, 31)
+# expect: ("7", 3.5, False) ("-4", -2.0, True)
+# expect: 3 2 2 2
+# expect: 8 9 False
+# expect: 5 3 23
+# expect: -2 7 9
+# expect: [(10, 0), (5, 0), (3, 1), (2, 2)] 4 (3, 1)
+# expect: (8, 12) (2, 1)
+# expect: (30, 20) (6, 4)
+# expect: (3, 6) (6, 3) (0, 0)
+# expect: (0, 1) (1, 1) (55, 89)
+# expect: 55 89 True
+# expect: ("negative", 6) ("zero", 0) ("positive", 6)
+# expect: negative 6
+# expect: True True True
+
+fn divmod2(a: int, b: int) -> tuple<int, int>:
+    return (a // b, a % b)
+
+fn stats(xs: list<int>) -> tuple<int, int, int>:
+    lo = xs[0]
+    hi = xs[0]
+    total = 0
+    for x in xs:
+        lo = min(lo, x)
+        hi = max(hi, x)
+        total = total + x
+    return (lo, hi, total)
+
+fn describe(n: int) -> tuple<str, float, bool>:
+    return (str(n), float(n) / 2.0, n % 2 == 0)
+
+fn scale(t: tuple<int, int>, k: int) -> tuple<int, int>:
+    a, b = t
+    return (a * k, b * k)
+
+fn swap(t: tuple<int, int>) -> tuple<int, int>:
+    a, b = t
+    return (b, a)
+
+fn fib_pair(n: int) -> tuple<int, int>:
+    if n == 0:
+        return (0, 1)
+    a, b = fib_pair(n - 1)
+    return (b, a + b)
+
+fn classify(n: int) -> tuple<str, int>:
+    if n < 0:
+        return ("negative", -n)
+    if n == 0:
+        return ("zero", 0)
+    return ("positive", n)
+
+fn main():
+    # A two-element and a three-element return.
+    print(divmod2(17, 5), divmod2(-17, 5))
+    print(stats([3, 1, 4, 1, 5, 9, 2, 6]))
+
+    # A mixed-type return.
+    print(describe(7), describe(-4))
+
+    # Returned and immediately indexed.
+    print(divmod2(17, 5)[0], divmod2(17, 5)[1], divmod2(17, 5)[-1], len(divmod2(17, 5)))
+    print(stats([2, 8, 5])[1], describe(9)[0], describe(9)[2])
+
+    # Returned and unpacked at the call site.
+    q, rem = divmod2(23, 4)
+    print(q, rem, q * 4 + rem)
+    lo, hi, total = stats([7, -2, 4])
+    print(lo, hi, total)
+
+    # Collected into a list<tuple<...>>.
+    quotients: list<tuple<int, int>> = []
+    for i in range(1, 5):
+        quotients.append(divmod2(10, i))
+    print(quotients, len(quotients), quotients[2])
+
+    # A function that takes a tuple AND returns one.
+    print(scale((2, 3), 4), swap((1, 2)))
+
+    # The same tuple threaded through two calls.
+    print(swap(scale((2, 3), 10)), scale(swap((2, 3)), 2))
+    step1 = scale((1, 2), 3)
+    step2 = swap(step1)
+    print(step1, step2, scale(step2, 0))
+
+    # A recursive function returning a tuple.
+    print(fib_pair(0), fib_pair(1), fib_pair(10))
+    f10, f11 = fib_pair(10)
+    print(f10, f11, f10 + f11 == fib_pair(11)[1])
+
+    # An early return of a tuple from inside a branch.
+    print(classify(-6), classify(0), classify(6))
+    kind, magnitude = classify(-6)
+    print(kind, magnitude)
+
+    # Returned tuples compare by value, like any other tuple.
+    print(divmod2(17, 5) == (3, 2), scale((1, 1), 2) == swap((2, 2)), describe(4)[2])

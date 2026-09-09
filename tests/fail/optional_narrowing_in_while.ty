@@ -1,0 +1,18 @@
+# Only an `if` narrows in M2: a `while` header leaves the body unnarrowed
+# because the local may be reassigned in the loop (DESIGN 3.8).
+# milestone: M2
+# error: `Point | None` may be `None` here
+
+class Point:
+    x: float
+
+fn find(flag: bool) -> Point | None:
+    if flag:
+        return Point(x=1.0)
+    return None
+
+fn main():
+    p = find(True)
+    while p is not None:
+        print(p.x)
+        p = None

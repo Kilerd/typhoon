@@ -1,10 +1,12 @@
-# `class` parses but has no meaning before M2 (DESIGN 3.8, 8).
-# milestone: M1
-# error: the `class` declaration is not supported yet (planned for M2)
+# typhoon has no inheritance; compose instead (DESIGN 3.8, 9).
+# milestone: M2
+# error: inheritance is not supported
 
-class Point:
-    x: float
-    y: float
+class Shape:
+    sides: int
+
+class Square(Shape):
+    side: float
 
 fn main():
     print(1)

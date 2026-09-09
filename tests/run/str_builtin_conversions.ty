@@ -1,0 +1,93 @@
+# The built-in conversions str()/int()/float(): every scalar source type,
+# the i64 extremes, truncation toward zero on both signs, round trips, and
+# the fact that str(x) is exactly what print(x) and an f-string hole write.
+# milestone: M2
+# expect: 42 -42 0 0
+# expect: 9223372036854775807 -9223372036854775808
+# expect: 19 20
+# expect: 1.0 -2.0 0.0 -0.0
+# expect: 0.5 -0.25 3.14159
+# expect: 1e+30 -1.5e-07
+# expect: True False
+# expect: x héllo []
+# expect: 0 True
+# expect: 2 2 -2 -2
+# expect: 3 -3 0 0
+# expect: 3.0 -3.0 0.0
+# expect: 2.0 7 -2.0
+# expect: 5.0 5
+# expect: n=7 f=2.5 b=False
+# expect: 5 2 3 4
+# expect: count=12 neg=-4
+# expect: 2.5 True
+# expect: ["1", "2.5", "True", ""] 4
+# expect: True False True True
+# expect: -12
+# expect: -12
+# expect: -12 True
+# expect: 2.5
+# expect: 2.5
+# expect: 2.5 True
+# expect: quoted? quoted? True
+
+fn label(prefix: str, value: int) -> str:
+    return prefix + "=" + str(value)
+
+fn tenth(n: int) -> float:
+    return float(n) / 10.0
+
+fn main():
+    # str() on int: both signs, zero, and the i64 extremes.
+    print(str(42), str(-42), str(0), str(-0))
+    big = 9223372036854775807
+    small = -9223372036854775808
+    print(str(big), str(small))
+    print(len(str(big)), len(str(small)))
+
+    # str() on float: an integral value keeps its `.`, and there is a
+    # negative zero and an exponent form.
+    print(str(1.0), str(-2.0), str(0.0), str(-0.0))
+    print(str(0.5), str(-0.25), str(3.14159))
+    print(str(1e30), str(-1.5e-7))
+
+    # str() on bool, and on str (identity, the empty string included).
+    print(str(True), str(False))
+    print(str("x"), str("héllo"), "[" + str("") + "]")
+    print(len(str("")), str("abc") == "abc")
+
+    # int() truncates toward zero on both signs and leaves integral floats.
+    print(int(2.9), int(2.1), int(-2.9), int(-2.1))
+    print(int(3.0), int(-3.0), int(0.0), int(-0.0))
+
+    # float() on int, and the round trips in both directions.
+    print(float(3), float(-3), float(0))
+    print(float(int(2.9)), int(float(7)), float(int(-2.9)))
+    print(str(float(5)), str(int(5.0)))
+
+    # Conversions inside concatenation and under len().
+    print("n=" + str(7) + " f=" + str(2.5) + " b=" + str(False))
+    print(len(str(12345)), len(str(-1)), len(str(2.5)), len(str(True)))
+
+    # Conversions as function arguments and inside a container.
+    print(label("count", 12), label("neg", int(-4.7)))
+    print(tenth(25), str(tenth(25)) == "2.5")
+    texts: list<str> = [str(1), str(2.5), str(True), str("")]
+    print(texts, len(texts))
+
+    # Conversions compared with ==: str(7) is "7" but str(7.0) is "7.0".
+    print(str(7) == "7", str(7.0) == "7", str(7.0) == "7.0", str(True) != "true")
+
+    # str(x) writes exactly what print(x) writes for a scalar, which is also
+    # what an f-string hole produces.
+    v = -12
+    f = 2.5
+    print(v)
+    print(str(v))
+    print(f"{v}", str(v) == f"{v}")
+    print(f)
+    print(str(f))
+    print(f"{f}", str(f) == f"{f}")
+
+    # A bare str prints unquoted, and str() of it is the same value.
+    s = "quoted?"
+    print(s, str(s), s == str(s))

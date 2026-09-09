@@ -1,0 +1,13 @@
+# Methods are not first-class values in M2: they can only be called
+# (DESIGN 3.8).
+# milestone: M2
+# error: `get` is a method; call it
+
+class Point:
+    x: float
+
+    fn get(self) -> float:
+        return self.x
+
+fn main():
+    print(Point(x=1.0).get)

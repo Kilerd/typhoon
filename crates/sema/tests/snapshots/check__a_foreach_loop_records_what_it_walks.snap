@@ -1,0 +1,13 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn main() -> None
+  local total: int
+  local n: int
+  local c: str
+  total = 0:int
+  for n in list [1:int, 2:int, 3:int]:list<int>:
+    total = (total:int + n:int):int
+  for c in str "ab":str:
+    print(c:str):None

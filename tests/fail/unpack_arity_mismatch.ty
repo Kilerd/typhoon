@@ -1,0 +1,7 @@
+# Unpacking is arity-checked against the tuple's type (DESIGN 4.1).
+# milestone: M2
+# error: expected 3 values to unpack, found 2
+
+fn main():
+    a, b, c = (1, 2)
+    print(1)

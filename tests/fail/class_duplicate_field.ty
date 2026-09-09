@@ -1,0 +1,10 @@
+# Field names inside a class must be unique (DESIGN 3.8).
+# milestone: M2
+# error: the field `x` is declared twice
+
+class Point:
+    x: float
+    x: int
+
+fn main():
+    print(Point(x=1.0).x)

@@ -1,0 +1,88 @@
+# Classes (DESIGN 3.8): fields declared in order with int, float, str and bool
+# types, the keyword-only constructor written in and out of declaration order,
+# field reads, a value-returning method, a unit method, and `is` / `is not`.
+# milestone: M2
+# expect: 1
+# expect: 0.5
+# expect: north
+# expect: True
+# expect: 1 0.5 north True
+# expect: 1 0.5 north True
+# expect: north#1
+# expect: 2.0
+# expect: 5.0
+# expect: 7
+# expect: False
+# expect: south#1
+# expect: north True
+# expect: True
+# expect: False
+# expect: True
+# expect: True
+# expect: False
+# expect: 3 1.5 west False
+# expect: west#3 0.0
+
+class Sensor:
+    id: int
+    scale: float
+    name: str
+    active: bool
+
+    # A method with a declared return type.
+    fn label(self) -> str:
+        return f"{self.name}#{self.id}"
+
+    fn reading(self, raw: float) -> float:
+        return raw * self.scale
+
+    # A method with no `->` returns unit; both of these write a field.
+    fn deactivate(self):
+        self.active = False
+
+    fn rename(self, name: str):
+        self.name = name
+
+fn describe(s: Sensor) -> str:
+    return f"{s.label()} {s.reading(0.0)}"
+
+fn main():
+    # The constructor is keyword-only; here the arguments are in field order.
+    s = Sensor(id=1, scale=0.5, name="north", active=True)
+
+    # Reading each field on its own, then all four at once.
+    print(s.id)
+    print(s.scale)
+    print(s.name)
+    print(s.active)
+    print(s.id, s.scale, s.name, s.active)
+
+    # The same fields, with the keywords written in a different order.
+    t = Sensor(active=True, name="north", scale=0.5, id=1)
+    print(t.id, t.scale, t.name, t.active)
+
+    # Methods that return a value, alone and inside larger expressions.
+    print(s.label())
+    print(s.reading(4.0))
+    print(s.reading(4.0) + s.reading(6.0))
+    print(len(s.label()))
+
+    # A unit method mutates the receiver in place.
+    s.deactivate()
+    print(s.active)
+    s.rename("south")
+    print(s.label())
+    print(t.name, t.active)         # `t` is a separate object, untouched
+
+    # `is` / `is not` compare identity, never field values.
+    print(s is s)
+    print(s is t)
+    print(s is not t)
+    u = s
+    print(u is s)
+    print(u is not s)
+
+    # Constructor arguments may be arbitrary expressions.
+    v = Sensor(id=1 + 2, scale=3.0 / 2.0, name="w" + "est", active=1 > 2)
+    print(v.id, v.scale, v.name, v.active)
+    print(describe(v))

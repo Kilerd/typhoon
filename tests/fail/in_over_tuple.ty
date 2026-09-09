@@ -1,0 +1,9 @@
+# `in` works on a `list<T>` and a `str`; a tuple is heterogeneous and has no
+# membership test (DESIGN 3.6, 4.1).
+# milestone: M2
+# error: `in` is not defined for `tuple<int, str>`
+
+fn main():
+    t: tuple<int, str> = (1, "a")
+    if 1 in t:
+        print("yes")

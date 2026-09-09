@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Point:\\n    x: float\\n    y: float\\n\\nfn main():\\n    p = Point(1.0, y=2.0)\\n    print(p.x)\\n\")"
+---
+error: the constructor of `Point` only takes keyword arguments
+ --> main.ty:6:15
+  |
+6 |     p = Point(1.0, y=2.0)
+  |               ^^^ name the field, e.g. `x=1`
+  |
+  = note: the generated constructor is keyword-only, see DESIGN.md 3.8

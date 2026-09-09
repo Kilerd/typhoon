@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Point:\\n    x: float\\n\\nfn main():\\n    print(Point(x=1.0))\\n\")"
+---
+error: cannot print a `Point`
+ --> main.ty:5:11
+  |
+5 |     print(Point(x=1.0))
+  |           ^^^^^^^^^^^^ this is a `Point`
+  |
+  = note: see DESIGN.md section 3.8
+  = help: format the fields explicitly; a repr protocol arrives in M3

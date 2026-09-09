@@ -1,0 +1,9 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Point:\\n    x: float\\n\\n    fn norm(self) -> float:\\n        return self.x\\n\\nfn main():\\n    p = Point(x=1.0)\\n    print(p.dist())\\n\")"
+---
+error: `Point` has no method `dist`
+ --> main.ty:9:13
+  |
+9 |     print(p.dist())
+  |             ^^^^ unknown method

@@ -1,0 +1,108 @@
+# Tuple unpacking: `a, b, c = t`, the bare `a, b = 1, 2` form, unpacking a
+# returned tuple, the outer level of a nested one, a row inside a loop, the
+# swap idiom, the single-element `(only,) = one`, and rebinding existing names.
+# milestone: M2
+# expect: 1 two True
+# expect: 1 2
+# expect: 3 four 5.0
+# expect: 5 25
+# expect: -3 -3 False
+# expect: (1, 2) (3, 4) 1 4
+# expect: 1 (2, (3, 4)) (3, 4) 3
+# expect: 1 a 1
+# expect: 2 bb 2
+# expect: 3 ccc 3
+# expect: 14
+# expect: 20 10
+# expect: 10 20
+# expect: 3 1 2
+# expect: 42 True
+# expect: 99 old False
+# expect: 1 two True
+# expect: 1 2.5 three False (4, 5) 5
+# expect: 11 42
+# expect: 3 9 12
+
+fn pair(n: int) -> tuple<int, int>:
+    return (n, n * n)
+
+fn triple(n: int) -> tuple<int, str, bool>:
+    return (n, str(n), n > 0)
+
+fn dot(a: tuple<int, int>, b: tuple<int, int>) -> int:
+    ax, ay = a
+    bx, by = b
+    return ax * bx + ay * by
+
+fn main():
+    # a, b, c = t over a mixed tuple.
+    t = (1, "two", True)
+    a, b, c = t
+    print(a, b, c)
+
+    # The bare comma list on the right builds a tuple, so `a, b = 1, 2` works.
+    x, y = 1, 2
+    print(x, y)
+    p, q, r = 3, "four", 5.0
+    print(p, q, r)
+
+    # Unpacking a tuple returned from a function.
+    lo, hi = pair(5)
+    print(lo, hi)
+    n, s, positive = triple(-3)
+    print(n, s, positive)
+
+    # Unpacking only the outer level: the parts stay tuples.
+    left, right = ((1, 2), (3, 4))
+    print(left, right, left[0], right[-1])
+    head, tail = (1, (2, (3, 4)))
+    print(head, tail, tail[1], tail[1][0])
+
+    # Unpacking a row in a loop body, out of a list<tuple<...>>.
+    rows: list<tuple<int, str>> = [(1, "a"), (2, "bb"), (3, "ccc")]
+    for row in rows:
+        num, name = row
+        print(num, name, len(name))
+    total = 0
+    for row in rows:
+        num, name = row
+        total = total + num * len(name)
+    print(total)
+
+    # The swap idiom, with and without explicit parentheses.
+    u = 10
+    v = 20
+    u, v = v, u
+    print(u, v)
+    u, v = (v, u)
+    print(u, v)
+
+    # A three-way rotation in one statement.
+    i = 1
+    j = 2
+    k = 3
+    i, j, k = k, i, j
+    print(i, j, k)
+
+    # A single-element tuple unpacks with a trailing comma on the left.
+    one = (42,)
+    (only,) = one
+    print(only, only == one[0])
+
+    # Unpacking into names that already exist just rebinds them.
+    a = 99
+    b = "old"
+    c = False
+    print(a, b, c)
+    a, b, c = t
+    print(a, b, c)
+
+    # Unpacking mixed types, including a nested tuple element.
+    mixed = (1, 2.5, "three", False, (4, 5))
+    m1, m2, m3, m4, m5 = mixed
+    print(m1, m2, m3, m4, m5, m5[1])
+
+    # The unpacked parts feeding further calls.
+    print(dot((1, 2), (3, 4)), dot(pair(2), pair(3)))
+    d1, d2 = pair(3)
+    print(d1, d2, d1 + d2)

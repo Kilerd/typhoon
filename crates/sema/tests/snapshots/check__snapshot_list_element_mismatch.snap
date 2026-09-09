@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    xs = [1, 2.0, 3]\\n    print(xs)\\n\")"
+---
+error: mismatched types: expected `int`, found `float`
+ --> main.ty:2:14
+  |
+2 |     xs = [1, 2.0, 3]
+  |              ^^^ expected `int`, found `float`
+  |
+  = note: every element of a list literal must have the same type

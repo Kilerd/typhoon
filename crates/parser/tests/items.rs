@@ -231,3 +231,23 @@ fn several_functions_in_a_row_without_blank_lines() {
     let module = module("fn a():\n    pass\nfn b():\n    pass\nfn c():\n    pass\n");
     assert_eq!(module.items.len(), 3);
 }
+
+#[test]
+fn a_base_class_list_is_rejected_with_a_dedicated_message() {
+    let messages = common::messages("class B(A):\n    x: int\n");
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("inheritance is not supported")),
+        "{messages:?}"
+    );
+    // Recovery still yields the class, so its body is checked as usual.
+    let (module, _) = common::module_with_diags("class B(A):\n    x: int\n");
+    match &module.items[0] {
+        Item::Class(decl) => {
+            assert_eq!(decl.name.as_str(), "B");
+            assert_eq!(decl.fields.len(), 1);
+        }
+        other => panic!("{other:?}"),
+    }
+}

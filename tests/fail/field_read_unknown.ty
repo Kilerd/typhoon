@@ -1,0 +1,12 @@
+# A class has exactly the fields it declares (DESIGN 3.8).
+# milestone: M2
+# error: `Point` has no field `z`
+# error: `Point` has the fields `x`, `y`
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    p = Point(x=1.0, y=2.0)
+    print(p.z)

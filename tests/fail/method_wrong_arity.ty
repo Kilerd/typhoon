@@ -1,0 +1,14 @@
+# A method call is checked against the declared signature, `self` excluded
+# (DESIGN 3.8, 4.4).
+# milestone: M2
+# error: `Point.shift` takes 1 argument but 2 were supplied
+
+class Point:
+    x: float
+
+    fn shift(self, dx: float):
+        self.x = self.x + dx
+
+fn main():
+    p = Point(x=1.0)
+    p.shift(1.0, 2.0)

@@ -1,0 +1,7 @@
+# `None` is the unit type: a container of nothing holds no values (DESIGN 4.1).
+# milestone: M2
+# error: `list<None>` has no values
+
+fn main():
+    xs: list<None> = [None]
+    print(len(xs))

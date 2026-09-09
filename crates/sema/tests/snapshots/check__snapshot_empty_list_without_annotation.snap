@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    xs = []\\n    print(len(xs))\\n\")"
+---
+error: cannot infer the element type of an empty list
+ --> main.ty:2:10
+  |
+2 |     xs = []
+  |          ^^ this literal has no elements to infer from
+  |
+  = note: inference is local, so an empty container needs an annotation, see DESIGN.md section 4.4
+  = help: annotate the variable, e.g. `xs: list<int> = []`

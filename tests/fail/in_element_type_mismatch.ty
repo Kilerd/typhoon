@@ -1,0 +1,8 @@
+# `in` over a `list<T>` compares against `T` (DESIGN 3.6).
+# milestone: M2
+# error: mismatched types: expected `int`, found `str`
+
+fn main():
+    xs: list<int> = [1, 2]
+    if "1" in xs:
+        print("found")

@@ -1,0 +1,93 @@
+# str methods: upper / lower (ASCII only, everything else passes through),
+# strip (leading, trailing, both, tabs and newlines, all whitespace, nothing to
+# strip), startswith / endswith, find (a code point index, -1 when absent),
+# replace (none, one, many, growing, shrinking, the empty needle) and chains.
+# milestone: M2
+# expect: 9
+# expect: HELLO, 世界
+# expect: hello, 世界
+# expect: MIXED 123 台风 mixed 123 台风
+# expect: | NAïVE
+# expect: [lead]
+# expect: [trail]
+# expect: [both]
+# expect: [mix]
+# expect: []
+# expect: []
+# expect: [nothing]
+# expect: [a b]
+# expect: True False
+# expect: True False
+# expect: True True
+# expect: True True
+# expect: False False
+# expect: 0 4 8
+# expect: 3 -1
+# expect: 0 0 -1
+# expect: baNANA
+# expect: boonoonoo
+# expect: ba
+# expect: banana
+# expect: a to b
+# expect: ba
+# expect: .a.b.c.
+# expect: 你好, 世界
+# expect: mixed case
+# expect: QUIET
+# expect: b 1
+
+fn shout(text: str) -> str:
+    return text.strip().upper()
+
+fn main():
+    # len counts code points, not bytes.
+    s = "Hello, 世界"
+    print(len(s))
+
+    # upper / lower only map ASCII letters; other characters pass through.
+    print(s.upper())
+    print(s.lower())
+    print("MiXeD 123 台风".upper(), "MiXeD 123 台风".lower())
+    print("".upper() + "|", "naïve".upper())
+
+    # strip removes leading and trailing whitespace only; brackets show the
+    # exact result.
+    print("[" + "  lead".strip() + "]")
+    print("[" + "trail  ".strip() + "]")
+    print("[" + "  both  ".strip() + "]")
+    print("[" + "\t\n mix \n\t".strip() + "]")
+    print("[" + "   ".strip() + "]")
+    print("[" + "".strip() + "]")
+    print("[" + "nothing".strip() + "]")
+    print("[" + " a b ".strip() + "]")
+
+    # startswith / endswith, including the empty prefix, the whole string and a
+    # needle longer than the string.
+    print(s.startswith("He"), s.startswith("he"))
+    print(s.endswith("界"), s.endswith("world"))
+    print(s.startswith(""), s.endswith(""))
+    print(s.startswith(s), s.endswith(s))
+    print("ab".startswith("abc"), "ab".endswith("zab"))
+
+    # find returns a CODE POINT index: the non-ASCII match is at 8, not at a
+    # byte offset, and a missing needle gives -1.
+    print(s.find("Hello"), s.find("o"), s.find("界"))
+    print(s.find("lo,"), s.find("zzz"))
+    print(s.find(""), "".find(""), "".find("a"))
+
+    # replace scans left to right over non-overlapping matches.
+    print("banana".replace("na", "NA"))
+    print("banana".replace("a", "oo"))
+    print("banana".replace("na", ""))
+    print("banana".replace("x", "y"))
+    print("a-b".replace("-", " to "))
+    print("aaa".replace("aa", "b"))
+    print("abc".replace("", "."))
+    print(s.replace("Hello", "你好"))
+
+    # Chaining several methods, including across a function boundary.
+    print("  MiXeD-case  ".strip().lower().replace("-", " "))
+    print(shout("  quiet  "))
+    dashed = "a,b,c".replace(",", "-")
+    cells: list<str> = dashed.split("-")
+    print(cells[1], "a,b,c".find(","))

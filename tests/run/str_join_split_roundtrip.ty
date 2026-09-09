@@ -1,0 +1,86 @@
+# split() and join() are exact inverses: `sep.join(s.split(sep)) == s` for
+# single- and multi-character separators, a separator equal to the whole
+# string, an absent separator, empty/leading/trailing/repeated separators and
+# non-ASCII text.
+# milestone: M2
+# expect: ["a", "b", "c"] 3 a-b-c True
+# expect: ["a", "b", "c"] 3 True
+# expect: ["a", "b", "c"] 3 aXXbXXc True
+# expect: ["", ""] 2 [ab] True
+# expect: ["abc"] 1 True True
+# expect: [""] 1 [] True
+# expect: ["", "a", "b", ""] 4 True
+# expect: ["a", "", "b"] 3 a--b True
+# expect: ["", ""] 2 True
+# expect: ["", "", "", ""] 4 True
+# expect: ["世界", "你好", "台风"] 3 世界-你好-台风 True
+# expect: ["a", "b", "c"] 3 a世b世c True
+# expect: ["one"] 1 one
+# expect: [] 0 [] 0
+# expect: abc 世界你好台风
+# expect: a+b+c 世界/你好/台风
+# expect: True True True True
+# expect: True True True True
+# expect: True True True True
+
+fn roundtrips(s: str, sep: str) -> bool:
+    parts: list<str> = s.split(sep)
+    return sep.join(parts) == s
+
+fn main():
+    # A plain single-character separator.
+    p1: list<str> = "a-b-c".split("-")
+    print(p1, len(p1), "-".join(p1), roundtrips("a-b-c", "-"))
+
+    # Split, join, split again: the second split yields the same parts.
+    again: list<str> = "-".join(p1).split("-")
+    print(again, len(again), again == p1)
+
+    # A multi-character separator.
+    p2: list<str> = "aXXbXXc".split("XX")
+    print(p2, len(p2), "XX".join(p2), roundtrips("aXXbXXc", "XX"))
+
+    # The separator is the whole string: two empty parts.
+    p3: list<str> = "ab".split("ab")
+    print(p3, len(p3), "[" + "ab".join(p3) + "]", roundtrips("ab", "ab"))
+
+    # A separator that does not occur: one part, the whole input.
+    p4: list<str> = "abc".split("-")
+    print(p4, len(p4), p4[0] == "abc", roundtrips("abc", "-"))
+
+    # The empty input string always splits into one empty part.
+    p5: list<str> = "".split("-")
+    print(p5, len(p5), "[" + "-".join(p5) + "]", roundtrips("", "-"))
+
+    # Leading, trailing and consecutive separators keep their empty parts.
+    p6: list<str> = "-a-b-".split("-")
+    print(p6, len(p6), roundtrips("-a-b-", "-"))
+    p7: list<str> = "a--b".split("-")
+    print(p7, len(p7), "-".join(p7), roundtrips("a--b", "-"))
+    p8: list<str> = "-".split("-")
+    print(p8, len(p8), roundtrips("-", "-"))
+    p9: list<str> = "---".split("-")
+    print(p9, len(p9), roundtrips("---", "-"))
+
+    # Non-ASCII text with an ASCII separator, then a non-ASCII separator.
+    p10: list<str> = "世界-你好-台风".split("-")
+    print(p10, len(p10), "-".join(p10), roundtrips("世界-你好-台风", "-"))
+    p11: list<str> = "a世b世c".split("世")
+    print(p11, len(p11), "世".join(p11), roundtrips("a世b世c", "世"))
+
+    # A one-element result, and joining an annotated empty list<str>.
+    p12: list<str> = "one".split(",")
+    print(p12, len(p12), "+".join(p12))
+    none: list<str> = []
+    print(none, len(none), "[" + "+".join(none) + "]", len("+".join(none)))
+
+    # Joining with the empty separator just concatenates the parts.
+    print("".join(p1), "".join(p10))
+
+    # Re-joining with a different separator rewrites the string.
+    print("+".join(p1), "/".join(p10))
+
+    # sep.join(s.split(sep)) == s holds for every case above.
+    print(roundtrips("a-b-c", "-"), roundtrips("aXXbXXc", "XX"), roundtrips("ab", "ab"), roundtrips("abc", "-"))
+    print(roundtrips("", "-"), roundtrips("-a-b-", "-"), roundtrips("a--b", "-"), roundtrips("---", "-"))
+    print(roundtrips("世界-你好-台风", "-"), roundtrips("a世b世c", "世"), roundtrips("one", ","), roundtrips("-", "-"))

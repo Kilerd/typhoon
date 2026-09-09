@@ -1,0 +1,8 @@
+# `append` mutates in place and returns unit, so its result cannot initialise a
+# variable (DESIGN 4.2, 4.6).
+# milestone: M2
+# error: cannot declare `n` with type `None`
+
+fn main():
+    xs: list<int> = [1]
+    n = xs.append(2)

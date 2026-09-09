@@ -1,0 +1,14 @@
+# A membership test needs an element type that can be compared, which class
+# instances cannot be in M2 (DESIGN 3.6, 3.8).
+# milestone: M2
+# error: `in` is not defined for `list<Point>`
+# error: `in` over a list needs `int`, `float`, `bool` or `str` elements
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    ps: list<Point> = [p]
+    if p in ps:
+        print("found")

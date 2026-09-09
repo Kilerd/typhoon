@@ -25,9 +25,12 @@
 //! * a local's type is fixed by its first assignment and never changes;
 //! * there are no implicit conversions and no truthiness (DESIGN §3.6, §4.3);
 //! * a function with a return type returns on every path;
-//! * features that parse but belong to a later milestone (classes, lists,
-//!   dicts, generics, `is`, `in`, indexing, attributes, comparison chains)
-//!   are rejected with one diagnostic each.
+//! * a class constructor is called with keyword arguments only, naming every
+//!   field that has no default exactly once (DESIGN §3.8);
+//! * a `C | None` is narrowed by `is None` before it is used as a `C`;
+//! * features that parse but belong to a later milestone (dicts, sets,
+//!   generics, comprehensions, general unions, comparison chains) are rejected
+//!   with one diagnostic each.
 
 #![warn(missing_docs)]
 
@@ -41,8 +44,8 @@ pub mod types;
 use typhoon_ast as ast;
 use typhoon_diag::{Diagnostic, Diagnostics, FileId, Span};
 
-use crate::check::{Checker, ConstEntry, FnSig, ParamSig};
-use crate::types::TypeId;
+use crate::check::{Checker, ClassEntry, ConstEntry, ConstValue, FnSig, ParamSig};
+use crate::types::{ClassId, FieldInfo, Type, TypeId};
 
 pub use dump::dump_program;
 
@@ -82,24 +85,135 @@ pub fn check_module(
 }
 
 impl<'a> Checker<'a> {
-    /// First pass: collect constants and function signatures, so that
-    /// functions may be called before they are declared.
+    /// First pass: collect classes, constants and function signatures, so that
+    /// every declaration may refer to every other one in any order.
+    ///
+    /// The order matters: class *names* come first so that fields and
+    /// signatures may mention classes declared later (and the class itself,
+    /// which is what makes `Node | None` trees possible); constants next,
+    /// because a field default may use one; then field types; then the
+    /// signatures of free functions and methods, in the order their bodies are
+    /// checked.
     fn collect_items<'m>(&mut self, module: &'m ast::Module) -> Vec<&'m ast::FnDecl> {
-        let mut decls = Vec::new();
+        for item in &module.items {
+            if let ast::Item::Class(decl) = item {
+                self.collect_class_name(decl);
+            }
+        }
+        for item in &module.items {
+            if let ast::Item::Const(decl) = item {
+                self.collect_const(decl);
+            }
+        }
+        for item in &module.items {
+            if let ast::Item::Class(decl) = item {
+                self.collect_class_fields(decl);
+            }
+        }
+
+        let mut decls: Vec<&'m ast::FnDecl> = Vec::new();
         for item in &module.items {
             match item {
-                ast::Item::Class(decl) => {
-                    self.unsupported(decl.span, "the `class` declaration", "M2");
-                }
-                ast::Item::Const(decl) => self.collect_const(decl),
                 ast::Item::Fn(decl) => {
-                    if self.collect_fn(decl, hir::FuncId(decls.len() as u32)) {
+                    if self.collect_fn(decl, hir::FuncId(decls.len() as u32), None) {
                         decls.push(decl);
                     }
                 }
+                ast::Item::Class(decl) => {
+                    let Some(class) = self.classes.get(decl.name.as_str()).map(|c| c.id) else {
+                        continue;
+                    };
+                    for method in &decl.methods {
+                        if self.collect_fn(method, hir::FuncId(decls.len() as u32), Some(class)) {
+                            decls.push(method);
+                        }
+                    }
+                }
+                ast::Item::Const(_) => {}
             }
         }
         decls
+    }
+
+    /// Registers a class name, before any field type is resolved.
+    fn collect_class_name(&mut self, decl: &ast::ClassDecl) {
+        if !decl.generics.is_empty() {
+            let span = decl.generics[0].span;
+            self.unsupported(span, "a generic class", "M3");
+            self.poisoned.insert(decl.name.name.clone());
+            return;
+        }
+        if self.classes.contains_key(decl.name.as_str())
+            || self.duplicate_name(decl.name.as_str(), decl.name.span)
+        {
+            self.poisoned.insert(decl.name.name.clone());
+            return;
+        }
+        let (id, ty) = self.types.declare_class(decl.name.as_str());
+        self.classes.insert(
+            decl.name.name.clone(),
+            ClassEntry {
+                id,
+                ty,
+                name_span: decl.name.span,
+                defaults: Vec::new(),
+            },
+        );
+    }
+
+    /// Resolves the field types and constant defaults of a class (DESIGN §3.8).
+    fn collect_class_fields(&mut self, decl: &ast::ClassDecl) {
+        let Some(id) = self.classes.get(decl.name.as_str()).map(|c| c.id) else {
+            return;
+        };
+        let mut fields: Vec<FieldInfo> = Vec::with_capacity(decl.fields.len());
+        let mut defaults: Vec<Option<ConstValue>> = Vec::with_capacity(decl.fields.len());
+        for field in &decl.fields {
+            let ty = self.resolve_type(&field.ty);
+            if ty == TypeId::UNIT {
+                self.error(
+                    Diagnostic::error(format!(
+                        "the field `{}` cannot have type `None`",
+                        field.name.as_str()
+                    ))
+                    .with_label(field.ty.span, "`None` is not a value type"),
+                );
+            }
+            if let Some(previous) = fields.iter().position(|f| f.name == field.name.name) {
+                let previous = decl.fields[previous].name.span;
+                self.error(
+                    Diagnostic::error(format!(
+                        "the field `{}` is declared twice",
+                        field.name.as_str()
+                    ))
+                    .with_label(field.name.span, "duplicate field")
+                    .with_secondary(previous, "first declared here"),
+                );
+                continue;
+            }
+            let default = match &field.default {
+                Some(expr) => {
+                    let value = self.eval_const(expr);
+                    match value {
+                        Some(value) if !self.assignable(ty, value.ty()) => {
+                            self.mismatch(expr.span, ty, value.ty());
+                            None
+                        }
+                        other => other,
+                    }
+                }
+                None => None,
+            };
+            fields.push(FieldInfo {
+                name: field.name.name.clone(),
+                ty,
+            });
+            defaults.push(default);
+        }
+        self.types.set_fields(id, fields);
+        if let Some(entry) = self.classes.get_mut(decl.name.as_str()) {
+            entry.defaults = defaults;
+        }
     }
 
     fn collect_const(&mut self, decl: &ast::ConstDecl) {
@@ -108,7 +222,10 @@ impl<'a> Checker<'a> {
             self.poisoned.insert(decl.name.name.clone());
             return;
         };
-        if declared != TypeId::ERROR && value.ty() != declared {
+        if declared != TypeId::ERROR
+            && !matches!(self.types.get(declared), Type::Optional(_))
+            && value.ty() != declared
+        {
             self.mismatch(decl.value.span, declared, value.ty());
             self.poisoned.insert(decl.name.name.clone());
             return;
@@ -130,33 +247,72 @@ impl<'a> Checker<'a> {
     }
 
     /// Records the signature of `decl`, returning whether its body should be
-    /// checked.
-    fn collect_fn(&mut self, decl: &ast::FnDecl, id: hir::FuncId) -> bool {
+    /// checked. `class` is `Some` for a method, whose first parameter is the
+    /// untyped `self` receiver (DESIGN §3.8).
+    fn collect_fn(&mut self, decl: &ast::FnDecl, id: hir::FuncId, class: Option<ClassId>) -> bool {
         if !decl.generics.is_empty() {
             let span = decl.generics[0].span;
             self.unsupported(span, "a generic function", "M3");
             return false;
         }
-        if decl.is_method() {
-            self.error(
-                Diagnostic::error("`self` is only allowed on a method of a class")
-                    .with_label(decl.params[0].span, "not inside a class")
-                    .with_note("classes arrive in M2, see DESIGN.md section 3.8"),
-            );
-            return false;
-        }
-        if self.duplicate_name(decl.name.as_str(), decl.name.span) {
-            return false;
-        }
-        self.poisoned.remove(decl.name.as_str());
+        let (qualified, symbol) = match class {
+            Some(class) => {
+                if !decl.is_method() {
+                    let span = decl.params.first().map_or(decl.name.span, |p| p.span);
+                    self.error(
+                        Diagnostic::error(format!(
+                            "the method `{}` must take `self` as its first parameter",
+                            decl.name.as_str()
+                        ))
+                        .with_label(span, "expected `self` here")
+                        .with_note("see DESIGN.md section 3.8"),
+                    );
+                    return false;
+                }
+                if self.methods.contains_key(&(class, decl.name.name.clone())) {
+                    let class_name = self.types.class(class).name.clone();
+                    self.error(
+                        Diagnostic::error(format!(
+                            "the method `{}` is declared twice on `{class_name}`",
+                            decl.name.as_str()
+                        ))
+                        .with_label(decl.name.span, "duplicate method"),
+                    );
+                    return false;
+                }
+                let class_name = self.types.class(class).name.clone();
+                self.methods.insert((class, decl.name.name.clone()), id);
+                (
+                    format!("{class_name}.{}", decl.name.as_str()),
+                    format!("ty_user_{class_name}__{}", decl.name.as_str()),
+                )
+            }
+            None => {
+                if decl.is_method() {
+                    self.error(
+                        Diagnostic::error("`self` is only allowed on a method of a class")
+                            .with_label(decl.params[0].span, "not inside a class")
+                            .with_help("declare this function inside a `class`"),
+                    );
+                    return false;
+                }
+                if self.duplicate_name(decl.name.as_str(), decl.name.span) {
+                    return false;
+                }
+                self.poisoned.remove(decl.name.as_str());
+                (decl.name.name.clone(), mangle(decl.name.as_str()))
+            }
+        };
 
         let mut params = Vec::with_capacity(decl.params.len());
         let mut seen: Vec<&str> = Vec::new();
         for param in &decl.params {
-            let ty = match &param.ty {
-                Some(ty) => self.resolve_type(ty),
+            let ty = match (&param.ty, param.is_self, class) {
+                // `self` is never annotated; its type is the enclosing class.
+                (None, true, Some(class)) => self.types.class_ty(class),
+                (Some(ty), _, _) => self.resolve_type(ty),
                 // The parser already reported the missing annotation.
-                None => TypeId::ERROR,
+                _ => TypeId::ERROR,
             };
             if seen.contains(&param.name.as_str()) {
                 self.error(
@@ -172,7 +328,7 @@ impl<'a> Checker<'a> {
                 Some(expr) => {
                     let value = self.eval_const(expr);
                     match value {
-                        Some(value) if ty != TypeId::ERROR && value.ty() != ty => {
+                        Some(value) if !self.assignable(ty, value.ty()) => {
                             self.mismatch(expr.span, ty, value.ty());
                             None
                         }
@@ -210,12 +366,15 @@ impl<'a> Checker<'a> {
             None => TypeId::UNIT,
         };
         self.sigs.push(FnSig {
-            name: decl.name.name.clone(),
+            name: qualified,
+            symbol,
             params,
             ret,
             name_span: decl.name.span,
         });
-        self.fn_index.insert(decl.name.name.clone(), id);
+        if class.is_none() {
+            self.fn_index.insert(decl.name.name.clone(), id);
+        }
         true
     }
 
@@ -225,7 +384,8 @@ impl<'a> Checker<'a> {
             .fn_index
             .get(name)
             .map(|id| self.sigs[id.index()].name_span)
-            .or_else(|| self.consts.get(name).map(|c| c.span));
+            .or_else(|| self.consts.get(name).map(|c| c.span))
+            .or_else(|| self.classes.get(name).map(|c| c.name_span));
         match previous {
             Some(previous) => {
                 self.error(
@@ -244,6 +404,7 @@ impl<'a> Checker<'a> {
         self.locals.clear();
         self.scope.clear();
         self.assigned.clear();
+        self.narrowed.clear();
         self.loop_depth = 0;
         self.ret_ty = self.sigs[id.index()].ret;
         self.fn_name = self.sigs[id.index()].name.clone();
@@ -279,7 +440,7 @@ impl<'a> Checker<'a> {
 
         hir::Function {
             name: self.fn_name.clone(),
-            symbol: mangle(&self.fn_name),
+            symbol: self.sigs[id.index()].symbol.clone(),
             params: param_ids,
             ret: self.ret_ty,
             locals: std::mem::take(&mut self.locals),

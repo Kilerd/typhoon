@@ -1,0 +1,8 @@
+# An f-string hole formats a scalar; a repr protocol for containers arrives in
+# M3 (DESIGN 3.7, 4.6).
+# milestone: M2
+# error: cannot interpolate a `list<int>`
+
+fn main():
+    xs: list<int> = [1, 2]
+    print(f"{xs}")

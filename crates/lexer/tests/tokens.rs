@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{content_kinds, content_kinds_lossy, kinds, lex_ok, str_value};
+use common::{content_kinds, content_kinds_lossy, kinds, lex, lex_ok, str_value};
 use typhoon_lexer::TokenKind as K;
 
 // ------------------------------------------------------------------ keywords
@@ -452,4 +452,82 @@ fn hash_inside_brackets_still_comments() {
         content_kinds("f(  # why\n    1)"),
         vec![K::Ident("f".into()), K::LParen, K::Int(1), K::RParen]
     );
+}
+
+// ------------------------------------------------------- i64::MIN literals
+
+/// `i64::MIN` has no positive counterpart, so a `-` directly in front of the
+/// magnitude `9223372036854775808` becomes part of the literal.
+#[test]
+fn negative_int_min_is_one_literal() {
+    assert_eq!(
+        content_kinds("x = -9223372036854775808"),
+        vec![K::Ident("x".to_string()), K::Eq, K::Int(i64::MIN),]
+    );
+    // The same magnitude in hex, and with `_` separators.
+    assert_eq!(content_kinds("-0x8000000000000000"), vec![K::Int(i64::MIN)]);
+    assert_eq!(
+        content_kinds("-9_223_372_036_854_775_808"),
+        vec![K::Int(i64::MIN)]
+    );
+}
+
+/// The span of a folded literal covers the sign as well.
+#[test]
+fn negative_int_min_span_covers_the_sign() {
+    let tokens = lex_ok("-9223372036854775808");
+    let token = tokens
+        .iter()
+        .find(|t| matches!(t.kind, K::Int(_)))
+        .expect("an int token");
+    assert_eq!(token.span.start, 0);
+    assert_eq!(token.span.end, 20);
+}
+
+/// Only that one magnitude folds, so every other literal keeps its shape and
+/// `-2 ** 2` still parses as `-(2 ** 2)`.
+#[test]
+fn other_negative_literals_do_not_fold() {
+    assert_eq!(content_kinds("-5"), vec![K::Minus, K::Int(5)]);
+    assert_eq!(content_kinds("- 5"), vec![K::Minus, K::Int(5)]);
+    assert_eq!(
+        content_kinds("-2 ** 2"),
+        vec![K::Minus, K::Int(2), K::StarStar, K::Int(2)]
+    );
+    assert_eq!(content_kinds("-1.5"), vec![K::Minus, K::Float(1.5)]);
+}
+
+/// A `-` that follows an operand is subtraction, so the magnitude is still
+/// out of range there.
+#[test]
+fn int_min_only_folds_after_a_prefix_minus() {
+    for src in [
+        "a - 9223372036854775808",
+        "1 - 9223372036854775808",
+        ") - 9223372036854775808",
+    ] {
+        let (_, diags) = lex(src);
+        let messages = diags.iter().map(|d| d.message.clone()).collect::<Vec<_>>();
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains("integer literal is too large")),
+            "{src}: {messages:?}"
+        );
+    }
+    // After an operator, a keyword or an opening bracket it does fold.
+    for src in [
+        "x = -9223372036854775808",
+        "f(-9223372036854775808)",
+        "[-9223372036854775808]",
+        "return -9223372036854775808",
+        "1 + -9223372036854775808",
+    ] {
+        let tokens = lex_ok(src);
+        assert!(
+            tokens.iter().any(|t| t.kind == K::Int(i64::MIN)),
+            "{src}: {:?}",
+            tokens.iter().map(|t| t.kind.clone()).collect::<Vec<_>>()
+        );
+    }
 }

@@ -1,0 +1,7 @@
+# `append` takes the list's element type (DESIGN 4.6).
+# milestone: M2
+# error: mismatched types: expected `int`, found `str`
+
+fn main():
+    xs: list<int> = [1, 2]
+    xs.append("three")

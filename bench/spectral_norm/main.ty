@@ -1,0 +1,62 @@
+# spectral_norm: the Benchmarks Game eigenvalue benchmark. Ten power-method
+# iterations of `AtA*u` over N-element vectors, where A is the implicit
+# matrix A[i][j] = 1/((i+j)*(i+j+1)/2 + i + 1), followed by the Rayleigh
+# quotient sqrt(vBv/vv).
+#
+# Measures `list<float>` code: sequential indexed reads of a float vector in
+# a hot inner loop, one integer division and one float division per element,
+# and a float accumulator kept in a register. Must stay structurally
+# identical to main.go (DESIGN 7.2): same three vectors, same loops, same
+# order of operations.
+#
+# milestone: M2
+# expect: 1.274224153
+
+N: int = 6650
+ITERATIONS: int = 10
+
+fn eval_a(i: int, j: int) -> float:
+    return 1.0 / float((i + j) * (i + j + 1) // 2 + i + 1)
+
+# au = A * u
+fn eval_a_times_u(n: int, u: list<float>, au: list<float>):
+    for i in range(n):
+        total = 0.0
+        for j in range(n):
+            total = total + eval_a(i, j) * u[j]
+        au[i] = total
+
+# au = At * u
+fn eval_at_times_u(n: int, u: list<float>, au: list<float>):
+    for i in range(n):
+        total = 0.0
+        for j in range(n):
+            total = total + eval_a(j, i) * u[j]
+        au[i] = total
+
+# at_au = At * (A * u), using w as scratch
+fn eval_at_a_times_u(n: int, u: list<float>, at_au: list<float>, w: list<float>):
+    eval_a_times_u(n, u, w)
+    eval_at_times_u(n, w, at_au)
+
+fn main():
+    n = N
+    u: list<float> = []
+    v: list<float> = []
+    w: list<float> = []
+    for i in range(n):
+        u.append(1.0)
+        v.append(0.0)
+        w.append(0.0)
+
+    for i in range(ITERATIONS):
+        eval_at_a_times_u(n, u, v, w)
+        eval_at_a_times_u(n, v, u, w)
+
+    v_bv = 0.0
+    vv = 0.0
+    for i in range(n):
+        v_bv = v_bv + u[i] * v[i]
+        vv = vv + v[i] * v[i]
+    result = (v_bv / vv) ** 0.5
+    print(f"{result:.9f}")

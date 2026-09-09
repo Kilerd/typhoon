@@ -1,0 +1,11 @@
+# `list<T>` is invariant: a `list<int>` is not a `list<float>`, and there is no
+# implicit numeric conversion (DESIGN 4.1, 4.3).
+# milestone: M2
+# error: mismatched types: expected `list<float>`, found `list<int>`
+
+fn total(xs: list<float>) -> int:
+    return len(xs)
+
+fn main():
+    xs: list<int> = [1, 2]
+    print(total(xs))

@@ -290,3 +290,12 @@ fn missing_operand_is_reported_once() {
         "{messages:?}"
     );
 }
+
+/// `i64::MIN` is only writable with the sign glued to the literal, which the
+/// lexer folds; the parser must see one negative literal, not a negation.
+#[test]
+fn the_smallest_int_is_a_literal() {
+    assert_eq!(expr("-9223372036854775808"), "-9223372036854775808");
+    assert_eq!(expr("- 5"), "(- 5)");
+    assert_eq!(expr("-2 ** 2"), "(- (** 2 2))");
+}

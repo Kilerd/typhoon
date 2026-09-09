@@ -1,0 +1,13 @@
+# Ordering needs a protocol that M2 does not have, so `<` on instances is
+# rejected like `==` (DESIGN 3.6, 3.8).
+# milestone: M2
+# error: `Point` values cannot be compared with `<`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    q = Point(x=2.0)
+    if p < q:
+        print("less")

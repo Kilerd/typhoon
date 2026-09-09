@@ -1,0 +1,9 @@
+# A loop variable is an ordinary local: its type is fixed by its first
+# assignment and the elements must match it (DESIGN 3.4, 3.5).
+# milestone: M2
+# error: mismatched types: expected `int`, found `str`
+
+fn main():
+    i = 0
+    for i in ["a", "b"]:
+        print(i)

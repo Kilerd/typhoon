@@ -155,7 +155,7 @@ impl Parser<'_> {
                 ) {
                     None
                 } else {
-                    Some(self.parse_expr())
+                    Some(self.parse_expr_or_bare_tuple())
                 };
                 let span = self.span_from(start);
                 self.expect_newline("`return`");
@@ -228,10 +228,39 @@ impl Parser<'_> {
                 None
             }
             _ => {
-                let expr = self.parse_expr();
+                let expr = self.parse_expr_or_bare_tuple();
                 self.parse_stmt_after_expr(start, expr)
             }
         }
+    }
+
+    /// Parses an expression, gathering a bare comma-separated list into a
+    /// tuple: `a, b = t` and `return a, b` (DESIGN 4.1, tuples are values).
+    ///
+    /// Only statement position uses this; inside an expression a comma always
+    /// belongs to the enclosing call, list or parenthesised tuple.
+    pub(crate) fn parse_expr_or_bare_tuple(&mut self) -> Expr {
+        let first = self.parse_expr();
+        if !self.at(&TokenKind::Comma) {
+            return first;
+        }
+        let start = first.span;
+        let mut items = vec![first];
+        while self.eat(&TokenKind::Comma) {
+            // A trailing comma ends the list: `a, = t`, `x = 1,`.
+            if matches!(
+                self.kind(),
+                TokenKind::Newline | TokenKind::Eof | TokenKind::Dedent | TokenKind::Eq
+            ) {
+                break;
+            }
+            let before = self.pos();
+            items.push(self.parse_expr());
+            if self.pos() == before {
+                self.bump();
+            }
+        }
+        Expr::new(ExprKind::Tuple(items), start.merge(self.prev_span()))
     }
 
     /// After an expression at statement position: assignment, annotated
@@ -242,7 +271,7 @@ impl Parser<'_> {
                 self.bump();
                 let ty = self.parse_type();
                 let value = if self.eat(&TokenKind::Eq) {
-                    Some(self.parse_expr())
+                    Some(self.parse_expr_or_bare_tuple())
                 } else {
                     None
                 };
@@ -280,7 +309,7 @@ impl Parser<'_> {
             }
             TokenKind::Eq => {
                 self.bump();
-                let value = self.parse_expr();
+                let value = self.parse_expr_or_bare_tuple();
                 let span = self.span_from(start);
                 self.expect_newline("an assignment");
                 if !expr.is_assign_target() {

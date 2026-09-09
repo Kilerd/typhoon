@@ -1,0 +1,10 @@
+# `str(x)` renders a scalar; a class instance has no textual form until the M3
+# repr protocol (DESIGN 4.6).
+# milestone: M2
+# error: `str` is not defined for `Point`
+
+class Point:
+    x: float
+
+fn main():
+    print(str(Point(x=1.0)))

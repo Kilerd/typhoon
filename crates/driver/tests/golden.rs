@@ -42,7 +42,7 @@ use common::{Scratch, repo_root, unified_diff};
 /// The milestone whose test cases are currently enforced (DESIGN section 8).
 ///
 /// Raise this as milestones land; anything above it is reported as ignored.
-const CURRENT_MILESTONE: &str = "M1";
+const CURRENT_MILESTONE: &str = "M2";
 
 /// What a `.ty` file asserts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

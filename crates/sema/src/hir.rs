@@ -16,7 +16,7 @@
 
 use typhoon_diag::Span;
 
-use crate::types::TypeId;
+use crate::types::{ClassId, TypeId};
 
 /// Index of a function in [`Program::functions`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -141,12 +141,56 @@ pub enum Stmt {
         /// The body.
         body: Block,
     },
+    /// `for var in <list or str>: body` (DESIGN §3.5).
+    ForEach {
+        /// The loop variable, a normal local of the element type.
+        var: LocalId,
+        /// The iterated `list<T>` or `str`.
+        iter: Expr,
+        /// What is being iterated.
+        over: IterKind,
+        /// The body.
+        body: Block,
+    },
+    /// `xs[i] = value`, with the bounds check of DESIGN §4.3.
+    SetIndex {
+        /// The indexed `list<T>`.
+        list: Expr,
+        /// The index; negative counts from the end.
+        index: Expr,
+        /// The stored value, of the element type.
+        value: Expr,
+    },
+    /// `obj.field = value`.
+    SetField {
+        /// The receiver.
+        obj: Expr,
+        /// Its class.
+        class: ClassId,
+        /// Index of the field in the class's declaration order.
+        field: u32,
+        /// The stored value.
+        value: Expr,
+    },
+    /// Several statements standing in for one source statement; produced by
+    /// tuple unpacking (`a, b = t` evaluates `t` once into a temporary).
+    Group(Block),
     /// `return` or `return value`.
     Return(Option<Expr>),
     /// `break`.
     Break,
     /// `continue`.
     Continue,
+}
+
+/// What a [`Stmt::ForEach`] walks over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IterKind {
+    /// A `list<T>`; the loop variable has type `T`.
+    List,
+    /// A `str`; the loop variable is a length-1 `str` holding one code point
+    /// (DESIGN §3.5, §4.3).
+    Str,
 }
 
 /// A typed expression.
@@ -412,4 +456,174 @@ pub enum ExprKind {
     Print(Vec<Expr>),
     /// An f-string.
     FString(Vec<FStringPart>),
+
+    // -- str ---------------------------------------------------------------
+    /// `len(s)`, the number of code points, read from the string header.
+    StrLen(Box<Expr>),
+    /// One of the `str` methods of DESIGN §4.6.
+    StrMethod {
+        /// Which method.
+        op: StrMethod,
+        /// The receiver.
+        recv: Box<Expr>,
+        /// The arguments, already checked against the method's signature.
+        args: Vec<Expr>,
+    },
+    /// `str(x)` on an `int`, `float` or `bool`.
+    StrFrom(Box<Expr>),
+
+    // -- list --------------------------------------------------------------
+    /// A list literal; `elem` is the element type even when `items` is empty.
+    ListNew {
+        /// The element type.
+        elem: TypeId,
+        /// The elements, in order.
+        items: Vec<Expr>,
+    },
+    /// `xs[i]`, with the bounds check of DESIGN §4.3.
+    ListGet {
+        /// The list.
+        list: Box<Expr>,
+        /// The index; negative counts from the end.
+        index: Box<Expr>,
+    },
+    /// `len(xs)`, read from the list header.
+    ListLen(Box<Expr>),
+    /// `xs.append(v)`.
+    ListAppend {
+        /// The list.
+        list: Box<Expr>,
+        /// The appended value.
+        value: Box<Expr>,
+    },
+    /// `xs.pop()`; panics on an empty list.
+    ListPop(Box<Expr>),
+    /// `xs.insert(i, v)`, with Python's index clamping.
+    ListInsert {
+        /// The list.
+        list: Box<Expr>,
+        /// Where to insert.
+        index: Box<Expr>,
+        /// The inserted value.
+        value: Box<Expr>,
+    },
+    /// `xs.clear()`.
+    ListClear(Box<Expr>),
+    /// `xs + ys`, a fresh list.
+    ListConcat {
+        /// Left operand.
+        lhs: Box<Expr>,
+        /// Right operand.
+        rhs: Box<Expr>,
+    },
+    /// `v in xs` / `v in s` (and their `not in` forms).
+    Contains {
+        /// The `list<T>` or `str` searched.
+        haystack: Box<Expr>,
+        /// The element or substring looked for.
+        needle: Box<Expr>,
+        /// Whether the operator was `not in`.
+        negated: bool,
+    },
+
+    // -- tuple -------------------------------------------------------------
+    /// A tuple literal, a value aggregate (DESIGN §4.2).
+    TupleNew(Vec<Expr>),
+    /// `t[k]`, where `k` is a constant checked against the arity.
+    TupleGet {
+        /// The tuple.
+        tuple: Box<Expr>,
+        /// The member index.
+        index: u32,
+    },
+
+    // -- class -------------------------------------------------------------
+    /// `C(field=…)`: the generated keyword constructor (DESIGN §3.8).
+    New {
+        /// The class.
+        class: ClassId,
+        /// One initializer per field, in declaration order, defaults filled in.
+        fields: Vec<Expr>,
+        /// Indices into `fields` in source evaluation order: the constructor
+        /// matches by name but evaluates as written (DESIGN §3.2). Field
+        /// defaults are constants and are not listed.
+        eval_order: Vec<u32>,
+    },
+    /// `obj.field`.
+    GetField {
+        /// The receiver.
+        obj: Box<Expr>,
+        /// Its class.
+        class: ClassId,
+        /// Index of the field in the class's declaration order.
+        field: u32,
+    },
+    /// The `None` of a `C | None`: a null reference.
+    NoneRef,
+    /// `x is None` / `x is not None`.
+    IsNone {
+        /// The tested reference.
+        value: Box<Expr>,
+        /// Whether the operator was `is not`.
+        negated: bool,
+    },
+    /// `a is b` / `a is not b` on two class references: pointer identity.
+    RefEq {
+        /// Left operand.
+        lhs: Box<Expr>,
+        /// Right operand.
+        rhs: Box<Expr>,
+        /// Whether the operator was `is not`.
+        negated: bool,
+    },
+    /// `==` / `!=` on two lists or two tuples, compared member by member.
+    StructEq {
+        /// The operator.
+        op: CmpOp,
+        /// Left operand.
+        lhs: Box<Expr>,
+        /// Right operand.
+        rhs: Box<Expr>,
+    },
+}
+
+/// The `str` methods of DESIGN §4.6. `str` is immutable, so each one returns a
+/// fresh value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StrMethod {
+    /// `s.upper()`, ASCII-only case mapping.
+    Upper,
+    /// `s.lower()`, ASCII-only case mapping.
+    Lower,
+    /// `s.strip()`, ASCII whitespace on both ends.
+    Strip,
+    /// `s.split(sep)` into a `list<str>`; an empty separator panics.
+    Split,
+    /// `sep.join(parts)`.
+    Join,
+    /// `s.startswith(prefix)`.
+    StartsWith,
+    /// `s.endswith(suffix)`.
+    EndsWith,
+    /// `s.find(sub)`, a code-point index or `-1`.
+    Find,
+    /// `s.replace(old, new)`.
+    Replace,
+}
+
+impl StrMethod {
+    /// The name as written in source.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StrMethod::Upper => "upper",
+            StrMethod::Lower => "lower",
+            StrMethod::Strip => "strip",
+            StrMethod::Split => "split",
+            StrMethod::Join => "join",
+            StrMethod::StartsWith => "startswith",
+            StrMethod::EndsWith => "endswith",
+            StrMethod::Find => "find",
+            StrMethod::Replace => "replace",
+        }
+    }
 }

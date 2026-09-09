@@ -1,0 +1,9 @@
+# `str` is an immutable UTF-8 value; its methods return new strings
+# (DESIGN 4.1, 4.2, 4.6).
+# milestone: M2
+# error: cannot assign through an index into `str`
+
+fn main():
+    s = "abc"
+    s[0] = "z"
+    print(s)

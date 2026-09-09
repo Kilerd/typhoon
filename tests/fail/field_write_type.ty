@@ -1,0 +1,10 @@
+# A field keeps its declared type for the life of the instance (DESIGN 3.8).
+# milestone: M2
+# error: mismatched types: expected `float`, found `int`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    p.x = 1

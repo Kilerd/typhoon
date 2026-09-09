@@ -19,6 +19,10 @@ impl Checker<'_> {
     pub(crate) fn eval_const(&mut self, expr: &ast::Expr) -> Option<ConstValue> {
         match &expr.kind {
             ast::ExprKind::Error => None,
+            // `None` is only a usable constant as the default of a `C | None`
+            // field or parameter; every other use is rejected by the type check
+            // that follows.
+            ast::ExprKind::None => Some(ConstValue::Unit),
             ast::ExprKind::Int(v) => Some(ConstValue::Int(*v)),
             ast::ExprKind::Float(v) => Some(ConstValue::Float(*v)),
             ast::ExprKind::Bool(v) => Some(ConstValue::Bool(*v)),
@@ -249,6 +253,7 @@ fn const_type_name(value: &ConstValue) -> &'static str {
         ConstValue::Float(_) => "float",
         ConstValue::Bool(_) => "bool",
         ConstValue::Str(_) => "str",
+        ConstValue::Unit => "None",
     }
 }
 

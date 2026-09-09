@@ -179,6 +179,39 @@ impl Parser<'_> {
             return None;
         };
         let generics = self.parse_generic_params();
+        // `class B(A):` — DESIGN 3.8 has no inheritance at all.
+        if self.at(&TokenKind::LParen) {
+            let span = self.span();
+            self.report(
+                Diagnostic::error("inheritance is not supported")
+                    .with_label(span, "a class cannot list base classes")
+                    .with_help("compose instead: give the class a field of the other type")
+                    .with_note(
+                        "typhoon has no inheritance; traits are an open question, \
+                         see DESIGN.md section 9",
+                    ),
+            );
+            let mut depth = 0usize;
+            loop {
+                match self.kind() {
+                    TokenKind::LParen => {
+                        depth += 1;
+                        self.bump();
+                    }
+                    TokenKind::RParen => {
+                        self.bump();
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    TokenKind::Eof | TokenKind::Newline => break,
+                    _ => {
+                        self.bump();
+                    }
+                }
+            }
+        }
         if self.at(&TokenKind::LBrace) {
             let span = self.span();
             self.report(

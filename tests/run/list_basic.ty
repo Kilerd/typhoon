@@ -1,0 +1,76 @@
+# The core `list` API: a literal, an annotated empty literal filled in a loop,
+# append, len, positive indexing, element writes, pop, iteration, lists across
+# a function boundary, and list<float> / list<str> / list<bool> alongside int.
+# milestone: M2
+# expect: 3 10 20 30
+# expect: [10, 20, 30, 40] 4
+# expect: [10, 21, 30, 40] 21
+# expect: 40 [10, 21, 30] 3
+# expect: 10
+# expect: 21
+# expect: 30
+# expect: [1, 4, 9, 16] 4
+# expect: 30 [2, 8, 18, 32] 60
+# expect: [7] 1 7 7
+# expect: [] 0 True
+# expect: [1.5, 2.0, 0.25] 3 0.25
+# expect: ["ty", "phoon"] 2 typhoon
+# expect: [True, False, True] 3 False
+
+fn total(xs: list<int>) -> int:
+    s = 0
+    for x in xs:
+        s = s + x
+    return s
+
+fn doubled(xs: list<int>) -> list<int>:
+    out: list<int> = []
+    for x in xs:
+        out.append(x * 2)
+    return out
+
+fn main():
+    # a literal, its length and its elements by index
+    xs = [10, 20, 30]
+    print(len(xs), xs[0], xs[1], xs[2])
+
+    # append grows the list at the end
+    xs.append(40)
+    print(xs, len(xs))
+
+    # an element write replaces one slot in place
+    xs[1] = 21
+    print(xs, xs[1])
+
+    # pop returns the last element and shortens the list
+    last = xs.pop()
+    print(last, xs, len(xs))
+
+    # iteration visits the remaining elements in order
+    for x in xs:
+        print(x)
+
+    # an empty literal needs an annotation, then a loop can fill it
+    squares: list<int> = []
+    for i in range(1, 5):
+        squares.append(i * i)
+    print(squares, len(squares))
+
+    # a list as a parameter and as a return value
+    print(total(squares), doubled(squares), total(doubled(squares)))
+
+    # the degenerate sizes: one element and none at all
+    one = [7]
+    print(one, len(one), one[0], one[-1])
+    empty: list<int> = []
+    print(empty, len(empty), empty == [])
+
+    # the same API on the other element types
+    fs = [1.5, 2.0]
+    fs.append(0.25)
+    print(fs, len(fs), fs[2])
+    ss = ["ty", "phoon"]
+    print(ss, len(ss), ss[0] + ss[1])
+    bs = [True, False]
+    bs.append(True)
+    print(bs, len(bs), bs[1])

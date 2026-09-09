@@ -1,0 +1,11 @@
+# There is no iterator protocol in M2: `for` walks a `range(...)`, a `list<T>`
+# or a `str` (DESIGN 3.5).
+# milestone: M2
+# error: cannot iterate over a `Point`
+
+class Point:
+    x: float
+
+fn main():
+    for c in Point(x=1.0):
+        print(1)

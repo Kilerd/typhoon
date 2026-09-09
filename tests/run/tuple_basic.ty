@@ -1,0 +1,91 @@
+# Tuple construction and element access: mixed element types, every literal
+# index forwards and backwards, len(), the single-element `(x,)`, nesting,
+# tuples in lists and class fields, and copy-by-VALUE on assignment.
+# milestone: M2
+# expect: (1, "two", 3.0, True, "5")
+# expect: 1 two 3.0 True 5
+# expect: 5 True 3.0 two 1
+# expect: 5
+# expect: (1,) 1 1 1
+# expect: ("only",) only 1
+# expect: (10, 20) 30 2
+# expect: ("ada", "bob") (0.5, -1.5, 2.0) (True, False, True)
+# expect: bob 2.0 True 2 3 3
+# expect: ((1, 2), (3, 4)) (1, 2) (3, 4) 2 4 2
+# expect: ((1, (2, 3)), "x") (2, 3) 2 x
+# expect: [(1, "a"), (2, "b"), (3, "c")] 3 (1, "a") (3, "c") b
+# expect: (3, 4) 3 4 12 r
+# expect: (5, 6) 30
+# expect: (9, 9) (1, 2) True False
+# expect: [(9, 9)] (9, 9) (0, 0)
+# expect: (42, "ab", True, 3.0) 42 3.0 4
+# expect: (7, "seven") 7 seven 2
+
+class Rect:
+    size: tuple<int, int>
+    name: str
+
+    fn area(self) -> int:
+        return self.size[0] * self.size[1]
+
+fn main():
+    # Mixed element types, every literal index forwards and backwards, len().
+    t = (1, "two", 3.0, True, "5")
+    print(t)
+    print(t[0], t[1], t[2], t[3], t[4])
+    print(t[-1], t[-2], t[-3], t[-4], t[-5])
+    print(len(t))
+
+    # A single-element tuple needs its trailing comma and prints with one.
+    one = (1,)
+    print(one, one[0], one[-1], len(one))
+    solo = ("only",)
+    print(solo, solo[0], len(solo))
+
+    # A two-element tuple.
+    pair = (10, 20)
+    print(pair, pair[0] + pair[1], len(pair))
+
+    # Homogeneous tuples of str, float and bool.
+    names = ("ada", "bob")
+    ratios = (0.5, -1.5, 2.0)
+    flags = (True, False, True)
+    print(names, ratios, flags)
+    print(names[1], ratios[-1], flags[0], len(names), len(ratios), len(flags))
+
+    # Tuples nest, and indexing chains through the levels.
+    nested = ((1, 2), (3, 4))
+    print(nested, nested[0], nested[1], nested[0][1], nested[-1][-1], len(nested))
+    deep = ((1, (2, 3)), "x")
+    print(deep, deep[0][1], deep[0][1][0], deep[1])
+
+    # A tuple stored in a list, appended to and indexed back out.
+    rows: list<tuple<int, str>> = [(1, "a"), (2, "b")]
+    rows.append((3, "c"))
+    print(rows, len(rows), rows[0], rows[-1], rows[1][1])
+
+    # A tuple as a class field, read through a method and reassigned.
+    r = Rect(size=(3, 4), name="r")
+    print(r.size, r.size[0], r.size[-1], r.area(), r.name)
+    r.size = (5, 6)
+    print(r.size, r.area())
+
+    # Tuples are VALUE types: `copy = src` copies, so rebinding `src`
+    # afterwards leaves the copy alone.
+    src = (1, 2)
+    copy = src
+    src = (9, 9)
+    print(src, copy, copy == (1, 2), src == copy)
+    held: list<tuple<int, int>> = [src]
+    src = (0, 0)
+    print(held, held[0], src)
+
+    # Built from variables and expressions rather than literals.
+    a = 6
+    b = 7
+    built = (a * b, "a" + "b", a < b, float(a) / 2.0)
+    print(built, built[0], built[3], len(built))
+
+    # An annotated tuple local.
+    ann: tuple<int, str> = (7, "seven")
+    print(ann, ann[0], ann[1], len(ann))

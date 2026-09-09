@@ -1,0 +1,63 @@
+# binary_trees: the Benchmarks Game allocation benchmark. Build perfectly
+# balanced binary trees of two-pointer nodes and walk them counting nodes:
+# one stretch tree, one long-lived tree, then a doubling loop that builds
+# and immediately drops a great many short-lived trees.
+#
+# Measures the allocator and the GC rather than arithmetic: every node is a
+# heap object with two nullable references, and the walk is one `is None`
+# test plus one add per node. Must stay structurally identical to main.go
+# (DESIGN 7.2): same node layout, same recursion, same tree counts.
+#
+# milestone: M2
+# expect: stretch tree of depth 19 check: 1048575
+# expect: 786432 trees of depth 4 check: 24379392
+# expect: 196608 trees of depth 6 check: 24969216
+# expect: 49152 trees of depth 8 check: 25116672
+# expect: 12288 trees of depth 10 check: 25153536
+# expect: 3072 trees of depth 12 check: 25162752
+# expect: 768 trees of depth 14 check: 25165056
+# expect: 192 trees of depth 16 check: 25165632
+# expect: 48 trees of depth 18 check: 25165776
+# expect: long lived tree of depth 18 check: 524287
+
+MIN_DEPTH: int = 4
+MAX_DEPTH: int = 18
+# Trees built per depth, as a multiple of the classic
+# `1 << (MAX_DEPTH - depth + MIN_DEPTH)`. See README.md: the classic count is
+# a pure power of two, so MAX_DEPTH alone moves the running time in steps of
+# 2x (0.50 s / 1.00 s / 2.33 s here) and cannot be aimed at 1.5 s.
+SCALE: int = 3
+
+class Node:
+    left: Node | None
+    right: Node | None
+
+fn bottom_up_tree(depth: int) -> Node:
+    if depth > 0:
+        return Node(left=bottom_up_tree(depth - 1), right=bottom_up_tree(depth - 1))
+    return Node(left=None, right=None)
+
+fn item_check(t: Node) -> int:
+    left = t.left
+    if left is None:
+        return 1
+    right = t.right
+    if right is None:
+        return 1
+    return 1 + item_check(left) + item_check(right)
+
+fn main():
+    stretch_depth = MAX_DEPTH + 1
+    stretch = bottom_up_tree(stretch_depth)
+    print(f"stretch tree of depth {stretch_depth} check: {item_check(stretch)}")
+
+    long_lived_tree = bottom_up_tree(MAX_DEPTH)
+
+    for depth in range(MIN_DEPTH, MAX_DEPTH + 1, 2):
+        iterations = SCALE << (MAX_DEPTH - depth + MIN_DEPTH)
+        check = 0
+        for i in range(iterations):
+            check = check + item_check(bottom_up_tree(depth))
+        print(f"{iterations} trees of depth {depth} check: {check}")
+
+    print(f"long lived tree of depth {MAX_DEPTH} check: {item_check(long_lived_tree)}")

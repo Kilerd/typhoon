@@ -1,0 +1,13 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn Counter.bump(self: Counter, by: int) -> None
+  self:Counter.n = (self:Counter.n:int + by:int):int
+fn Counter.value(self: Counter) -> int
+  return self:Counter.n:int
+fn main() -> None
+  local c: Counter
+  c = Counter(n=0:int):Counter
+  Counter.bump(c:Counter, 2:int):None
+  print(Counter.value(c:Counter):int):None

@@ -317,12 +317,14 @@ impl Expr {
     }
 
     /// Whether this expression is a valid assignment target
-    /// (`Name`, `Attribute` or `Index`).
+    /// (`Name`, `Attribute`, `Index`, or a non-empty tuple of those, which is
+    /// the unpacking form `a, b = ...`).
     pub fn is_assign_target(&self) -> bool {
-        matches!(
-            self.kind,
-            ExprKind::Name(_) | ExprKind::Attribute { .. } | ExprKind::Index { .. }
-        )
+        match &self.kind {
+            ExprKind::Name(_) | ExprKind::Attribute { .. } | ExprKind::Index { .. } => true,
+            ExprKind::Tuple(items) => !items.is_empty() && items.iter().all(Expr::is_assign_target),
+            _ => false,
+        }
     }
 }
 

@@ -4,7 +4,8 @@
 use std::fmt::Write;
 
 use crate::hir::{
-    Block, Expr, ExprKind, FStringPart, FloatOp, FormatSpec, Function, IntOp, MinMax, Program, Stmt,
+    Block, Expr, ExprKind, FStringPart, FloatOp, FormatSpec, Function, IntOp, IterKind, MinMax,
+    Program, Stmt,
 };
 
 /// Renders a whole program as indented text.
@@ -104,6 +105,50 @@ fn dump_stmt(out: &mut String, program: &Program, func: &Function, stmt: &Stmt, 
             );
             dump_block(out, program, func, body, depth + 1);
         }
+        Stmt::ForEach {
+            var,
+            iter,
+            over,
+            body,
+        } => {
+            let what = match over {
+                IterKind::List => "list",
+                IterKind::Str => "str",
+            };
+            let _ = writeln!(
+                out,
+                "{pad}for {} in {what} {}:",
+                func.locals[var.index()].name,
+                dump_expr(program, func, iter)
+            );
+            dump_block(out, program, func, body, depth + 1);
+        }
+        Stmt::SetIndex { list, index, value } => {
+            let _ = writeln!(
+                out,
+                "{pad}{}[{}] = {}",
+                dump_expr(program, func, list),
+                dump_expr(program, func, index),
+                dump_expr(program, func, value)
+            );
+        }
+        Stmt::SetField {
+            obj,
+            class,
+            field,
+            value,
+        } => {
+            let _ = writeln!(
+                out,
+                "{pad}{}.{} = {}",
+                dump_expr(program, func, obj),
+                program.types.class(*class).fields[*field as usize].name,
+                dump_expr(program, func, value)
+            );
+        }
+        Stmt::Group(block) => {
+            dump_block(out, program, func, block, depth);
+        }
         Stmt::Return(None) => {
             let _ = writeln!(out, "{pad}return");
         }
@@ -183,6 +228,64 @@ fn dump_expr(program: &Program, func: &Function, expr: &Expr) -> String {
                 })
                 .collect();
             format!("f({})", parts.join(", "))
+        }
+        ExprKind::StrLen(v) | ExprKind::ListLen(v) => format!("len({})", e(v)),
+        ExprKind::StrMethod { op, recv, args } => {
+            let args: Vec<String> = args.iter().map(&e).collect();
+            format!("{}.{}({})", e(recv), op.as_str(), args.join(", "))
+        }
+        ExprKind::StrFrom(v) => format!("str({})", e(v)),
+        ExprKind::ListNew { items, .. } => {
+            let items: Vec<String> = items.iter().map(&e).collect();
+            format!("[{}]", items.join(", "))
+        }
+        ExprKind::ListGet { list, index } => format!("{}[{}]", e(list), e(index)),
+        ExprKind::ListAppend { list, value } => format!("{}.append({})", e(list), e(value)),
+        ExprKind::ListPop(list) => format!("{}.pop()", e(list)),
+        ExprKind::ListInsert { list, index, value } => {
+            format!("{}.insert({}, {})", e(list), e(index), e(value))
+        }
+        ExprKind::ListClear(list) => format!("{}.clear()", e(list)),
+        ExprKind::ListConcat { lhs, rhs } => format!("({} + {})", e(lhs), e(rhs)),
+        ExprKind::Contains {
+            haystack,
+            needle,
+            negated,
+        } => {
+            let op = if *negated { "not in" } else { "in" };
+            format!("({} {op} {})", e(needle), e(haystack))
+        }
+        ExprKind::TupleNew(items) => {
+            let items: Vec<String> = items.iter().map(&e).collect();
+            format!("({})", items.join(", "))
+        }
+        ExprKind::TupleGet { tuple, index } => format!("{}[{index}]", e(tuple)),
+        ExprKind::New { class, fields, .. } => {
+            let info = program.types.class(*class);
+            let args: Vec<String> = info
+                .fields
+                .iter()
+                .zip(fields)
+                .map(|(f, value)| format!("{}={}", f.name, e(value)))
+                .collect();
+            format!("{}({})", info.name, args.join(", "))
+        }
+        ExprKind::GetField { obj, class, field } => format!(
+            "{}.{}",
+            e(obj),
+            program.types.class(*class).fields[*field as usize].name
+        ),
+        ExprKind::NoneRef => "None".to_string(),
+        ExprKind::IsNone { value, negated } => {
+            let op = if *negated { "is not" } else { "is" };
+            format!("({} {op} None)", e(value))
+        }
+        ExprKind::RefEq { lhs, rhs, negated } => {
+            let op = if *negated { "is not" } else { "is" };
+            format!("({} {op} {})", e(lhs), e(rhs))
+        }
+        ExprKind::StructEq { op, lhs, rhs } => {
+            format!("({} {} {})", e(lhs), cmp_op_str(*op), e(rhs))
         }
     };
     format!("{body}:{}", program.types.name(expr.ty))

@@ -1,0 +1,8 @@
+# A tuple is a value type and cannot be mutated in place (DESIGN 4.1, 4.2).
+# milestone: M2
+# error: cannot assign through an index into `tuple<int, str>`
+
+fn main():
+    t: tuple<int, str> = (1, "a")
+    t[0] = 2
+    print(t[0])

@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    xs = [1, 2]\\n    a, b = xs\\n\")"
+---
+error: cannot unpack a `list<int>`
+ --> main.ty:3:12
+  |
+3 |     a, b = xs
+  |            ^^ this is a `list<int>`
+  |
+  = help: only a tuple can be unpacked

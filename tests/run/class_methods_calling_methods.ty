@@ -1,0 +1,142 @@
+# Methods calling other methods on `self` (mutating and reading), a method
+# calling a free function, a free function calling a method, plain and mutual
+# recursion through methods, and a method result feeding another method call.
+# milestone: M2
+# expect: 3 1
+# expect: 13 3
+# expect: 24 6
+# expect: 4.0
+# expect: run: 24/6 avg 4.0
+# expect: [run: 24/6 avg 4.0]
+# expect: RUN: 24/6 AVG 4.0
+# expect: 8.0
+# expect: 120 1
+# expect: 55
+# expect: True True
+# expect: run: 48/6 avg 8.0
+# expect: run: 24/6 avg 4.0
+# expect: False
+# expect: 12.0
+# expect: run: 144/6 avg 24.0
+# expect: [run: 0/6 avg 0.0]
+# expect: acc: 0/0 avg 0.0
+# expect: 0.0
+# expect: 48 48
+# expect: 72
+
+class Acc:
+    total: int = 0
+    steps: int = 0
+    name: str = "acc"
+
+    # The one mutating primitive; everything else goes through it.
+    fn add(self, v: int):
+        self.total = self.total + v
+        self.steps = self.steps + 1
+
+    # A method calling a mutating method on `self`, twice and in a loop.
+    fn add_twice(self, v: int):
+        self.add(v)
+        self.add(v)
+
+    fn add_all(self, vs: list<int>):
+        for v in vs:
+            self.add(v)
+
+    # A pure reading method, and a method that calls it.
+    fn average(self) -> float:
+        if self.steps == 0:
+            return 0.0
+        return self.total / self.steps
+
+    fn describe(self) -> str:
+        return f"{self.name}: {self.total}/{self.steps} avg {self.average()}"
+
+    # A method calling a free function, on its own and around another method.
+    fn boosted(self) -> int:
+        return double(self.total)
+
+    fn tagged(self) -> str:
+        return decorate(self.describe())
+
+    # Recursion through a method, and mutual recursion between two methods.
+    fn fact(self, n: int) -> int:
+        if n <= 1:
+            return 1
+        return n * self.fact(n - 1)
+
+    fn fib(self, n: int) -> int:
+        if n < 2:
+            return n
+        return self.fib(n - 1) + self.fib(n - 2)
+
+    fn is_even(self, n: int) -> bool:
+        if n == 0:
+            return True
+        return self.is_odd(n - 1)
+
+    fn is_odd(self, n: int) -> bool:
+        if n == 0:
+            return False
+        return self.is_even(n - 1)
+
+    # A method returning a fresh instance, so calls can be chained.
+    fn scaled(self, k: int) -> Acc:
+        return Acc(total=self.total * k, steps=self.steps, name=self.name)
+
+fn double(n: int) -> int:
+    return n * 2
+
+fn decorate(s: str) -> str:
+    return "[" + s + "]"
+
+# Free functions calling methods.
+fn report(a: Acc) -> str:
+    return a.describe().upper()
+
+fn twice_average(a: Acc) -> float:
+    return a.average() + a.average()
+
+fn sum_of(a: Acc, b: Acc) -> int:
+    return a.total + b.total
+
+fn main():
+    # Mutating methods layered on top of each other.
+    a = Acc(name="run")
+    a.add(3)
+    print(a.total, a.steps)
+    a.add_twice(5)
+    print(a.total, a.steps)
+    a.add_all([1, 2, 8])
+    print(a.total, a.steps)
+
+    # Reading methods, and methods built out of reading methods.
+    print(a.average())
+    print(a.describe())
+    print(a.tagged())
+    print(report(a))
+    print(twice_average(a))
+
+    # Recursion, including the base cases and the mutual pair.
+    print(a.fact(5), a.fact(0))
+    print(a.fib(10))
+    print(a.is_even(10), a.is_odd(7))
+
+    # A method result feeding another method call, without touching the
+    # receiver the chain started from.
+    b = a.scaled(2)
+    print(b.describe())
+    print(a.describe())
+    print(b is a)
+    print(a.scaled(3).average())
+    print(a.scaled(2).scaled(3).describe())
+    print(decorate(a.scaled(0).describe()))
+
+    # The empty accumulator takes the guarded branch of `average`.
+    e = Acc()
+    print(e.describe())
+    print(e.average())
+
+    # The same free function reached through a method and directly.
+    print(a.boosted(), double(a.total))
+    print(sum_of(a, b))

@@ -1,0 +1,75 @@
+# Ten thousand appends into an annotated empty list, which drives the doubling
+# growth path: length, the sum, the first, last and interior elements, negative
+# indexing, and a second list built the same way comparing equal.
+# milestone: M2
+# expect: 10000
+# expect: 1 4 7
+# expect: 14998 15001 15004
+# expect: 29995 29998
+# expect: 29998 29995 1
+# expect: 149995000
+# expect: True 149995000
+# expect: [1, 4, 7, 10, 13] True 5
+# expect: 10000 True False
+# expect: 10001 -1 29998 False
+# expect: -1 10000 True
+# expect: 1 1 1
+# expect: 2 1 2
+# expect: 4 1 4
+# expect: 8 1 8
+# expect: 16 1 16
+
+fn build(n: int) -> list<int>:
+    xs: list<int> = []
+    for i in range(n):
+        xs.append(i * 3 + 1)
+    return xs
+
+fn main():
+    # ten thousand appends, so the backing storage is grown many times over
+    xs = build(10000)
+    print(len(xs))
+
+    # the elements survive every reallocation, at both ends and in the middle
+    print(xs[0], xs[1], xs[2])
+    print(xs[4999], xs[5000], xs[5001])
+    print(xs[9998], xs[9999])
+    print(xs[-1], xs[-2], xs[-10000])
+
+    # the sum of everything that was appended, once by iteration ...
+    total = 0
+    for x in xs:
+        total = total + x
+    print(total)
+
+    # ... and once by index, which must agree
+    i = 0
+    indexed = 0
+    while i < len(xs):
+        indexed = indexed + xs[i]
+        i = i + 1
+    print(indexed == total, indexed)
+
+    # the same construction in miniature, against a literal
+    small = build(5)
+    print(small, small == [1, 4, 7, 10, 13], len(small))
+
+    # a second list built the same way holds equal contents
+    ys = build(10000)
+    print(len(ys), xs == ys, xs != ys)
+
+    # growing it once more keeps the earlier elements untouched
+    ys.append(-1)
+    print(len(ys), ys[-1], ys[9999], xs == ys)
+
+    # and popping back down to the original length restores equality
+    back = ys.pop()
+    print(back, len(ys), xs == ys)
+
+    # growth from nothing, checked at each power of two
+    zs: list<int> = []
+    for k in range(1, 17):
+        zs.append(k)
+        n = len(zs)
+        if n == 1 or n == 2 or n == 4 or n == 8 or n == 16:
+            print(n, zs[0], zs[-1])

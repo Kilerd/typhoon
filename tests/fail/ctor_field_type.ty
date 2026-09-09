@@ -1,0 +1,12 @@
+# A constructor argument is checked against the field's declared type, and
+# there is no implicit `int` -> `float` conversion (DESIGN 3.8, 4.3).
+# milestone: M2
+# error: mismatched types: expected `float`, found `int`
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    p = Point(x=1, y=2.0)
+    print(p.x)

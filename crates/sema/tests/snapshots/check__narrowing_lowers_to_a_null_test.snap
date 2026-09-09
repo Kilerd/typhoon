@@ -1,0 +1,10 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn head(n: Node | None) -> int
+  if (n:Node | None is None):bool:
+    return 0:int
+  return n:Node.value:int
+fn main() -> None
+  print(head(None:Node | None):int):None

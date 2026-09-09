@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Node:\\n    value: int\\n    next: Node | None = None\\n\\nfn main():\\n    cur: Node | None = Node(value=1)\\n    while cur is not None:\\n        cur = cur.next\\n\")"
+---
+error: `Node | None` may be `None` here
+ --> main.ty:8:15
+  |
+8 |         cur = cur.next
+  |               ^^^ this is `Node | None`, not `Node`
+  |
+  = note: M2 narrows only inside an `if`; it does not flow through `and`, `or` or a loop condition, see DESIGN.md section 3.8
+  = help: narrow it first: assign it to a local, then test it in an `if` with `x is None` / `x is not None`

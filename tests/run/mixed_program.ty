@@ -1,0 +1,97 @@
+# A small gradebook that leans on everything M2 adds at once: a class with
+# methods, a list<Student> built and iterated, str splitting / joining /
+# formatting, a tuple returned from a helper, and loops that continue and break.
+# milestone: M2
+# expect: 4 ada edsger
+# expect: ada: total=274 avg=91.3 grade=A
+# expect: grace: total=251 avg=83.7 grade=B
+# expect: ALAN withdrew
+# expect: edsger: total=296 avg=98.7 grade=A
+# expect: honour roll stops at grace
+# expect: ["ada"] 1
+# expect: top: edsger 98.67
+# expect: grace [78, 82, 91, 96] B
+# expect: ada:A, grace:B, alan:F, edsger:A
+# expect: True 10 21
+
+class Student:
+    name: str
+    scores: list<int>
+    active: bool = True
+
+    fn total(self) -> int:
+        acc = 0
+        for s in self.scores:
+            acc = acc + s
+        return acc
+
+    fn average(self) -> float:
+        return float(self.total()) / float(len(self.scores))
+
+    fn grade(self) -> str:
+        avg = self.average()
+        if avg >= 90.0:
+            return "A"
+        elif avg >= 80.0:
+            return "B"
+        return "F"
+
+fn best_of(students: list<Student>) -> tuple<str, float>:
+    # the highest average among the students still enrolled
+    name = "nobody"
+    top = 0.0
+    for s in students:
+        if not s.active:
+            continue
+        avg = s.average()
+        if avg > top:
+            top = avg
+            name = s.name
+    return (name, top)
+
+fn main():
+    # the roster arrives as one line of text
+    roster = "ada,grace,alan,edsger"
+    names: list<str> = roster.split(",")
+    print(len(names), names[0], names[-1])
+
+    students: list<Student> = []
+    students.append(Student(name=names[0], scores=[91, 95, 88]))
+    students.append(Student(name=names[1], scores=[78, 82, 91]))
+    students.append(Student(name=names[2], scores=[65, 70, 72], active=False))
+    students.append(Student(name=names[3], scores=[100, 99, 97]))
+
+    # one report line per student; the withdrawn one gets a shorter one
+    for s in students:
+        if not s.active:
+            print(f"{s.name.upper()} withdrew")
+            continue
+        print(f"{s.name}: total={s.total()} avg={s.average():.1f} grade={s.grade()}")
+
+    # the honour roll is in roster order and stops at the first miss
+    honours: list<str> = []
+    for s in students:
+        if not s.active:
+            continue
+        if s.average() < 90.0:
+            print(f"honour roll stops at {s.name}")
+            break
+        honours.append(s.name)
+    print(honours, len(honours))
+
+    # a tuple returned from a helper, unpacked at the call site
+    top_name, top_avg = best_of(students)
+    print(f"top: {top_name} {top_avg:.2f}")
+
+    # a late submission mutates the student already stored in the list
+    late = students[1]
+    late.scores.append(96)
+    print(late.name, late.scores, late.grade())
+
+    # one label per student, glued back into a single line
+    labels: list<str> = []
+    for s in students:
+        labels.append(s.name + ":" + s.grade())
+    print(", ".join(labels))
+
+    print("ada" in names, roster.find("alan"), len(roster))

@@ -1,0 +1,13 @@
+# A class exposes exactly the methods it declares; there is no inheritance and
+# no dynamic dispatch (DESIGN 3.8).
+# milestone: M2
+# error: `Point` has no method `triple`
+
+class Point:
+    x: float
+
+    fn double(self) -> float:
+        return self.x + self.x
+
+fn main():
+    print(Point(x=1.0).triple())

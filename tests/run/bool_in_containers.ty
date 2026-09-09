@@ -1,0 +1,150 @@
+# `bool` round-trips through every aggregate: it lives in an i1 register but an
+# i8 slot in memory, so this pins that storing into and reloading out of lists,
+# tuples and class fields never corrupts it, in either direction.
+# milestone: M2
+# expect: [True, False, True] 3
+# expect: True False True True
+# expect: [True, True, True, False]
+# expect: False [True, True, True]
+# expect: [False, True, True, True] 4
+# expect: True True False
+# expect: True False
+# expect: 3
+# expect: True False
+# expect: [True, False, True, False, True]
+# expect: True True 5
+# expect: [] 0
+# expect: [[True, False], [False, False, True]] True True
+# expect: [False, False, True] 3 True
+# expect: (True, "on", False, 7) True False 4
+# expect: True on False 7
+# expect: True False
+# expect: (True,) True
+# expect: True False
+# expect: [(True, False), (True, True), (False, False)] 3
+# expect: True True True
+# expect: True
+# expect: write 2 False True
+# expect: True
+# expect: True False
+# expect: True False 0
+# expect: True True
+# expect: True False
+# expect: [True, True] True
+# expect: week [True, False, True] 3
+# expect: (False, True) False True
+# expect: True True
+# expect: False True
+# expect: first=False last=True
+
+class Task:
+    name: str
+    tries: int
+    done: bool = False
+    urgent: bool = True
+
+    fn finish(self):
+        self.done = True
+
+    fn overdue(self) -> bool:
+        return self.urgent and not self.done
+
+class Sheet:
+    title: str
+    marks: list<bool>
+    flags: tuple<bool, bool>
+
+fn is_even(n: int) -> bool:
+    return n % 2 == 0
+
+fn both(pair: tuple<bool, bool>) -> bool:
+    return pair[0] and pair[1]
+
+fn main():
+    # a list<bool> literal: repr, len, positive and negative indexing
+    flags: list<bool> = [True, False, True]
+    print(flags, len(flags))
+    print(flags[0], flags[1], flags[-1], flags[-3])
+
+    # append, element write, pop and insert all cross the store / load boundary
+    flags.append(False)
+    flags[1] = True
+    print(flags)
+    print(flags.pop(), flags)
+    flags.insert(0, False)
+    print(flags, len(flags))
+
+    # membership and equality between two list<bool>
+    print(True in flags, False in flags, False not in flags)
+    print(flags == [False, True, True, True], flags == [True, True, True, True])
+
+    # iteration yields usable conditions, and `not` works on a reloaded element
+    trues = 0
+    for f in flags:
+        if f:
+            trues = trues + 1
+    print(trues)
+    print(not flags[0], not flags[1])
+
+    # bools computed from a comparison inside a function, then stored
+    computed: list<bool> = []
+    for i in range(5):
+        computed.append(is_even(i))
+    print(computed)
+    print(computed[0], computed[4], len(computed))
+
+    # an empty list<bool>, and bools nested one level deeper
+    none_yet: list<bool> = []
+    print(none_yet, len(none_yet))
+    table: list<list<bool>> = [[True, False], [False, False, True]]
+    print(table, table[0][0], table[1][2])
+    row = table[1]
+    print(row, len(row), not row[0])
+
+    # bools in tuples: construction, indexing, unpacking, equality and repr
+    t = (True, "on", False, 7)
+    print(t, t[0], t[2], len(t))
+    a, b, c, d = t
+    print(a, b, c, d)
+    print(t == (True, "on", False, 7), t == (False, "on", False, 7))
+    single = (True,)
+    print(single, single[0])
+    print(both((True, True)), both((True, False)))
+
+    # a list of bool tuples: appended, indexed and compared
+    pairs: list<tuple<bool, bool>> = [(True, False), (True, True)]
+    pairs.append((False, False))
+    print(pairs, len(pairs))
+    chosen = pairs[1]
+    print(chosen[0], chosen[1], both(chosen))
+    print(pairs[-1] == (False, False))
+
+    # bool fields on a class: defaults, reads, a write, and one beside an int
+    first = Task(name="write", tries=2)
+    print(first.name, first.tries, first.done, first.urgent)
+    print(first.overdue())
+    first.finish()
+    print(first.done, first.overdue())
+    second = Task(name="ship", tries=0, done=True, urgent=False)
+    print(second.done, second.urgent, second.tries)
+    print(first.done, first.urgent)
+
+    # a bool field assigned from a comparison, then collected into a list
+    second.urgent = second.tries < 3
+    print(second.urgent, not second.urgent)
+    states: list<bool> = []
+    tasks: list<Task> = [first, second]
+    for task in tasks:
+        states.append(task.done)
+    print(states, states == [True, True])
+
+    # class fields that are themselves containers of bools
+    sheet = Sheet(title="week", marks=[True, False], flags=(False, True))
+    sheet.marks.append(True)
+    print(sheet.title, sheet.marks, len(sheet.marks))
+    print(sheet.flags, sheet.flags[0], sheet.flags[1])
+    print(not sheet.marks[1], sheet.marks[-1])
+
+    # and rendered back out as text
+    print(str(flags[0]), str(flags[1]))
+    print(f"first={flags[0]} last={flags[-1]}")

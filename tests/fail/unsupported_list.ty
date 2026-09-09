@@ -1,7 +1,8 @@
-# List literals arrive with `list<T>` in M2.
-# milestone: M1
-# error: a list literal is not supported yet (planned for M2)
+# Inference is local, so an empty container literal needs an annotation
+# (DESIGN 4.4).
+# milestone: M2
+# error: cannot infer the element type of an empty list
 
 fn main():
-    xs = [1, 2, 3]
-    print(1)
+    xs = []
+    print(len(xs))

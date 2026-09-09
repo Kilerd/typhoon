@@ -1,0 +1,7 @@
+# `upper` takes no argument; the `str` methods are checked like any call
+# (DESIGN 4.6).
+# milestone: M2
+# error: `str.upper` takes 0 arguments but 1 was supplied
+
+fn main():
+    print("a".upper("b"))

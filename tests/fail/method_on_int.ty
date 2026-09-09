@@ -1,0 +1,8 @@
+# Scalars have operators, not methods (DESIGN 3.8, 4.6).
+# milestone: M2
+# error: `int` has no method `bit_length`
+# error: only `list`, `str` and class instances have methods
+
+fn main():
+    n = 5
+    print(n.bit_length())

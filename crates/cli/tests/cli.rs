@@ -175,11 +175,15 @@ fn a_runtime_panic_propagates_its_exit_code() {
     );
 }
 
+/// The milestone the compiler implements; raise it together with
+/// `CURRENT_MILESTONE` in `crates/driver/tests/golden.rs`.
+const CURRENT_MILESTONE: u32 = 2;
+
 #[test]
 fn every_example_is_accepted_or_names_its_milestone() {
-    // M0/M1 examples must check; the ones carrying a later milestone must be
-    // rejected with a diagnostic that names that milestone, never with a
-    // crash or a silent success.
+    // Examples at or below the current milestone must check; the ones carrying
+    // a later one must be rejected with a diagnostic that names it, never with
+    // a crash or a silent success.
     let examples = std::fs::read_dir(repo_root().join("examples")).unwrap();
     let mut checked = 0;
     for entry in examples.flatten() {
@@ -195,7 +199,7 @@ fn every_example_is_accepted_or_names_its_milestone() {
             .unwrap_or_else(|| panic!("{} has no `# milestone:` line", path.display()));
         let rel = format!("examples/{}", path.file_name().unwrap().to_string_lossy());
         let out = typhoon(&["check", &rel]);
-        if milestone <= 1 {
+        if milestone <= CURRENT_MILESTONE {
             assert_eq!(code(&out), 0, "{rel} must check:\n{}", stderr(&out));
         } else {
             assert_eq!(code(&out), 1, "{rel} must be rejected");

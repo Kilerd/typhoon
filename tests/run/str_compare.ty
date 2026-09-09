@@ -1,0 +1,81 @@
+# str comparison: == / != / < / <= / > / >= against the empty string, a prefix
+# versus the longer string, case and digits, non-ASCII above ASCII, a literal
+# versus an equal concatenation, through variables and across a function
+# boundary -- and that ordering is by code point rather than by length.
+# milestone: M2
+# expect: True False
+# expect: True False False
+# expect: True True True False True
+# expect: True False
+# expect: True True True
+# expect: True True
+# expect: False True True
+# expect: True True True
+# expect: True True True
+# expect: True True
+# expect: True True True
+# expect: True True
+# expect: True False False True True
+# expect: True False
+# expect: True True
+# expect: True False True
+# expect: apple pear
+# expect: True True
+
+fn cmp_lt(a: str, b: str) -> bool:
+    return a < b
+
+fn label() -> str:
+    return "typhoon"
+
+fn main():
+    # == and != on literals, then on a computed string.
+    print("abc" == "abc", "abc" != "abc")
+    x = "ab" + "c"
+    print(x == "abc", x != "abc", x == "abd")
+
+    # The empty string equals itself and is below every other string.
+    print("" == "", "" < "a", "" <= "", "" > "", "" >= "")
+    print("a" > "", "a" < "")
+
+    # A prefix is less than the longer string that starts with it.
+    print("app" < "apple", "apple" > "app", "app" <= "apple")
+    print("apple" < "apples", "apple" >= "apple")
+
+    # Ordering is by code point, not by length: "z" beats the longer "aa".
+    print("z" < "aa", "z" > "aa", len("z") < len("aa"))
+
+    # Uppercase sorts before lowercase, digits before letters.
+    print("Z" < "a", "A" < "a", "Zebra" < "apple")
+    print("1" < "A", "9" < "Z", "0" < "a")
+    print("!" < "0", "~" > "z")
+
+    # Non-ASCII code points sit above all of ASCII.
+    print("台" > "z", "台" > "~", "世界" > "zzz")
+    print("café" > "cafe", "台风" == "台风")
+
+    # A literal and an equal concatenation are equal and neither is smaller.
+    a = "typhoon"
+    b = "ty" + "phoon"
+    print(a == b, a < b, a > b, a <= b, a >= b)
+
+    # Across a function boundary, and on a value returned from a function.
+    print(cmp_lt("apple", "banana"), cmp_lt("banana", "apple"))
+    print(label() == "typhoon", label() < "typhoons")
+
+    # The same relations reached through variables.
+    p = "storm"
+    q = "surge"
+    print(p < q, p > q, p != q)
+
+    # Ordering used to pick the smallest and the largest of a list<str>.
+    words: list<str> = ["pear", "apple", "fig"]
+    smallest = words[0]
+    largest = words[0]
+    for w in words:
+        if w < smallest:
+            smallest = w
+        if w > largest:
+            largest = w
+    print(smallest, largest)
+    print(smallest <= largest, smallest != largest)

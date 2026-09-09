@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    t = (1, 2)\\n    a, b, c = t\\n\")"
+---
+error: expected 3 values to unpack, found 2
+ --> main.ty:3:5
+  |
+3 |     a, b, c = t
+  |     ^^^^^^^   - this is `tuple<int, int>`
+  |     |
+  |     3 target(s) here

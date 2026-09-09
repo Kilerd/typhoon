@@ -1,6 +1,6 @@
-# Attribute access needs classes, which are M2 (DESIGN 3.8).
-# milestone: M1
-# error: attribute access is not supported yet (planned for M2)
+# Only class instances have fields (DESIGN 3.8).
+# milestone: M2
+# error: `float` has no field `imag`
 
 fn main():
     x = 1.0

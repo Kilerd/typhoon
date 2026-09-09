@@ -1,7 +1,7 @@
-# Tuples are a value type of M2 (DESIGN 4.1, 4.2).
-# milestone: M1
-# error: a tuple is not supported yet (planned for M2)
+# M2 has no unit tuple: a tuple needs at least one member (DESIGN 4.1).
+# milestone: M2
+# error: the empty tuple `()` has no type
 
 fn main():
-    pair = (1, 2)
+    pair = ()
     print(1)

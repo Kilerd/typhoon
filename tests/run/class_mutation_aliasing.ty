@@ -1,0 +1,95 @@
+# Instances are references (DESIGN 4.2): two names share one object, a function
+# mutates the caller's instance, a list holds the alias rather than a copy, and
+# a fresh instance with equal fields is still a distinct identity. Scalar
+# fields copied into locals do not alias.
+# milestone: M2
+# expect: 5 5
+# expect: renamed
+# expect: True False
+# expect: 15 15
+# expect: 15 renamed
+# expect: 16 15
+# expect: 115 15
+# expect: renamed changed
+# expect: 99 True
+# expect: 5
+# expect: 198 10
+# expect: third 3
+# expect: True True
+# expect: False True
+# expect: 198 0
+# expect: 198 1 False
+
+class Box:
+    v: int
+    tag: str
+
+fn bump(b: Box, by: int):
+    b.v = b.v + by
+
+fn rebind(b: Box):
+    # Rebinding the parameter binds a brand new object; the argument the caller
+    # passed keeps pointing at its own object.
+    b = Box(v=-1, tag="fresh")
+    b.v = 7
+
+fn added(n: int) -> int:
+    n = n + 100
+    return n
+
+fn copy_of(b: Box) -> Box:
+    return Box(v=b.v, tag=b.tag)
+
+fn main():
+    # Two names for one object see each other's writes, in both directions.
+    a = Box(v=1, tag="a")
+    b = a
+    b.v = 5
+    print(a.v, b.v)
+    a.tag = "renamed"
+    print(b.tag)
+    print(a is b, a is not b)
+
+    # Passing an instance to a function mutates the caller's object, but
+    # rebinding the parameter inside the function does not.
+    bump(a, 10)
+    print(a.v, b.v)
+    rebind(a)
+    print(a.v, a.tag)
+
+    # A scalar field copied into a local is a copy: writing the local, or
+    # handing the value to a function, leaves the field alone.
+    n = a.v
+    n = n + 1
+    print(n, a.v)
+    print(added(a.v), a.v)
+    t = a.tag
+    a.tag = "changed"
+    print(t, a.tag)
+
+    # An instance stored in a list is the very same object as the local.
+    xs: list<Box> = [a, Box(v=2, tag="b")]
+    xs[0].v = 99
+    print(a.v, xs[0] is a)
+    bump(xs[1], 3)
+    print(xs[1].v)
+    for x in xs:
+        x.v = x.v * 2
+    print(a.v, xs[1].v)
+
+    # `append` stores the alias, so the list can rename the local's object.
+    xs.append(a)
+    xs[2].tag = "third"
+    print(a.tag, len(xs))
+
+    # A fresh instance with equal field values is a distinct identity.
+    c = Box(v=198, tag="third")
+    print(c.v == a.v, c.tag == a.tag)
+    print(c is a, c is not a)
+    c.v = 0
+    print(a.v, c.v)
+
+    # Copying field by field is what actually breaks the aliasing.
+    d = copy_of(a)
+    d.v = 1
+    print(a.v, d.v, d is a)

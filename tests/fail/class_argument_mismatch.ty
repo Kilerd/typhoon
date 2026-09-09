@@ -1,0 +1,16 @@
+# Classes are nominal: two classes with the same fields are still different
+# types (DESIGN 3.8, 4.4).
+# milestone: M2
+# error: mismatched types: expected `Vec`, found `Point`
+
+class Point:
+    x: float
+
+class Vec:
+    x: float
+
+fn norm(v: Vec) -> float:
+    return v.x
+
+fn main():
+    print(norm(Point(x=1.0)))

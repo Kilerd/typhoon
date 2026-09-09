@@ -33,22 +33,44 @@ tracked by milestone; each one has a measurable exit criterion
 | Milestone | Scope | Exit criterion | Status |
 |---|---|---|---|
 | **M0** Reset | Workspace skeleton, toolchain, runtime + Boehm GC linkage, golden test harness | `hello.ty` compiles and runs in CI | **Done** |
-| **M1** Numeric core | lexer/parser, `fn`, `int`/`float`/`bool`, operators, `if`/`while`/`for range`, recursion, `print`, type checking | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go | **In progress** — the language subset is complete and the whole golden suite is green; of the benchmarks, `fib` (0.79x), `nbody` (0.67x) and `mandelbrot` (0.99x) meet the target, `loops` is at 1.07x (where `clang -O2` on the identical C loop is no faster), and `spectral-norm` needs `list<float>` from M2 |
-| M2 Data | `class`, `str`, `list<T>`, `tuple`, `for-in` | binary-trees ≤ 2.0x, fannkuch ≤ 1.0x | Not started |
+| **M1** Numeric core | lexer/parser, `fn`, `int`/`float`/`bool`, operators, `if`/`while`/`for range`, recursion, `print`, type checking | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go | **Done** — `fib` 0.82x, `nbody` 0.68x, `mandelbrot` 0.99x and `spectral-norm` 0.81x all meet the target. `loops` sits at 1.04x and is accepted as an LLVM-vs-`gc` codegen gap rather than a defect: `clang -O2` on the identical C loop is no faster than the emitted IR |
+| **M2** Data | `class`, `str`, `list<T>`, `tuple`, `for-in`, Boehm GC in anger | binary-trees ≤ 2.0x, fannkuch ≤ 1.0x | **Done** — `binary_trees` 1.06x (target ≤ 2.0x) and `fannkuch` 0.99x. Includes an early slice of M3's `T \| None`: a class reference may be written `C \| None` and is narrowed by `is None` |
 | M3 Generics & inference | Monomorphised generics, `dict`/`set`, comprehensions, `T \| None`, comparison chains | k-nucleotide ≤ 1.5x | Not started |
 | M4 Errors & modules | `try`/`except`/`raise`, `import`, C FFI | fasta / k-nucleotide ≤ 1.0x | Not started |
 | M5 Performance & UX | Escape analysis, GC replacement study, JIT `run`, diagnostics, formatter | binary-trees ≤ 1.0x | Not started |
 | M6 Concurrency | Model undecided | TBD | Not started |
 
-The whole pipeline is in place for the M1 language subset: `lexer` → `parser`
-→ `sema` (name resolution, type checking, definite assignment) → `codegen`
-(textual LLVM IR) → `clang -O2` → native binary. `int`, `float`, `bool` and
-`str`, functions with default and keyword arguments, top-level constants,
-`if`/`while`/`for range`, recursion, f-strings and the `print` / `float` /
-`int` / `abs` / `min` / `max` builtins all work; everything else
-(`class`, `list`, `dict`, `tuple`, generics, `is`, `in`, indexing, attributes,
-comparison chains, `import`, `try`) is rejected with a diagnostic naming the
-milestone it arrives in.
+The whole pipeline is in place for the M2 language subset: `lexer` → `parser`
+→ `sema` (name resolution, type checking, definite assignment, `is None`
+narrowing) → `codegen` (textual LLVM IR) → `clang -O2` → native binary. On top
+of M1's numeric core — `int`, `float`, `bool`, functions with default and
+keyword arguments, top-level constants, `if`/`while`/`for range`, recursion,
+f-strings — M2 adds:
+
+* **`class`** with annotated fields, constant field defaults, a generated
+  keyword-only constructor, methods taking `self`, field read and write, and
+  reference semantics (`p is q`); plus `C | None` for a nullable class
+  reference, narrowed by `is None` inside an `if`.
+* **`list<T>`**: literals, Python-style negative indexing with a bounds check,
+  `append` / `pop` / `insert` / `clear`, `+`, `==`, `in`, `len`, `for x in xs`,
+  nesting, and a Python-style repr from `print`.
+* **`str`**: `len` in code points (O(1)), ordering comparisons, `in` as a
+  substring test, `upper` / `lower` / `strip` / `split` / `join` /
+  `startswith` / `endswith` / `find` / `replace`, `for c in s` over code
+  points, and `str(x)`.
+* **`tuple<A, B, …>`** as a by-value aggregate: literals, constant indexing,
+  unpacking (`a, b = t`), parameters and return values, `==` and `print`.
+
+The hot paths are emitted inline, never as a runtime call per element: the
+bounds check, element load and store, `len`, the `append` fast path, field
+access and the `str` header reads. The runtime only handles the slow paths
+(growth, allocation, string algorithms, formatting), and the emitter attaches
+TBAA metadata so LLVM can keep a list's length and data pointer in registers
+across a loop that stores into its elements.
+
+Everything else (`dict`, `set`, generics, comprehensions, general `T | None`,
+comparison chains, `s[i]`, `print(obj)`, `obj == obj`, `import`, `try`) is
+rejected with a diagnostic naming the milestone it arrives in.
 
 ## Building
 

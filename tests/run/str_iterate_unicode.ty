@@ -1,0 +1,91 @@
+# str under unicode: len() counts CODE POINTS and not UTF-8 bytes, `for c in s`
+# yields length-1 pieces that concatenate back into the original, and
+# find/startswith/in take non-ASCII needles while upper()/lower() stay ASCII.
+# milestone: M2
+# expect: 5 5 4 2 4
+# expect: 1 2 0
+# expect: 世 1
+# expect: 界 1
+# expect: 你 1
+# expect: 好 1
+# expect: 🌀 1
+# expect: 🌊 1
+# expect: 4 4 True
+# expect: a世🌀é True
+# expect: True True
+# expect: 0 True 0
+# expect: ["a", "世", "🌀", "é"] 4 a é
+# expect: 2 3 -1
+# expect: 0 2 3
+# expect: True False True
+# expect: True True False True
+# expect: 3
+# expect: HéLLO 世界你好 🌀🌊 A世🌀é
+# expect: Ähnlich 台风 storm
+# expect: 5 5 True
+
+fn count_chars(s: str) -> int:
+    n = 0
+    for c in s:
+        n = n + 1
+    return n
+
+fn rebuild(s: str) -> str:
+    out = ""
+    for c in s:
+        out = out + c
+    return out
+
+fn main():
+    # len() is a code point count, so a multi-byte string is much shorter than
+    # its UTF-8 encoding: "héllo" is 6 bytes but 5 characters.
+    ascii_s = "hello"
+    latin = "héllo"
+    cjk = "世界你好"
+    emoji = "🌀🌊"
+    mixed = "a世🌀é"
+    print(len(ascii_s), len(latin), len(cjk), len(emoji), len(mixed))
+    print(len("é"), len("台风"), len(""))
+
+    # Iteration yields one code point at a time, each of length 1.
+    for c in cjk:
+        print(c, len(c))
+    for c in emoji:
+        print(c, len(c))
+
+    # The number of rounds equals len(), and the pieces rebuild the original.
+    print(count_chars(mixed), len(mixed), count_chars(mixed) == len(mixed))
+    print(rebuild(mixed), rebuild(mixed) == mixed)
+    print(rebuild(cjk) == cjk, rebuild(ascii_s) == ascii_s)
+
+    # The empty string iterates zero times.
+    rounds = 0
+    for c in "":
+        rounds = rounds + 1
+    print(rounds, rebuild("") == "", len(rebuild("")))
+
+    # Collected into a list<str>; inside a container each piece prints quoted.
+    cps: list<str> = []
+    for c in mixed:
+        cps.append(c)
+    print(cps, len(cps), cps[0], cps[-1])
+
+    # find() reports a CODE POINT index, and -1 when the needle is absent.
+    print(cjk.find("你"), cjk.find("好"), cjk.find("z"))
+    print(mixed.find("a"), mixed.find("🌀"), mixed.find("é"))
+
+    # startswith/endswith and `in` accept non-ASCII needles too.
+    print(cjk.startswith("世界"), cjk.startswith("界"), cjk.endswith("你好"))
+    print("世" in cjk, "界你" in cjk, "z" in cjk, "🌀" in mixed)
+
+    # Counting a non-ASCII needle by hand, one code point per round.
+    hits = 0
+    for c in "台风台风台":
+        if c == "台":
+            hits = hits + 1
+    print(hits)
+
+    # upper()/lower() are ASCII-only: non-ASCII code points pass through.
+    print(latin.upper(), cjk.upper(), emoji.upper(), mixed.upper())
+    print("Ähnlich".lower(), "台风 STORM".lower())
+    print(len(latin), len(latin.upper()), len(mixed) == len(mixed.upper()))

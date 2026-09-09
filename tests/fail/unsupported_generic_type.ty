@@ -1,7 +1,10 @@
-# `list<int>` as a type annotation needs M2.
-# milestone: M1
-# error: the type `list` is not supported yet (planned for M2)
+# User generics are monomorphised in M3 (DESIGN 3.9).
+# milestone: M2
+# error: a generic type is not supported yet (planned for M3)
+
+class Stack:
+    n: int
 
 fn main():
-    xs: list<int> = [1]
-    print(1)
+    s: Stack<int> = Stack(n=0)
+    print(s.n)

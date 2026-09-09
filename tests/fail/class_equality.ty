@@ -1,0 +1,13 @@
+# Class instances have no structural equality in M2; `is` compares identity
+# (DESIGN 3.8, 3.6).
+# milestone: M2
+# error: `Point` values cannot be compared with `==`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    q = Point(x=2.0)
+    if p == q:
+        print("same")

@@ -1,0 +1,103 @@
+# Constant field defaults for every scalar type: omitted, overridden one at a
+# time and all at once, keywords in any order, `Config()` with no arguments,
+# required fields mixed with defaulted ones, and each instance owning its own
+# copy of a defaulted value.
+# milestone: M2
+# expect: default 3 0.25 False
+# expect: default 3 0.25 False
+# expect: a 3 0.25 False
+# expect: default 10 0.25 False
+# expect: default 3 0.5 False
+# expect: default 3 0.25 True
+# expect: full 0 2.0 True
+# expect: full 0 2.0 True
+# expect: True False
+# expect: pair 3 0.25 True
+# expect: 1.0 2.0
+# expect: p 99 0.25 False
+# expect: default 3 0.25 False
+# expect: default 3 0.25 False
+# expect: 2 1 0
+# expect: db 8080 -1.5 True -7
+# expect: [] 0
+# expect: cache 11211 -1.5 False -7
+# expect: 0.0
+
+class Config:
+    name: str = "default"
+    retries: int = 3
+    ratio: float = 0.25
+    verbose: bool = False
+
+    fn describe(self) -> str:
+        return f"{self.name} {self.retries} {self.ratio} {self.verbose}"
+
+    fn budget(self) -> float:
+        return self.ratio * 4.0
+
+class Job:
+    # A required field first, then defaults, including negative literals and
+    # the empty string.
+    host: str
+    port: int = 8080
+    timeout: float = -1.5
+    tls: bool = True
+    note: str = ""
+    limit: int = -7
+
+class Counter:
+    n: int = 0
+
+    fn bump(self):
+        self.n = self.n + 1
+
+fn main():
+    # Every field defaulted, so the constructor takes no arguments at all.
+    c = Config()
+    print(c.name, c.retries, c.ratio, c.verbose)
+    print(c.describe())
+
+    # One default overridden at a time, one per type.
+    print(Config(name="a").describe())
+    print(Config(retries=10).describe())
+    print(Config(ratio=0.5).describe())
+    print(Config(verbose=True).describe())
+
+    # All of them overridden, then the same values with the keywords in a
+    # scrambled order: same fields, different object.
+    full = Config(name="full", retries=0, ratio=2.0, verbose=True)
+    print(full.describe())
+    scrambled = Config(verbose=True, ratio=2.0, name="full", retries=0)
+    print(scrambled.describe())
+    print(full.describe() == scrambled.describe(), full is scrambled)
+
+    # A subset of the fields, written in reverse declaration order.
+    print(Config(verbose=True, name="pair").describe())
+
+    # A method reads the defaulted field like any other.
+    print(Config().budget(), Config(ratio=0.5).budget())
+
+    # Each instance owns its copy of a default: writing one leaves the others
+    # and every later instance untouched.
+    p = Config()
+    q = Config()
+    p.retries = 99
+    p.name = "p"
+    print(p.describe())
+    print(q.describe())
+    print(Config().describe())
+
+    x = Counter()
+    y = Counter()
+    x.bump()
+    x.bump()
+    y.bump()
+    print(x.n, y.n, Counter().n)
+
+    # A required field alongside defaults.
+    j = Job(host="db")
+    print(j.host, j.port, j.timeout, j.tls, j.limit)
+    print(f"[{j.note}]", len(j.note))
+    k = Job(tls=False, host="cache", port=11211)
+    print(k.host, k.port, k.timeout, k.tls, k.limit)
+    print(Job(timeout=0.0, host="edge").timeout)

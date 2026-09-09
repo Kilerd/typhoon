@@ -2,9 +2,9 @@
 //! compute it, returning the operand string holding the result.
 
 use typhoon_sema::hir;
-use typhoon_sema::types::TypeId;
+use typhoon_sema::types::{Type, TypeId};
 
-use super::{Emitter, I64_MIN, align_of, float_literal, llvm_ty};
+use super::{Emitter, I64_MIN, Tbaa, float_literal};
 
 impl<'p> Emitter<'p> {
     /// Emits `expr` and returns the operand holding its value. Expressions of
@@ -21,9 +21,9 @@ impl<'p> Emitter<'p> {
                 let out = self.fresh();
                 self.emit(&format!(
                     "{out} = load {}, ptr {}, align {}",
-                    llvm_ty(local.ty),
+                    self.llvm_ty(local.ty),
                     self.slots[id.index()],
-                    align_of(local.ty)
+                    self.align_of(local.ty)
                 ));
                 out
             }
@@ -125,12 +125,27 @@ impl<'p> Emitter<'p> {
             hir::ExprKind::StrCmp { op, lhs, rhs } => {
                 let lhs = self.expr(func, lhs);
                 let rhs = self.expr(func, rhs);
-                self.decls
-                    .insert("declare i8 @ty_str_eq(ptr, ptr) nounwind");
-                let raw = self.fresh();
-                self.emit(&format!("{raw} = call i8 @ty_str_eq(ptr {lhs}, ptr {rhs})"));
-                let pred = if *op == hir::CmpOp::Eq { "ne" } else { "eq" };
-                self.binop(&format!("icmp {pred}"), "i8", &raw, "0")
+                match op {
+                    hir::CmpOp::Eq | hir::CmpOp::Ne => {
+                        self.decls
+                            .insert("declare i8 @ty_str_eq(ptr nocapture readonly, ptr nocapture readonly) nounwind willreturn");
+                        let raw = self.fresh();
+                        self.emit(&format!("{raw} = call i8 @ty_str_eq(ptr {lhs}, ptr {rhs})"));
+                        let pred = if *op == hir::CmpOp::Eq { "ne" } else { "eq" };
+                        self.binop(&format!("icmp {pred}"), "i8", &raw, "0")
+                    }
+                    // Byte-wise order, which for UTF-8 is code point order.
+                    _ => {
+                        self.decls
+                            .insert("declare i64 @ty_str_cmp(ptr nocapture readonly, ptr nocapture readonly) nounwind willreturn");
+                        let raw = self.fresh();
+                        self.emit(&format!(
+                            "{raw} = call i64 @ty_str_cmp(ptr {lhs}, ptr {rhs})"
+                        ));
+                        let pred = int_predicate(*op);
+                        self.binop(&format!("icmp {pred}"), "i64", &raw, "0")
+                    }
+                }
             }
             hir::ExprKind::StrConcat { lhs, rhs } => {
                 let lhs = self.expr(func, lhs);
@@ -230,11 +245,96 @@ impl<'p> Emitter<'p> {
                 String::new()
             }
             hir::ExprKind::FString(parts) => self.fstring(func, parts),
+
+            // -- str ------------------------------------------------------
+            hir::ExprKind::StrLen(value) => {
+                let value = self.expr(func, value);
+                self.str_char_len(&value)
+            }
+            hir::ExprKind::StrMethod { op, recv, args } => self.str_method(func, *op, recv, args),
+            hir::ExprKind::StrFrom(value) => {
+                let ty = value.ty;
+                let value = self.expr(func, value);
+                self.format_value(ty, &value, hir::FormatSpec::Display)
+            }
+
+            // -- list -----------------------------------------------------
+            hir::ExprKind::ListNew { elem, items } => self.list_new(func, *elem, items),
+            hir::ExprKind::ListGet { list, index } => self.list_get(func, list, index, expr.ty),
+            hir::ExprKind::ListLen(list) => {
+                let list = self.expr(func, list);
+                self.list_len(&list)
+            }
+            hir::ExprKind::ListAppend { list, value } => {
+                self.list_append(func, list, value);
+                String::new()
+            }
+            hir::ExprKind::ListPop(list) => self.list_pop(func, list, expr.ty),
+            hir::ExprKind::ListInsert { list, index, value } => {
+                self.list_insert(func, list, index, value);
+                String::new()
+            }
+            hir::ExprKind::ListClear(list) => {
+                self.list_clear(func, list);
+                String::new()
+            }
+            hir::ExprKind::ListConcat { lhs, rhs } => {
+                let elem = self
+                    .types
+                    .as_list(expr.ty)
+                    .expect("`+` on lists yields a list");
+                self.list_concat(func, lhs, rhs, elem)
+            }
+            hir::ExprKind::Contains {
+                haystack,
+                needle,
+                negated,
+            } => self.contains(func, haystack, needle, *negated),
+
+            // -- tuple ----------------------------------------------------
+            hir::ExprKind::TupleNew(items) => self.tuple_new(func, expr.ty, items),
+            hir::ExprKind::TupleGet { tuple, index } => {
+                self.tuple_get(func, tuple, *index, expr.ty)
+            }
+
+            // -- class ----------------------------------------------------
+            hir::ExprKind::New {
+                class,
+                fields,
+                eval_order,
+            } => self.class_new(func, *class, fields, eval_order),
+            hir::ExprKind::GetField { obj, class, field } => {
+                let obj = self.expr(func, obj);
+                let slot = self.field_slot(&obj, *class, *field);
+                self.load_slot(&slot, expr.ty, Tbaa::ClassField)
+            }
+            hir::ExprKind::NoneRef => "null".to_string(),
+            hir::ExprKind::IsNone { value, negated } => {
+                let value = self.expr(func, value);
+                let pred = if *negated { "ne" } else { "eq" };
+                self.binop(&format!("icmp {pred}"), "ptr", &value, "null")
+            }
+            hir::ExprKind::RefEq { lhs, rhs, negated } => {
+                let lhs = self.expr(func, lhs);
+                let rhs = self.expr(func, rhs);
+                let pred = if *negated { "ne" } else { "eq" };
+                self.binop(&format!("icmp {pred}"), "ptr", &lhs, &rhs)
+            }
+            hir::ExprKind::StructEq { op, lhs, rhs } => {
+                let ty = lhs.ty;
+                let lhs = self.expr(func, lhs);
+                let rhs = self.expr(func, rhs);
+                let equal = self.values_equal(ty, &lhs, &rhs);
+                if *op == hir::CmpOp::Ne {
+                    return self.binop("xor", "i1", &equal, "true");
+                }
+                equal
+            }
         }
     }
 
     /// `%t = <op> <ty> <lhs>, <rhs>`.
-    fn binop(&mut self, op: &str, ty: &str, lhs: &str, rhs: &str) -> String {
+    pub(super) fn binop(&mut self, op: &str, ty: &str, lhs: &str, rhs: &str) -> String {
         let out = self.fresh();
         self.emit(&format!("{out} = {op} {ty} {lhs}, {rhs}"));
         out
@@ -462,6 +562,7 @@ impl<'p> Emitter<'p> {
 
     /// A call to a user function: arguments are evaluated in source order and
     /// passed in parameter order (DESIGN section 3.2).
+    #[allow(clippy::needless_range_loop)]
     fn call(
         &mut self,
         func: &'p hir::Function,
@@ -487,7 +588,7 @@ impl<'p> Emitter<'p> {
             .map(|(arg, value)| {
                 format!(
                     "{} {}",
-                    llvm_ty(arg.ty),
+                    self.llvm_ty(arg.ty),
                     value.as_deref().expect("filled above")
                 )
             })
@@ -501,7 +602,7 @@ impl<'p> Emitter<'p> {
             let out = self.fresh();
             self.emit(&format!(
                 "{out} = call {} @{symbol}({})",
-                llvm_ty(ret),
+                self.llvm_ty(ret),
                 arguments.join(", ")
             ));
             out
@@ -510,7 +611,7 @@ impl<'p> Emitter<'p> {
 
     /// `print(a, b)`: every argument is evaluated first, then written with a
     /// single space between them and a newline at the end (DESIGN section 4.6).
-    fn print(&mut self, func: &'p hir::Function, args: &[hir::Expr]) {
+    pub(super) fn print(&mut self, func: &'p hir::Function, args: &[hir::Expr]) {
         let values: Vec<(TypeId, String)> = args
             .iter()
             .map(|arg| (arg.ty, self.expr(func, arg)))
@@ -520,51 +621,17 @@ impl<'p> Emitter<'p> {
                 self.decls.insert("declare void @ty_print_sep() nounwind");
                 self.emit("call void @ty_print_sep()");
             }
-            match *ty {
-                TypeId::INT => {
-                    self.decls
-                        .insert("declare void @ty_print_int(i64) nounwind");
-                    self.emit(&format!("call void @ty_print_int(i64 {value})"));
-                }
-                TypeId::FLOAT => {
-                    self.decls
-                        .insert("declare void @ty_print_float(double) nounwind");
-                    self.emit(&format!("call void @ty_print_float(double {value})"));
-                }
-                TypeId::BOOL => {
-                    self.decls
-                        .insert("declare void @ty_print_bool(i8) nounwind");
-                    let byte = self.fresh();
-                    self.emit(&format!("{byte} = zext i1 {value} to i8"));
-                    self.emit(&format!("call void @ty_print_bool(i8 {byte})"));
-                }
-                TypeId::STR => {
-                    self.decls
-                        .insert("declare void @ty_print_str(ptr, i64) nounwind");
-                    let (bytes, len) = self.str_parts(value);
-                    self.emit(&format!("call void @ty_print_str(ptr {bytes}, i64 {len})"));
-                }
-                _ => {}
-            }
+            // Only a top-level `str` prints verbatim; inside a container it
+            // prints as its repr (DESIGN §4.6).
+            self.print_value(*ty, value, false);
         }
         self.decls.insert("declare void @ty_print_end() nounwind");
         self.emit("call void @ty_print_end()");
     }
 
-    /// Splits a `str` value into the pointer to its bytes and its length.
-    fn str_parts(&mut self, value: &str) -> (String, String) {
-        let len = self.fresh();
-        let bytes = self.fresh();
-        self.emit(&format!("{len} = load i64, ptr {value}, align 8"));
-        self.emit(&format!(
-            "{bytes} = getelementptr inbounds i8, ptr {value}, i64 8"
-        ));
-        (bytes, len)
-    }
-
-    fn concat(&mut self, lhs: &str, rhs: &str) -> String {
+    pub(super) fn concat(&mut self, lhs: &str, rhs: &str) -> String {
         self.decls
-            .insert("declare ptr @ty_str_concat(ptr, ptr) nounwind");
+            .insert("declare noalias ptr @ty_str_concat(ptr nocapture readonly, ptr nocapture readonly) nounwind");
         let out = self.fresh();
         self.emit(&format!(
             "{out} = call ptr @ty_str_concat(ptr {lhs}, ptr {rhs})"
@@ -593,37 +660,42 @@ impl<'p> Emitter<'p> {
         result.unwrap_or_else(|| self.string_literal(""))
     }
 
-    fn format_value(&mut self, ty: TypeId, value: &str, spec: hir::FormatSpec) -> String {
+    pub(super) fn format_value(
+        &mut self,
+        ty: TypeId,
+        value: &str,
+        spec: hir::FormatSpec,
+    ) -> String {
         if let hir::FormatSpec::Fixed(precision) = spec {
             self.decls
-                .insert("declare ptr @ty_str_from_float_fixed(double, i64) nounwind");
+                .insert("declare noalias ptr @ty_str_from_float_fixed(double, i64) nounwind");
             let out = self.fresh();
             self.emit(&format!(
                 "{out} = call ptr @ty_str_from_float_fixed(double {value}, i64 {precision})"
             ));
             return out;
         }
-        match ty {
-            TypeId::STR => value.to_string(),
-            TypeId::INT => {
+        match self.types.get(ty) {
+            Type::Str => value.to_string(),
+            Type::Int => {
                 self.decls
-                    .insert("declare ptr @ty_str_from_int(i64) nounwind");
+                    .insert("declare noalias ptr @ty_str_from_int(i64) nounwind");
                 let out = self.fresh();
                 self.emit(&format!("{out} = call ptr @ty_str_from_int(i64 {value})"));
                 out
             }
-            TypeId::FLOAT => {
+            Type::Float => {
                 self.decls
-                    .insert("declare ptr @ty_str_from_float(double) nounwind");
+                    .insert("declare noalias ptr @ty_str_from_float(double) nounwind");
                 let out = self.fresh();
                 self.emit(&format!(
                     "{out} = call ptr @ty_str_from_float(double {value})"
                 ));
                 out
             }
-            TypeId::BOOL => {
+            Type::Bool => {
                 self.decls
-                    .insert("declare ptr @ty_str_from_bool(i8) nounwind");
+                    .insert("declare noalias ptr @ty_str_from_bool(i8) nounwind");
                 let byte = self.fresh();
                 self.emit(&format!("{byte} = zext i1 {value} to i8"));
                 let out = self.fresh();
@@ -643,7 +715,7 @@ fn constant_int(expr: &hir::Expr) -> Option<i64> {
     }
 }
 
-fn int_predicate(op: hir::CmpOp) -> &'static str {
+pub(super) fn int_predicate(op: hir::CmpOp) -> &'static str {
     match op {
         hir::CmpOp::Eq => "eq",
         hir::CmpOp::Ne => "ne",

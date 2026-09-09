@@ -1,0 +1,94 @@
+# How a tuple prints and how it compares: repr form for mixed types, the
+# trailing comma of `(x,)`, nesting, quoted-and-escaped strings inside a
+# container, and ==/!= element by element including order and nesting.
+# milestone: M2
+# expect: (1, "a", True, 2.5)
+# expect: (0, -1, 2)
+# expect: (1,) ("only",) (True,) (1.0,)
+# expect: ((1, 2), (3, 4))
+# expect: (1, (2, (3, (4,))))
+# expect: ("quote: \"", "back: \\", "line\nbreak", "tab\there")
+# expect: quote: "
+# expect: line
+# expect: break
+# expect: ("", "x", "")
+# expect: ("héllo", "世界")
+# expect: (1.0, -0.0, 0.5, 1e+30)
+# expect: (True, False, False)
+# expect: pair: (1, 2) and (3, 4) done
+# expect: [(1, "a"), (2, "b")] [(1, 2)] [] 2
+# expect: True False True
+# expect: False True
+# expect: False True
+# expect: True True True
+# expect: False False
+# expect: True
+# expect: False
+# expect: True True
+# expect: True True False
+# expect: True True False
+# expect: True False
+# expect: True True True
+# expect: True False True
+
+fn make(a: int, b: str) -> tuple<int, str>:
+    return (a, b)
+
+fn eq(a: tuple<int, int>, b: tuple<int, int>) -> bool:
+    return a == b
+
+fn main():
+    # Repr form: mixed element types, all on one line.
+    print((1, "a", True, 2.5))
+    print((0, -1, 2))
+
+    # A single-element tuple keeps its trailing comma.
+    print((1,), ("only",), (True,), (1.0,))
+
+    # Nesting prints recursively, down to a nested single-element tuple.
+    print(((1, 2), (3, 4)))
+    print((1, (2, (3, (4,)))))
+
+    # A str INSIDE a container is quoted and escaped; a bare str is not.
+    print(("quote: \"", "back: \\", "line\nbreak", "tab\there"))
+    print("quote: \"")
+    print("line\nbreak")
+    print(("", "x", ""))
+    print(("héllo", "世界"))
+
+    # Floats always keep a `.` or an exponent; bools print True/False.
+    print((1.0, -0.0, 0.5, 1e30))
+    print((True, False, not True))
+
+    # Alongside other arguments in one print, and inside a list.
+    print("pair:", (1, 2), "and", (3, 4), "done")
+    rows: list<tuple<int, str>> = [(1, "a"), (2, "b")]
+    singles: list<tuple<int, int>> = [(1, 2)]
+    empty: list<tuple<int, int>> = []
+    print(rows, singles, empty, len(rows))
+
+    # ==/!= : identical, one element different, and the same elements in a
+    # different ORDER.
+    print((1, 2, 3) == (1, 2, 3), (1, 2, 3) == (1, 9, 3), (1, 2, 3) != (1, 9, 3))
+    print((1, 2) == (2, 1), (1, 2) != (2, 1))
+    print(("a", "b") == ("b", "a"), ("a", "b") == ("a", "b"))
+
+    # Tuples built from variables and expressions versus literals.
+    x = 3
+    y = 4
+    print((x, y) == (3, 4), (x + 1, y - 1) == (4, 3), (x * y, "n") == (12, "n"))
+    print((x, y) != (3, 4), (x, y) == (y, x))
+
+    # Nested equality compares element by element, at every level.
+    print(((1, 2), (3, 4)) == ((1, 2), (3, 4)))
+    print(((1, 2), (3, 4)) == ((1, 2), (4, 3)))
+    print((1, (2, (3,))) == (1, (2, (3,))), (1, (2, (3,))) != (1, (2, (4,))))
+
+    # Tuples of strings, floats and bools.
+    print(("héllo", "世界") == ("héllo", "世界"), ("a", "") == ("a", ""), ("a", "") == ("a", " "))
+    print((1.5, 2.5) == (1.5, 2.5), (0.0, 1.0) == (-0.0, 1.0), (1.0, 2.0) == (1.0, 2.5))
+    print((True, False) == (True, False), (True, False) == (False, True))
+
+    # Equality across a function boundary, on both sides of the call.
+    print(make(1, "a") == (1, "a"), make(1, "a") == make(1, "a"), make(1, "a") != make(2, "a"))
+    print(eq((1, 2), (1, 2)), eq((1, 2), (2, 1)), eq(singles[0], (1, 2)))

@@ -1,0 +1,91 @@
+# list<str> end to end: literals, an annotated empty list grown by appending,
+# indexing from both ends, `in` / `not in`, len of the list versus len of an
+# element, concatenation, ==, join/split, iteration, an empty and a non-ASCII
+# element, and a list<str> parameter and return value.
+# milestone: M2
+# expect: ["storm", "wind", "rain"]
+# expect: 3 storm rain rain storm
+# expect: 3 5 4
+# expect: [] 0
+# expect: ["storms", "winds", "rains"] 3
+# expect: True False
+# expect: True False
+# expect: False True
+# expect: ["", "台风", "ok"] 3 0 2
+# expect: True True
+# expect: ["x", "y", "z"] True False
+# expect: ["x", "y"] ["z"] ["x", "y", "z", "w"]
+# expect: True
+# expect: storm-wind-rain
+# expect: True
+# expect: stormwindrain stormswindsrains
+# expect: |
+# expect: storm/wind/rain/
+# expect: ["wind", "rain"] 13
+# expect: ["rain"] []
+
+fn tail(xs: list<str>) -> list<str>:
+    # Everything but the first element, as a fresh list.
+    out: list<str> = []
+    for i in range(1, len(xs)):
+        out.append(xs[i])
+    return out
+
+fn total_len(xs: list<str>) -> int:
+    n = 0
+    for w in xs:
+        n = n + len(w)
+    return n
+
+fn main():
+    # A literal list<str>: printing, length, indexing from both ends.
+    words: list<str> = ["storm", "wind", "rain"]
+    print(words)
+    print(len(words), words[0], words[2], words[-1], words[-3])
+
+    # len of the list versus len of one of its elements.
+    print(len(words), len(words[0]), len(words[1]))
+
+    # An annotated empty list, then the same list grown by appending in a loop.
+    built: list<str> = []
+    print(built, len(built))
+    for w in words:
+        built.append(w + "s")
+    print(built, len(built))
+
+    # `in` / `not in` compare by value, not by identity.
+    print("wind" in words, "snow" in words)
+    print("snow" not in words, "storm" not in words)
+    print("stor" in words, ("stor" + "m") in words)
+
+    # An empty element and a non-ASCII element are ordinary elements.
+    mixed: list<str> = ["", "台风", "ok"]
+    print(mixed, len(mixed), len(mixed[0]), len(mixed[1]))
+    print("" in mixed, "台风" in mixed)
+
+    # Concatenation builds a NEW list; == compares element by element.
+    a: list<str> = ["x", "y"]
+    b: list<str> = ["z"]
+    both = a + b
+    print(both, both == ["x", "y", "z"], both == a)
+    both.append("w")
+    print(a, b, both)
+    print(a + b != b + a)
+
+    # join and split are inverses when the parts do not contain the separator.
+    joined = "-".join(words)
+    print(joined)
+    print(joined.split("-") == words)
+    print("".join(words), "".join(built))
+    empty: list<str> = []
+    print("+".join(empty) + "|")
+
+    # Iterating a list<str> to build a single string.
+    line = ""
+    for w in words:
+        line = line + w + "/"
+    print(line)
+
+    # A list<str> as a parameter and as a return value.
+    print(tail(words), total_len(words))
+    print(tail(tail(words)), tail(empty))

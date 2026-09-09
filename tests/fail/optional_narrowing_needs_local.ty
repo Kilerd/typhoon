@@ -1,0 +1,16 @@
+# Narrowing is keyed to a local, so testing an expression does not narrow the
+# next call of it (DESIGN 3.8).
+# milestone: M2
+# error: narrow it first: assign it to a local
+
+class Point:
+    x: float
+
+fn find(flag: bool) -> Point | None:
+    if flag:
+        return Point(x=1.0)
+    return None
+
+fn main():
+    if find(True) is not None:
+        print(find(True).x)

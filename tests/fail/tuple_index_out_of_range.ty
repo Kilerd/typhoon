@@ -1,0 +1,8 @@
+# A tuple has a fixed arity, so an out-of-range index is a compile error, not a
+# runtime panic (DESIGN 4.1, 4.3).
+# milestone: M2
+# error: tuple index 2 is out of range for `tuple<int, str>`
+
+fn main():
+    t: tuple<int, str> = (1, "a")
+    print(t[2])

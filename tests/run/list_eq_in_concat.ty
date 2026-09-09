@@ -1,0 +1,82 @@
+# Lists: == / != element by element (order, length, empty, nesting, str, float
+# and bool elements), `in` / `not in` for a present, absent, first, last and
+# missing-from-empty value, and `+` -- chaining, an empty operand on either
+# side, and that the result is a new list whose mutation leaves the operands
+# untouched.
+# milestone: M2
+# expect: True False
+# expect: False True
+# expect: False False
+# expect: True True True
+# expect: True False True
+# expect: True False False
+# expect: True False
+# expect: True True
+# expect: True True True
+# expect: False True
+# expect: False True
+# expect: True False True
+# expect: True True
+# expect: [1, 2, 3] True
+# expect: [1] [1] []
+# expect: [1] [2] [1, 2, 99]
+# expect: True True
+# expect: ["a", "b", "c"] True
+# expect: [1, 2, 3, 4] True
+
+fn main():
+    # == and != compare element by element, in order.
+    a: list<int> = [1, 2, 3]
+    print(a == [1, 2, 3], a != [1, 2, 3])
+    print(a == [3, 2, 1], a != [3, 2, 1])
+    print(a == [1, 2], a == [1, 2, 3, 4])
+
+    # Two empty lists are equal, and an empty list differs from a filled one.
+    e1: list<int> = []
+    e2: list<int> = []
+    print(e1 == e2, e1 == [], e1 != a)
+
+    # Nested lists compare by their inner elements.
+    g1: list<list<int>> = [[1], [2, 3]]
+    g2: list<list<int>> = [[1], [2, 3]]
+    g3: list<list<int>> = [[1, 2], [3]]
+    print(g1 == g2, g1 == g3, g1 != g3)
+
+    # The same rules for str, float and bool elements.
+    s1: list<str> = ["a", "b"]
+    print(s1 == ["a", "b"], s1 == ["b", "a"], s1 == ["a"])
+    f1: list<float> = [1.0, 2.5]
+    print(f1 == [1.0, 2.5], f1 == [1.0, 2.0])
+    b1: list<bool> = [True, False]
+    print(b1 == [True, False], b1 != [False, True])
+
+    # `in` finds the first, the last and a middle element.
+    print(1 in a, 3 in a, 2 in a)
+    # An absent value, and `not in` as its exact negation.
+    print(7 in a, 7 not in a)
+    # Nothing is ever in an empty list.
+    print(1 in e1, 1 not in e1)
+    # `in` over a list<str> compares string values.
+    print("b" in s1, "c" in s1, "" not in s1)
+    print(2.5 in f1, False in b1)
+
+    # `+` chains left to right and is associative.
+    x: list<int> = [1]
+    y: list<int> = [2]
+    z: list<int> = [3]
+    print(x + y + z, (x + y) + z == x + (y + z))
+
+    # An empty operand on either side changes nothing.
+    print(x + e1, e1 + x, e1 + e2)
+
+    # The result is a NEW list: mutating it leaves both operands alone.
+    joined = x + y
+    joined.append(99)
+    print(x, y, joined)
+
+    # A concatenation compares equal to the literal spelling of its result.
+    print(x + y == [1, 2], x + y != [2, 1])
+    parts: list<str> = ["a"]
+    more: list<str> = ["b", "c"]
+    print(parts + more, parts + more == ["a", "b", "c"])
+    print(a + [4], a + [4] == [1, 2, 3, 4])

@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Point:\\n    x: float\\n    y: float\\n\\nfn main():\\n    p = Point(x=1.0)\\n    print(p.x)\\n\")"
+---
+error: missing field `y` in the constructor of `Point`
+ --> main.ty:6:9
+  |
+6 |     p = Point(x=1.0)
+  |         ^^^^^^^^^^^^ every field without a default must be supplied
+  |
+  = help: write `Point(field=value, …)`

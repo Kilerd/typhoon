@@ -1,0 +1,12 @@
+# Assignment cannot invent a field either: the field set is fixed by the class
+# declaration (DESIGN 3.8).
+# milestone: M2
+# error: `Point` has no field `z`
+# error: `Point` has one field, `x`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    p.z = 2.0

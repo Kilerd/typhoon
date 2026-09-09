@@ -28,6 +28,9 @@ BENCHMARKS = [
     ("loops", 1.0, "pure CPU + recursion, M1"),
     ("mandelbrot", 1.0, "float, M1"),
     ("nbody", 1.0, "float, M1"),
+    ("binary_trees", 2.0, "allocation heavy, M2 (Boehm phase)"),
+    ("fannkuch", 1.0, "integer arrays, M2"),
+    ("spectral_norm", 1.0, "float, M1 target, needs list<float> from M2"),
 ]
 
 GO_FALLBACKS = ["/opt/homebrew/opt/go/bin/go", "/usr/local/go/bin/go"]
@@ -56,7 +59,9 @@ def find_typhoon(explicit):
     if explicit:
         if not (os.path.isfile(explicit) and os.access(explicit, os.X_OK)):
             die("--typhoon %s is not an executable file" % explicit)
-        return explicit
+        # The benchmarks are built from inside their own directory, so a
+        # relative path would not resolve there.
+        return os.path.abspath(explicit)
     for candidate in TYPHOON_FALLBACKS:
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
@@ -241,8 +246,11 @@ def main():
             print("| %s | %.3f | - | - | <= %.1fx | %s |"
                   % (row["name"], row["go_median"], row["target"], what))
     print("")
-    print("Targets are the DESIGN section 2 exit criteria for M1 (typhoon <= 1.0x Go)%s."
-          % (" plus a %.0f%% tolerance" % (args.tolerance * 100) if args.tolerance else ""))
+    print("Targets are the DESIGN section 2 exit criteria for the milestone each row "
+          "belongs to%s."
+          % (", plus a %.0f%% tolerance" % (args.tolerance * 100) if args.tolerance else ""))
+    print("M1 rows and fannkuch are <= 1.0x Go; binary_trees is <= 2.0x while the Boehm")
+    print("collector is in place (M2), tightening to <= 1.0x after escape analysis (M5).")
     if typhoon is None:
         print("typhoon was not run, so nothing here can pass or fail yet.")
 

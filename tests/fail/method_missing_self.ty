@@ -1,0 +1,13 @@
+# The first parameter of a method is the unannotated receiver `self`
+# (DESIGN 3.8).
+# milestone: M2
+# error: the method `bump` must take `self` as its first parameter
+
+class Counter:
+    n: int
+
+    fn bump(this: int) -> int:
+        return this
+
+fn main():
+    print(Counter(n=0).n)

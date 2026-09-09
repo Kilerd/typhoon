@@ -1,0 +1,18 @@
+# `C | None` is a distinct type from `C`, so it cannot fill a `C` parameter
+# (DESIGN 3.8, 4.4).
+# milestone: M2
+# error: mismatched types: expected `Point`, found `Point | None`
+
+class Point:
+    x: float
+
+fn find(flag: bool) -> Point | None:
+    if flag:
+        return Point(x=1.0)
+    return None
+
+fn show(p: Point):
+    print(p.x)
+
+fn main():
+    show(find(True))

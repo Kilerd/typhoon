@@ -1,0 +1,12 @@
+# The generated keyword constructor only accepts declared fields (DESIGN 3.8).
+# milestone: M2
+# error: `Point` has no field `z`
+# error: `Point` constructed here
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    p = Point(x=1.0, y=2.0, z=3.0)
+    print(p.x)

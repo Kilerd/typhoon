@@ -1,0 +1,11 @@
+# Fields and methods live in the same namespace, so calling a field is caught
+# with a hint rather than a bare "unknown method" (DESIGN 3.8).
+# milestone: M2
+# error: `x` is a field; drop the `()`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    print(p.x())

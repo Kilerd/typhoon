@@ -23,6 +23,25 @@ fn is_ident_continue(c: char) -> bool {
 }
 
 /// Renders a character for a diagnostic message, escaping control characters.
+/// Whether a token can end an operand, i.e. whether a `-` after it is the
+/// binary subtraction operator rather than a prefix sign.
+fn ends_an_operand(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Ident(_)
+            | TokenKind::Int(_)
+            | TokenKind::Float(_)
+            | TokenKind::Str(_)
+            | TokenKind::FString(_)
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::None
+            | TokenKind::RParen
+            | TokenKind::RBracket
+            | TokenKind::RBrace
+    )
+}
+
 fn quoted(c: char) -> String {
     format!("`{}`", c.escape_debug())
 }
@@ -539,11 +558,52 @@ impl<'a> Scanner<'a> {
             );
         } else if let Ok(v) = i64::from_str_radix(&digits, radix) {
             value = v;
+        } else if self.fold_int_min(&digits, radix, end) {
+            return;
         } else {
             let span = self.span(start, end);
             self.error(Self::too_large(span));
         }
         self.emit(TokenKind::Int(value), start, end);
+    }
+
+    /// Folds a leading unary minus into the literal `9223372036854775808`.
+    ///
+    /// `i64::MIN` has no positive counterpart, so `-9223372036854775808` can
+    /// only be written by treating the sign as part of the literal — Python
+    /// has no negative literals and the magnitude alone does not fit. The fold
+    /// happens here, and only for this one magnitude, so that no other literal
+    /// changes shape: in particular `-2 ** 2` keeps parsing as `-(2 ** 2)`
+    /// because `2` is not `i64::MIN`'s magnitude.
+    ///
+    /// Returns whether the previous `-` token was replaced by an
+    /// [`TokenKind::Int`] holding [`i64::MIN`]. The `-` must be in prefix
+    /// position: `a - 9223372036854775808` is still out of range.
+    fn fold_int_min(&mut self, digits: &str, radix: u32, end: usize) -> bool {
+        if u128::from_str_radix(digits, radix) != Ok(1u128 << 63) {
+            return false;
+        }
+        let Some(last) = self.tokens.last() else {
+            return false;
+        };
+        if last.kind != TokenKind::Minus {
+            return false;
+        }
+        let before_is_operand = self
+            .tokens
+            .len()
+            .checked_sub(2)
+            .and_then(|i| self.tokens.get(i))
+            .is_some_and(|t| ends_an_operand(&t.kind));
+        if before_is_operand {
+            return false;
+        }
+        let minus = last.span;
+        let span = Span::new(self.file, minus.start, end as u32);
+        let last = self.tokens.last_mut().expect("checked above");
+        *last = Token::new(TokenKind::Int(i64::MIN), span);
+        self.line_has_tokens = true;
+        true
     }
 
     /// The "integer literal is too large" diagnostic.
@@ -676,6 +736,7 @@ impl<'a> Scanner<'a> {
         } else {
             match norm.parse::<i64>() {
                 Ok(value) => TokenKind::Int(value),
+                Err(_) if self.fold_int_min(&norm, 10, end) => return,
                 Err(_) => {
                     let span = self.span(start, end);
                     self.error(Self::too_large(span));

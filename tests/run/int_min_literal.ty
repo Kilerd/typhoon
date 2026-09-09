@@ -1,0 +1,110 @@
+# `-9223372036854775808` is writable as a literal and behaves as DESIGN 4.3
+# says: i64, two's complement, wrapping on overflow and never panicking. MIN
+# has no positive counterpart, so negation, `* -1`, `abs` and `// -1` all wrap.
+# milestone: M2
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: -9223372036854775808 9223372036854775807
+# expect: -9223372036854775808
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: -9223372036854775808
+# expect: 0
+# expect: -1
+# expect: -9223372036854775808
+# expect: -9223372036854775808
+# expect: -9223372036854775808
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: -9223372036854775808
+# expect: 0
+# expect: -4611686018427387904 6
+# expect: 9.223372036854776e+18
+# expect: 0 0
+# expect: -9223372036854775808
+# expect: True
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: -1 -2
+# expect: True True True True
+# expect: True False True
+# expect: -9223372036854775808 9223372036854775807
+# expect: [-9223372036854775808, 0, 9223372036854775807] -9223372036854775808 9223372036854775807
+# expect: True False
+# expect: (-9223372036854775808, 9223372036854775807) -9223372036854775808
+# expect: -9223372036854775808 9223372036854775807
+# expect: -9223372036854775808 20
+# expect: range is -9223372036854775808 .. 9223372036854775807
+# expect: -9.223372036854776e+18
+
+MIN_I64: int = -9223372036854775808
+MAX_I64: int = 9223372036854775807
+
+fn negate(n: int) -> int:
+    return -n
+
+fn wrap_add(a: int, b: int) -> int:
+    return a + b
+
+fn main():
+    # the literal itself, at both ends of the range, bare and as a constant
+    print(-9223372036854775808)
+    print(9223372036854775807)
+    print(MIN_I64, MAX_I64)
+
+    # the same value through a local and through a parameter
+    m = -9223372036854775808
+    print(m)
+    print(wrap_add(m, 0))
+
+    # crossing either boundary wraps around instead of panicking
+    print(m - 1)
+    print(MAX_I64 + 1)
+    print(m + m)
+    print(m + MAX_I64)
+
+    # MIN is its own negation: `-x`, `x * -1` and `abs` all wrap back to it
+    print(-m)
+    print(m * -1)
+    print(negate(m))
+    print(abs(m))
+    print(abs(m + 1))
+
+    # the division corners: `MIN // -1` wraps, `MIN % -1` is exactly 0
+    print(m // -1)
+    print(m % -1)
+    print(m // 2, m % 7)
+
+    # `/` promotes to float, so this one does not wrap -- it rounds
+    print(m / -1)
+
+    # multiplications that overflow past the top 64 bits leave zero
+    print(m * 2, m * MIN_I64)
+
+    # the same bit pattern reached by shifting and by complementing
+    print(1 << 63)
+    print((1 << 63) == m)
+    print(~MAX_I64)
+    print(~m)
+    print(m >> 63, m >> 62)
+
+    # comparisons against the literal, and the two-argument min / max
+    print(m == -9223372036854775808, m != MAX_I64, m < 0, m <= MIN_I64)
+    print(m < MAX_I64, m > MAX_I64, MIN_I64 >= m)
+    print(min(m, 0), max(m, MAX_I64))
+
+    # MIN stored in a list and a tuple, then read back out
+    bounds: list<int> = [MIN_I64, 0, MAX_I64]
+    print(bounds, bounds[0], bounds[-1])
+    print(MIN_I64 in bounds, m + 1 in bounds)
+    pair = (MIN_I64, MAX_I64)
+    print(pair, pair[0])
+    lo, hi = pair
+    print(lo, hi)
+
+    # and rendered as text, both ways
+    print(str(MIN_I64), len(str(MIN_I64)))
+    print(f"range is {MIN_I64} .. {MAX_I64}")
+
+    # widening to float keeps the sign and rounds to the nearest double
+    print(float(MIN_I64))

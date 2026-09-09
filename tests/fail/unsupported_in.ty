@@ -1,8 +1,8 @@
-# `in` needs containers, which arrive in M2.
-# milestone: M1
-# error: the `in` operator is not supported yet (planned for M2)
+# `in` on a `str` is a substring test, so both sides must be `str`.
+# milestone: M2
+# error: `in` on a `str` tests for a substring, found `int`
 
 fn main():
     s = "typhoon"
-    if "phon" in s:
+    if 1 in s:
         print("yes")

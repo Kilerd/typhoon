@@ -1,0 +1,11 @@
+# `print` renders scalars and containers; a repr protocol for classes waits for
+# M3 (DESIGN 3.8, 4.6).
+# milestone: M2
+# error: cannot print a `Point`
+
+class Point:
+    x: float
+
+fn main():
+    p = Point(x=1.0)
+    print(p)

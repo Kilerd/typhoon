@@ -262,10 +262,51 @@ fn a_comment_may_end_the_file() {
 }
 
 #[test]
-fn tuple_unpacking_is_not_supported_but_reports_cleanly() {
-    let messages = common::messages("fn main():\n    a, b = 1, 2\n");
-    assert!(!messages.is_empty());
-    assert!(messages[0].contains("expected end of line"), "{messages:?}");
+fn tuple_unpacking_parses_as_a_tuple_on_both_sides() {
+    let stmt = only("a, b = 1, 2");
+    let StmtKind::Assign { target, value } = &stmt.kind else {
+        panic!("expected an assignment, got {:?}", stmt.kind)
+    };
+    assert_eq!(common::sexpr(target), "(tuple a b)");
+    assert_eq!(common::sexpr(value), "(tuple 1 2)");
+}
+
+#[test]
+fn a_bare_tuple_may_be_returned() {
+    let stmt = only("return a, b");
+    let StmtKind::Return(Some(value)) = &stmt.kind else {
+        panic!("expected a return, got {:?}", stmt.kind)
+    };
+    assert_eq!(common::sexpr(value), "(tuple a b)");
+}
+
+#[test]
+fn a_trailing_comma_still_makes_a_tuple() {
+    let stmt = only("x = 1,");
+    let StmtKind::Assign { value, .. } = &stmt.kind else {
+        panic!("expected an assignment, got {:?}", stmt.kind)
+    };
+    assert_eq!(common::sexpr(value), "(tuple 1)");
+}
+
+#[test]
+fn an_annotated_declaration_accepts_a_bare_tuple() {
+    let stmt = only("t: tuple<int, int> = 1, 2");
+    let StmtKind::AnnAssign { value, .. } = &stmt.kind else {
+        panic!("expected a declaration, got {:?}", stmt.kind)
+    };
+    assert_eq!(common::sexpr(value.as_ref().unwrap()), "(tuple 1 2)");
+}
+
+#[test]
+fn an_unpacking_target_must_be_assignable() {
+    let messages = common::messages("fn main():\n    a, f() = 1, 2\n");
+    assert!(
+        messages
+            .iter()
+            .any(|m| m.contains("invalid assignment target")),
+        "{messages:?}"
+    );
 }
 
 #[test]

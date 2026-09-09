@@ -1,7 +1,10 @@
-# `str` has `==` and `!=` in M1; ordering needs the string API of M2.
-# milestone: M1
-# error: cannot be applied to `str` and `str`
+# `str` gained `<` `<=` `>` `>=` in M2 (code point order), but a container has
+# no order at all: only `==` and `!=` are defined for it (DESIGN 4.6).
+# milestone: M2
+# error: cannot be applied to `list<str>` and `list<str>`
 
 fn main():
-    if "a" < "b":
+    a: list<str> = ["a"]
+    b: list<str> = ["b"]
+    if a < b:
         print("ordered")

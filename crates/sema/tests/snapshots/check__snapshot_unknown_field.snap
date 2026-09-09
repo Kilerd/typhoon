@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"class Point:\\n    x: float\\n\\nfn main():\\n    p = Point(x=1.0)\\n    print(p.z)\\n\")"
+---
+error: `Point` has no field `z`
+ --> main.ty:6:13
+  |
+6 |     print(p.z)
+  |             ^ unknown field
+  |
+  = help: `Point` has one field, `x`

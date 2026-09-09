@@ -1,0 +1,8 @@
+# `split(sep)` takes the separator explicitly; there is no whitespace default
+# (DESIGN 4.6).
+# milestone: M2
+# error: `str.split` takes 1 argument but 0 were supplied
+
+fn main():
+    parts = "a b".split()
+    print(len(parts))

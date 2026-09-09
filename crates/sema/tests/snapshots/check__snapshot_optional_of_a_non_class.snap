@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n: int | None = None\\n    print(n)\\n\")"
+---
+error: an optional type (`int | None`) is not supported yet (planned for M3)
+ --> main.ty:2:8
+  |
+2 |     n: int | None = None
+  |        ^^^^^^^^^^ only a class type may be optional in M2
+  |
+  = note: see DESIGN.md section 3.10 for the roadmap
+  = help: M2 supports `C | None` for a class `C`, nothing else

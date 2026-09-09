@@ -1,0 +1,101 @@
+# list.insert and list.clear: inserting at 0, in the middle, at len, past the
+# end and at negative indices (Python clamping), into an empty list,
+# interleaved with append and pop; clear on a filled list, on an already empty
+# one, and seen through an alias of the same list, checking len after each step.
+# milestone: M2
+# expect: [5] 1
+# expect: [1, 5]
+# expect: [1, 3, 5]
+# expect: [1, 3, 5, 7] 4
+# expect: [1, 3, 5, 7, 9]
+# expect: [1, 3, 5, 7, 8, 9]
+# expect: [0, 1, 3, 5, 7, 8, 9] 7
+# expect: [2, 3, 4, 5] 4
+# expect: 5 [2, 3, 4] 3
+# expect: [5, 2, 3, 4]
+# expect: [5, 2, 3, 4, 6] 5
+# expect: [1]
+# expect: [2]
+# expect: ["mid"]
+# expect: ["pre", "mid", "post"]
+# expect: [] 0
+# expect: [] 0
+# expect: [1] 1
+# expect: [1, 2, 3] [1, 2, 3] 3 3
+# expect: [] [] 0 0
+# expect: [7] [7] 1 1
+
+fn main():
+    # Inserting into an empty list places the element first.
+    xs: list<int> = []
+    xs.insert(0, 5)
+    print(xs, len(xs))
+
+    # At the front, then in the middle.
+    xs.insert(0, 1)
+    print(xs)
+    xs.insert(1, 3)
+    print(xs)
+
+    # At exactly len(xs), which is the same as appending.
+    xs.insert(len(xs), 7)
+    print(xs, len(xs))
+
+    # An index past the end clamps to an append.
+    xs.insert(99, 9)
+    print(xs)
+
+    # A negative index counts from the end: -1 goes before the last element.
+    xs.insert(-1, 8)
+    print(xs)
+
+    # A far negative index clamps to the front.
+    xs.insert(-99, 0)
+    print(xs, len(xs))
+
+    # insert interleaved with append and pop.
+    ys: list<int> = [2]
+    ys.append(4)
+    ys.insert(1, 3)
+    ys.append(5)
+    print(ys, len(ys))
+    last = ys.pop()
+    print(last, ys, len(ys))
+    ys.insert(0, last)
+    print(ys)
+    ys.insert(len(ys), 6)
+    print(ys, len(ys))
+
+    # Any index at all lands at position 0 while the list is empty.
+    zs: list<int> = []
+    zs.insert(-42, 1)
+    print(zs)
+    zs.clear()
+    zs.insert(42, 2)
+    print(zs)
+
+    # The same clamping for a list<str>.
+    ws: list<str> = []
+    ws.insert(7, "mid")
+    print(ws)
+    ws.insert(-7, "pre")
+    ws.insert(1000, "post")
+    print(ws)
+
+    # clear empties a filled list, and is a no-op on an already empty one.
+    zs.clear()
+    print(zs, len(zs))
+    zs.clear()
+    print(zs, len(zs))
+    zs.append(1)
+    print(zs, len(zs))
+
+    # A list is a reference: clearing through one name empties the alias too,
+    # and inserting through the alias is visible from both.
+    src: list<int> = [1, 2, 3]
+    alias = src
+    print(src, alias, len(src), len(alias))
+    src.clear()
+    print(src, alias, len(src), len(alias))
+    alias.insert(0, 7)
+    print(src, alias, len(src), len(alias))

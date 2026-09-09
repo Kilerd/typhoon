@@ -1,0 +1,10 @@
+# `None` is the unit type, not a storable value, so no field can have it
+# (DESIGN 3.8, 4.1).
+# milestone: M2
+# error: the field `v` cannot have type `None`
+
+class Box:
+    v: None
+
+fn main():
+    print(1)

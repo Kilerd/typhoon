@@ -1,6 +1,6 @@
-# `is` is for `None` narrowing, which arrives with `T | None` in M3.
-# milestone: M1
-# error: the `is` operator is not supported yet (planned for M3)
+# `is` compares class references; a scalar can never be `None` (DESIGN 3.6).
+# milestone: M2
+# error: `int` can never be `None`
 
 fn main():
     n = 1

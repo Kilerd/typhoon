@@ -1,7 +1,7 @@
-# Iterating anything but `range(...)` needs containers (M2).
-# milestone: M1
-# error: iterating over anything but `range(...)` is not supported yet
+# `for` walks a `range(...)`, a `list<T>` or a `str` — nothing else (DESIGN 3.5).
+# milestone: M2
+# error: cannot iterate over an `int`
 
 fn main():
-    for c in "abc":
+    for c in 5:
         print(1)

@@ -1,0 +1,123 @@
+# A `list<Point>`: built in a loop, indexed from both ends, iterated, mutated
+# through the list and through the loop variable, appended to, popped from,
+# element-replaced, and handed to functions taking a `list<Point>` parameter.
+# `print(ps)` is not available for instances, so fields are printed instead.
+# milestone: M2
+# expect: 4
+# expect: (0.0, 0.0), (3.0, 4.0), (6.0, 8.0), (9.0, 12.0)
+# expect: 0.0 0.0
+# expect: (3.0, 4.0) 5.0
+# expect: (9.0, 12.0) 15.0
+# expect: 18.0
+# expect: 0.0
+# expect: 5.0
+# expect: 10.0
+# expect: 15.0
+# expect: (1.0, 2.0)
+# expect: (11.0, 2.0) (19.0, 12.0)
+# expect: (13.0, 0.0) (16.0, 0.0)
+# expect: 6 (100.0, 0.0) (-5.0, 0.0)
+# expect: (100.0, 1.0) True
+# expect: (-5.0, 0.0) (0.5, 0.5) False
+# expect: (0.5, 0.5) 5
+# expect: (100.0, 1.0)
+# expect: 159.0
+# expect: 6 (-1.0, 0.0)
+# expect: 3
+
+class Point:
+    x: float
+    y: float = 0.0
+
+    fn dist(self) -> float:
+        return (self.x * self.x + self.y * self.y) ** 0.5
+
+    fn shift(self, dx: float, dy: float):
+        self.x = self.x + dx
+        self.y = self.y + dy
+
+    fn label(self) -> str:
+        return f"({self.x}, {self.y})"
+
+# Functions taking a list of instances: reading, mutating and selecting.
+fn total_x(ps: list<Point>) -> float:
+    s = 0.0
+    for p in ps:
+        s = s + p.x
+    return s
+
+fn shift_all(ps: list<Point>, dx: float):
+    for p in ps:
+        p.shift(dx, 0.0)
+
+fn farthest(ps: list<Point>) -> Point:
+    best = ps[0]
+    for p in ps:
+        if p.dist() > best.dist():
+            best = p
+    return best
+
+fn labels(ps: list<Point>) -> str:
+    parts: list<str> = []
+    for p in ps:
+        parts.append(p.label())
+    return ", ".join(parts)
+
+fn main():
+    # Build the list one instance at a time; the 3-4-5 triangle keeps every
+    # distance exact.
+    ps: list<Point> = []
+    for i in range(4):
+        ps.append(Point(x=float(i) * 3.0, y=float(i) * 4.0))
+    print(len(ps))
+    print(labels(ps))
+
+    # Indexing, from the front and from the back, and methods on elements.
+    print(ps[0].x, ps[0].y)
+    print(ps[1].label(), ps[1].dist())
+    print(ps[-1].label(), ps[-1].dist())
+    print(total_x(ps))
+
+    # Iterating and calling a method on every element.
+    for p in ps:
+        print(p.dist())
+
+    # Mutating elements: by index, through a function, and through the loop
+    # variable, which is the element itself rather than a copy.
+    ps[0].shift(1.0, 2.0)
+    print(ps[0].label())
+    shift_all(ps, 10.0)
+    print(ps[0].label(), ps[3].label())
+    for p in ps:
+        p.y = 0.0
+    print(ps[1].label(), ps[2].label())
+
+    # Appending an existing local and a fresh instance.
+    extra = Point(x=100.0)
+    ps.append(extra)
+    ps.append(Point(x=-5.0, y=0.0))
+    print(len(ps), ps[4].label(), ps[5].label())
+    ps[4].shift(0.0, 1.0)
+    print(extra.label(), extra is ps[4])
+
+    # Assigning to a slot replaces the reference; the old object survives.
+    old = ps[5]
+    ps[5] = Point(x=0.5, y=0.5)
+    print(old.label(), ps[5].label(), ps[5] is old)
+
+    # `pop` hands the instance back and shrinks the list.
+    last = ps.pop()
+    print(last.label(), len(ps))
+    print(farthest(ps).label())
+    print(total_x(ps))
+
+    # `insert` puts an instance at the front.
+    ps.insert(0, Point(x=-1.0))
+    print(len(ps), ps[0].label())
+
+    # Counting elements by a method result.
+    far = 0
+    for p in ps:
+        if p.dist() > 15.0:
+            far = far + 1
+    print(far)

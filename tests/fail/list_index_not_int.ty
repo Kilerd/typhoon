@@ -1,0 +1,7 @@
+# A list is indexed by position, so the index must be an `int` (DESIGN 4.1).
+# milestone: M2
+# error: a list index must be an `int`, found `float`
+
+fn main():
+    xs: list<int> = [1, 2]
+    print(xs[1.0])

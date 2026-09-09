@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    s = \\\"abc\\\"\\n    print(s[0])\\n\")"
+---
+error: indexing a str by position is not supported yet; iterate over it or use find/split
+ --> main.ty:3:11
+  |
+3 |     print(s[0])
+  |           ^^^^ `str` has no positional indexing
+  |
+  = note: indexing UTF-8 by code point is O(n), so the semantics are still open, see DESIGN.md section 9 item 5

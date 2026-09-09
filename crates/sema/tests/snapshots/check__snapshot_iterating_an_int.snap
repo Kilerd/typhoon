@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    for x in 5:\\n        pass\\n\")"
+---
+error: cannot iterate over an `int`
+ --> main.ty:2:14
+  |
+2 |     for x in 5:
+  |              ^ this is an `int`
+  |
+  = note: see DESIGN.md section 3.5
+  = help: `for` walks a `range(...)`, a `list<T>` or a `str`

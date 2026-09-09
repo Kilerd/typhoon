@@ -1,0 +1,9 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    t = (1, \\\"a\\\")\\n    print(t[2])\\n\")"
+---
+error: tuple index 2 is out of range for `tuple<int, str>`
+ --> main.ty:3:13
+  |
+3 |     print(t[2])
+  |             ^ this tuple has 2 member(s)

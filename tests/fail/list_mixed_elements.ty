@@ -1,0 +1,8 @@
+# A list is homogeneous: the first element fixes the element type (DESIGN 4.1,
+# 4.4).
+# milestone: M2
+# error: every element of a list literal must have the same type
+
+fn main():
+    xs = [1, 2.0]
+    print(len(xs))

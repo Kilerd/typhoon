@@ -1,0 +1,50 @@
+# A runtime panic: `pop()` on a list that only becomes empty at run time. The
+# lines printed while the list is being drained still reach stdout, and the
+# one pop too many exits 101 with the message on stderr.
+# milestone: M2
+# expect: popped 3 leaving 2
+# expect: popped 2 leaving 1
+# expect: popped 1 leaving 0
+# expect: 6 0 []
+# expect: [10, 20, 30] 3
+# expect: 30 20 [10] 1
+# expect: 7 [] 0
+# expect: popped 10 leaving 0
+# expect: 10 0
+# expect: the list is empty: [] True
+# exit: 101
+# stderr: panic: pop from empty list
+
+fn drain(xs: list<int>) -> int:
+    total = 0
+    while len(xs) > 0:
+        v = xs.pop()
+        print("popped", v, "leaving", len(xs))
+        total = total + v
+    return total
+
+fn main():
+    # popping a list dry element by element; the caller's list is emptied too
+    xs = [1, 2, 3]
+    print(drain(xs), len(xs), xs)
+
+    # the drained list can be refilled and popped again
+    for i in range(1, 4):
+        xs.append(i * 10)
+    print(xs, len(xs))
+    a = xs.pop()
+    b = xs.pop()
+    print(a, b, xs, len(xs))
+
+    # a one-element list is empty after a single pop
+    one = [7]
+    last = one.pop()
+    print(last, one, len(one))
+
+    # draining the refilled list leaves nothing behind
+    print(drain(xs), len(xs))
+    print("the list is empty:", xs, len(xs) == 0)
+
+    # one pop too many
+    print(xs.pop())
+    print("unreachable")

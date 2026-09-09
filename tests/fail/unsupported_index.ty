@@ -1,6 +1,7 @@
-# Indexing needs `list` / `dict` / `str` indexing, M2 at the earliest.
-# milestone: M1
-# error: indexing is not supported yet (planned for M2)
+# Indexing UTF-8 by code point is O(n), so `s[i]` is still an open question
+# (DESIGN 9 item 5); iterate or use `find` / `split` instead.
+# milestone: M2
+# error: indexing a str by position is not supported yet
 
 fn main():
     s = "abc"

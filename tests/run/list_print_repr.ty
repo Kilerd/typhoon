@@ -1,0 +1,82 @@
+# print() of lists in Python repr form: int, float (always with a `.` or an
+# exponent), bool and str elements (quoted and escaped inside a container),
+# the empty and one-element cases, nesting, a list of tuples, a list printed
+# beside other arguments, and the same list before and after a mutation.
+# milestone: M2
+# expect: [1, 2, 3]
+# expect: [42]
+# expect: [-1, 0, 1000000]
+# expect: []
+# expect: [0.5, 5.0, -0.0, 1e+30, -1.5e-07]
+# expect: [0.30000000000000004]
+# expect: [True, False, True]
+# expect: [True]
+# expect: plain
+# expect: ["plain"]
+# expect: ["q\"x", "b\\c", "d\ne"]
+# expect: ["", "台风", "tab\there"]
+# expect: [[1], [2, 3], []]
+# expect: [["a", "b"], []]
+# expect: [(1, "a"), (2, "b")]
+# expect: [(1,), (2,)]
+# expect: ints: [1, 2, 3] 3 True
+# expect: [1, 2, 3] [0.5, 5.0, -0.0, 1e+30, -1.5e-07] ["plain"]
+# expect: [1, 2, 3]
+# expect: [9, 2, 3, 4]
+# expect: 4
+# expect: [9, 2, 3]
+# expect: [] 0
+
+fn main():
+    # list<int>: several elements, one element, negatives.
+    ints: list<int> = [1, 2, 3]
+    print(ints)
+    print([42])
+    print([-1, 0, 1000000])
+
+    # An empty list prints as `[]`.
+    empty: list<int> = []
+    print(empty)
+
+    # list<float>: every element keeps a `.` or an exponent, signed zero included.
+    floats: list<float> = [0.5, 5.0, -0.0, 1e30, -1.5e-07]
+    print(floats)
+    print([0.1 + 0.2])
+
+    # list<bool> prints True / False.
+    print([True, False, True])
+    print([1 < 2])
+
+    # A bare str prints unquoted, a str inside a container is quoted and the
+    # quote, backslash, newline and tab characters are escaped.
+    print("plain")
+    print(["plain"])
+    print(["q\"x", "b\\c", "d\ne"])
+    print(["", "台风", "tab\there"])
+
+    # Nesting: an inner empty list still prints as `[]`.
+    grid: list<list<int>> = [[1], [2, 3], []]
+    print(grid)
+    names: list<list<str>> = [["a", "b"], []]
+    print(names)
+
+    # A list of tuples; a one-element tuple keeps its trailing comma.
+    pairs: list<tuple<int, str>> = [(1, "a"), (2, "b")]
+    print(pairs)
+    singles: list<tuple<int>> = [(1,), (2,)]
+    print(singles)
+
+    # A list beside other arguments: exactly one space between arguments.
+    print("ints:", ints, len(ints), True)
+    print(ints, floats, ["plain"])
+
+    # The same list before and after each mutation.
+    print(ints)
+    ints.append(4)
+    ints[0] = 9
+    print(ints)
+    last = ints.pop()
+    print(last)
+    print(ints)
+    ints.clear()
+    print(ints, len(ints))

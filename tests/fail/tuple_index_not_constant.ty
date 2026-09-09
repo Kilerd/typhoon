@@ -1,0 +1,9 @@
+# A tuple's members may have different types, so its index has to be known at
+# compile time (DESIGN 4.1).
+# milestone: M2
+# error: a tuple index must be a constant
+
+fn main():
+    t: tuple<int, str> = (1, "a")
+    i = 0
+    print(t[i])

@@ -1,0 +1,14 @@
+# Method arguments are checked against the annotated parameter types, with no
+# implicit numeric conversion (DESIGN 3.8, 4.3).
+# milestone: M2
+# error: mismatched types: expected `float`, found `int`
+
+class Point:
+    x: float
+
+    fn shift(self, dx: float):
+        self.x = self.x + dx
+
+fn main():
+    p = Point(x=1.0)
+    p.shift(1)

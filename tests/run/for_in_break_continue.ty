@@ -1,0 +1,208 @@
+# `for x in <list>` and `for c in <str>` (with `range` for contrast) crossed with
+# `break` and `continue`: the first / a middle / the last element, both jumps in
+# one body, nested loops, an empty sequence and the loop variable afterwards.
+# milestone: M2
+# expect: 10
+# expect: [10, 20]
+# expect: 5
+# expect: [10, 30, 50] 3
+# expect: 80
+# expect: 9
+# expect: other 1
+# expect: two
+# expect: other 3
+# expect: break at 4
+# expect: row 3
+# expect: row 3
+# expect: row 18
+# expect: 0
+# expect: 5
+# expect: 30
+# expect: 50
+# expect: -1
+# expect: typ
+# expect: typhn
+# expect: ab界 3
+# expect: 9
+# expect: 3 7
+# expect: 5 5
+# expect: 6
+# expect: 2 3 0
+
+fn count_until_zero(xs: list<int>) -> int:
+    # the length of the leading run of non-zero elements
+    n = 0
+    for x in xs:
+        if x == 0:
+            break
+        n = n + 1
+    return n
+
+fn main():
+    xs = [10, 20, 30, 40, 50]
+
+    # `break` on the first element: the body runs exactly once
+    first = 0
+    for a in xs:
+        first = first + a
+        break
+    print(first)
+
+    # `break` on a middle element: the statements after it never run for it
+    middle: list<int> = []
+    for b in xs:
+        if b == 30:
+            break
+        middle.append(b)
+    print(middle)
+
+    # `break` on the last element: every element was visited
+    seen = 0
+    for c in xs:
+        seen = seen + 1
+        if c == 50:
+            break
+    print(seen)
+
+    # `continue` skips elements without ending the loop
+    kept: list<int> = []
+    for d in xs:
+        if d == 20:
+            continue
+        if d == 40:
+            continue
+        kept.append(d)
+    print(kept, len(kept))
+
+    # both jumps in one body: 20 is skipped, 50 stops the loop
+    total = 0
+    for e in xs:
+        if e == 20:
+            continue
+        if e > 40:
+            break
+        total = total + e
+    print(total)
+
+    # `continue` as the last statement of a body is a no-op
+    odd = 0
+    for f in [1, 2, 3, 4, 5]:
+        if f % 2 == 0:
+            continue
+        odd = odd + f
+        continue
+    print(odd)
+
+    # a `break` taken from an elif arm of an if / elif / else chain
+    for g in [1, 2, 3, 4, 5]:
+        if g == 2:
+            print("two")
+        elif g == 4:
+            print("break at", g)
+            break
+        else:
+            print("other", g)
+
+    # a `break` in the inner loop leaves the outer one running
+    grid: list<list<int>> = [[1, 2, 9], [3, 9, 4], [5, 6, 7]]
+    for row in grid:
+        line = 0
+        for h in row:
+            if h == 9:
+                break
+            line = line + h
+        print("row", line)
+
+    # a loop over an empty list runs zero times, break or no break
+    empty: list<int> = []
+    ran = 0
+    for i2 in empty:
+        ran = ran + 1
+        break
+    print(ran)
+
+    # a `break` whose condition never holds traverses the whole list
+    never = 0
+    for j in xs:
+        if j > 100:
+            break
+        never = never + 1
+    print(never)
+
+    # the loop variable keeps the value it had when the loop ended, and an
+    # empty sequence leaves the pre-assigned value alone
+    k = -1
+    for k in xs:
+        if k == 30:
+            break
+    print(k)
+    m = -1
+    for m in xs:
+        pass
+    print(m)
+    n = -1
+    for n in empty:
+        pass
+    print(n)
+
+    # `for` over a str: the jumps work on code points, not bytes
+    word = "typhoon"
+    prefix = ""
+    for p in word:
+        if p == "h":
+            break
+        prefix = prefix + p
+    print(prefix)
+    without_o = ""
+    for q in word:
+        if q == "o":
+            continue
+        without_o = without_o + q
+    print(without_o)
+    text = "a世b界c"
+    tail = ""
+    for r in text:
+        if r == "世":
+            continue
+        if r == "c":
+            break
+        tail = tail + r
+    print(tail, len(tail))
+
+    # the same two jumps over a range, for contrast
+    r_total = 0
+    for s in range(10):
+        if s % 3 != 0:
+            continue
+        if s > 6:
+            break
+        r_total = r_total + s
+    print(r_total)
+
+    # a `while` nested inside a `for`, with its own `break`
+    for t in [3, 5]:
+        steps = 0
+        v = t
+        while True:
+            if v == 1:
+                break
+            if v % 2 == 0:
+                v = v // 2
+            else:
+                v = 3 * v + 1
+            steps = steps + 1
+        print(t, steps)
+
+    # and the reverse nesting: a `for` with a `break` inside a `while`
+    sweep = 0
+    hits = 0
+    while sweep < 3:
+        for u in xs:
+            if u > 20:
+                break
+            hits = hits + 1
+        sweep = sweep + 1
+    print(hits)
+
+    # a `break` inside a function that still returns after the loop
+    print(count_until_zero([1, 2, 0, 3]), count_until_zero([1, 2, 3]), count_until_zero([0]))

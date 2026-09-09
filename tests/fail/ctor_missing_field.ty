@@ -1,0 +1,11 @@
+# A field without a default must be supplied to the constructor (DESIGN 3.8).
+# milestone: M2
+# error: missing field `y` in the constructor of `Point`
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    p = Point(x=1.0)
+    print(p.x)

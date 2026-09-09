@@ -1,0 +1,44 @@
+# A runtime panic: reading past the end of a list with an index that is only
+# known at run time. Everything printed before the panic must still reach
+# stdout, and the process must exit 101 with the message on stderr.
+# milestone: M2
+# expect: reading index 0 of a list of 3
+# expect: reading index 2 of a list of 3
+# expect: 10 30
+# expect: reading index -3 of a list of 3
+# expect: 10
+# expect: index 3 is out of range, skipping
+# expect: 0 10
+# expect: 1 20
+# expect: 2 30
+# expect: 30 2
+# expect: reading index 2 of a list of 2
+# exit: 101
+# stderr: panic: list index out of range
+
+fn at(xs: list<int>, i: int) -> int:
+    print(f"reading index {i} of a list of {len(xs)}")
+    return xs[i]
+
+fn main():
+    # both ends of the list are readable
+    xs = [10, 20, 30]
+    print(at(xs, 0), at(xs, len(xs) - 1))
+    print(at(xs, -3))
+
+    # a guarded read never reaches the panicking path
+    i = len(xs)
+    if i < len(xs):
+        print(at(xs, i))
+    else:
+        print("index", i, "is out of range, skipping")
+
+    # every index below the length is fine
+    for j in range(len(xs)):
+        print(j, xs[j])
+
+    # pop shrinks the list, so an index that was valid a moment ago panics
+    last = xs.pop()
+    print(last, len(xs))
+    print(at(xs, 2))
+    print("unreachable")

@@ -1,0 +1,11 @@
+# The generated constructor is keyword-only: order never matters (DESIGN 3.8).
+# milestone: M2
+# error: the constructor of `Point` only takes keyword arguments
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    p = Point(1.0, 2.0)
+    print(p.x)

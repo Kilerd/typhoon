@@ -1,0 +1,155 @@
+# A self-referential class: `Node` with `left`/`right` of type `Node | None`.
+# Builds a six-node tree, then sums, counts, measures, searches and walks it
+# recursively, always binding a child to a local before narrowing it with
+# `is None`. Also grows the tree by writing an optional field.
+# milestone: M2
+# expect: 23 6
+# expect: 3 3
+# expect: 7
+# expect: [1, 2, 3, 4, 6, 7]
+# expect: 6 1 7
+# expect: True False
+# expect: 1 1 3
+# expect: left child 2 6
+# expect: 6 has no left child
+# expect: 32 10
+# expect: 8 4
+# expect: [0, 1, 2, 3, 4, 5, 6, 7]
+# expect: 4
+# expect: 28 7
+# expect: True False
+
+class Node:
+    value: int
+    left: Node | None = None
+    right: Node | None = None
+
+    # Recursion through a method: each child is bound to a local first, so
+    # that `is not None` can narrow it to `Node`.
+    fn sum(self) -> int:
+        total = self.value
+        l = self.left
+        if l is not None:
+            total = total + l.sum()
+        r = self.right
+        if r is not None:
+            total = total + r.sum()
+        return total
+
+    # The `if x is None: ... else: ...` shape, nested.
+    fn leaves(self) -> int:
+        l = self.left
+        r = self.right
+        if l is None:
+            if r is None:
+                return 1
+            return r.leaves()
+        if r is None:
+            return l.leaves()
+        return l.leaves() + r.leaves()
+
+# Free functions taking `Node | None` narrow with the early return.
+fn count(n: Node | None) -> int:
+    if n is None:
+        return 0
+    return 1 + count(n.left) + count(n.right)
+
+fn depth(n: Node | None) -> int:
+    if n is None:
+        return 0
+    return 1 + max(depth(n.left), depth(n.right))
+
+fn contains(n: Node | None, target: int) -> bool:
+    if n is None:
+        return False
+    if n.value == target:
+        return True
+    return contains(n.left, target) or contains(n.right, target)
+
+fn inorder(n: Node | None, out: list<int>):
+    if n is None:
+        return
+    inorder(n.left, out)
+    out.append(n.value)
+    inorder(n.right, out)
+
+fn largest(n: Node) -> int:
+    best = n.value
+    l = n.left
+    if l is not None:
+        best = max(best, largest(l))
+    r = n.right
+    if r is not None:
+        best = max(best, largest(r))
+    return best
+
+# Growing the tree writes an optional field with a fresh Node.
+fn insert(root: Node, value: int):
+    if value < root.value:
+        l = root.left
+        if l is None:
+            root.left = Node(value=value)
+        else:
+            insert(l, value)
+    else:
+        r = root.right
+        if r is None:
+            root.right = Node(value=value)
+        else:
+            insert(r, value)
+
+fn main():
+    #         4
+    #       /   \
+    #      2     6
+    #     / \     \
+    #    1   3     7
+    # The `3` leaf spells its empty children out explicitly.
+    one = Node(value=1)
+    three = Node(value=3, left=None, right=None)
+    two = Node(value=2, left=one, right=three)
+    seven = Node(value=7)
+    six = Node(value=6, right=seven)
+    root = Node(value=4, left=two, right=six)
+
+    # Sum, node count, depth, leaf count and maximum.
+    print(root.sum(), count(root))
+    print(depth(root), root.leaves())
+    print(largest(root))
+
+    # An in-order walk collected into a list.
+    walk: list<int> = []
+    inorder(root, walk)
+    print(walk)
+    print(len(walk), walk[0], walk[-1])
+    print(contains(root, 3), contains(root, 5))
+
+    # A leaf on its own, and the two branches of a top-level `is None` test.
+    print(count(three), depth(three), three.sum())
+    l = root.left
+    if l is None:
+        print("no left child")
+    else:
+        print("left child", l.value, l.sum())
+    missing = six.left
+    if missing is None:
+        print("6 has no left child")
+    else:
+        print("6 has a left child", missing.value)
+
+    # Subtrees are shared, not copied: a write through a leaf is visible from
+    # the root.
+    one.value = 10
+    print(root.sum(), largest(root))
+    one.value = 1
+
+    # Insert 5 under 6 and 0 under 1, deepening the left spine.
+    insert(root, 5)
+    insert(root, 0)
+    print(count(root), depth(root))
+    walk2: list<int> = []
+    inorder(root, walk2)
+    print(walk2)
+    print(root.leaves())
+    print(root.sum(), largest(root))
+    print(contains(root, 0), contains(root, 9))
