@@ -3,4 +3,14 @@ name = "typhoon-sema"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "typhoon_sema"
+path = "src/lib.rs"
+
 [dependencies]
+typhoon-ast = { path = "../ast" }
+typhoon-diag = { path = "../diag" }
+
+[dev-dependencies]
+insta = "1.48.0"
+typhoon-parser = { path = "../parser" }

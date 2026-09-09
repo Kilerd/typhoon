@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn pick(n: int) -> int:\\n    return\\n\\nfn main():\\n    print(pick(1))\\n\")"
+---
+error: `return` with no value in function `pick` returning `int`
+ --> main.ty:2:5
+  |
+2 |     return
+  |     ^^^^^^ expected a `int` value
+  |
+  = help: write `return <int>`

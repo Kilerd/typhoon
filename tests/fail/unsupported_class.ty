@@ -1,0 +1,10 @@
+# `class` parses but has no meaning before M2 (DESIGN 3.8, 8).
+# milestone: M1
+# error: the `class` declaration is not supported yet (planned for M2)
+
+class Point:
+    x: float
+    y: float
+
+fn main():
+    print(1)

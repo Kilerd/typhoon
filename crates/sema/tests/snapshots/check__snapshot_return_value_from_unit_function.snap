@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn log(n: int):\\n    return n\\n\\nfn main():\\n    log(1)\\n\")"
+---
+error: cannot return a value from function `log`, which returns no value
+ --> main.ty:2:12
+  |
+2 |     return n
+  |            ^ this is a `int` value
+  |
+  = help: add `-> int` to the signature of `log`

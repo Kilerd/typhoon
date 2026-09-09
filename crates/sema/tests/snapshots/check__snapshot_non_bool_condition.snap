@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n = 3\\n    if n:\\n        print(n)\\n\")"
+---
+error: mismatched types: expected `bool`, found `int`
+ --> main.ty:3:8
+  |
+3 |     if n:
+  |        ^ expected `bool`, found `int`
+  |
+  = note: typhoon has no truthiness, see DESIGN.md section 3.6
+  = help: compare explicitly, e.g. `x != 0`

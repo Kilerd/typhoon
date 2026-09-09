@@ -1,0 +1,8 @@
+# `in` needs containers, which arrive in M2.
+# milestone: M1
+# error: the `in` operator is not supported yet (planned for M2)
+
+fn main():
+    s = "typhoon"
+    if "phon" in s:
+        print("yes")

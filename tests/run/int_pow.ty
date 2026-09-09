@@ -1,0 +1,77 @@
+# `int ** int`: constant and variable exponents, an exponent of 0 (including
+# `0 ** 0 == 1`), negative bases, right associativity and its precedence
+# against unary minus, wrapping to the low 64 bits, and `x ** 2` which the
+# compiler lowers to a multiply.
+# milestone: M1
+# expect: 1024
+# expect: 243
+# expect: 1000000000000000000
+# expect: 7
+# expect: 1 1 1
+# expect: 0 1
+# expect: -8 4
+# expect: -4
+# expect: -1 1
+# expect: -243
+# expect: 512
+# expect: 4611686018427387904
+# expect: -9223372036854775808
+# expect: 0
+# expect: 0
+# expect: -6289078614652622815
+# expect: -8446744073709551616
+# expect: -9223372036854775808
+# expect: 1024
+# expect: 1024 -2048
+# expect: -8446744073709551616
+# expect: 1 1
+# expect: 2
+# expect: 152399025 152399025
+# expect: -9223372036709301616
+# expect: 1881365963625
+
+fn power(base: int, exp: int) -> int:
+    return base ** exp
+
+fn main():
+    # the basics
+    print(2 ** 10)
+    print(3 ** 5)
+    print(10 ** 18)
+    print(7 ** 1)
+
+    # an exponent of 0 is 1 for every base, including 0
+    print(7 ** 0, 0 ** 0, (-5) ** 0)
+    print(0 ** 5, 1 ** 62)
+
+    # negative bases; `**` binds tighter than unary minus and is right
+    # associative
+    print((-2) ** 3, (-2) ** 2)
+    print(-2 ** 2)
+    print((-1) ** 63, (-1) ** 64)
+    print((-3) ** 5)
+    print(2 ** 3 ** 2)
+
+    # wrapping: the result is the low 64 bits of the true power
+    print(2 ** 62)
+    print(2 ** 63)
+    print(2 ** 64)
+    print(2 ** 100)
+    print(3 ** 40)
+    print(10 ** 19)
+    print((-2) ** 63)
+
+    # a variable exponent goes through the exponentiation-by-squaring loop
+    e = 10
+    b = 2
+    print(power(b, e))
+    print(power(-2, e), power(-2, e + 1))
+    print(power(10, 19))
+    print(power(b, 0), power(0, 0))
+    print(power(b, 1))
+
+    # `x ** 2` lowers to a multiply, but the answer must not change
+    x = 12345
+    print(x ** 2, (-x) ** 2)
+    print(power(3037000500, 2))
+    print(x ** 3)

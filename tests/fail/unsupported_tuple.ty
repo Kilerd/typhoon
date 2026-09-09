@@ -1,0 +1,7 @@
+# Tuples are a value type of M2 (DESIGN 4.1, 4.2).
+# milestone: M1
+# error: a tuple is not supported yet (planned for M2)
+
+fn main():
+    pair = (1, 2)
+    print(1)

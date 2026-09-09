@@ -1,0 +1,7 @@
+# List literals arrive with `list<T>` in M2.
+# milestone: M1
+# error: a list literal is not supported yet (planned for M2)
+
+fn main():
+    xs = [1, 2, 3]
+    print(1)

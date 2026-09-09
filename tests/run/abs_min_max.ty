@@ -1,0 +1,65 @@
+# `abs`, `min` and `max` on both `int` and `float`: negative values, equal
+# arguments, infinities, `abs(i64::MIN)` wrapping to itself, and the builtins
+# nested inside larger expressions.
+# milestone: M1
+# expect: 5 5 0
+# expect: 2 3
+# expect: -3 -2
+# expect: -7 7
+# expect: 4 4
+# expect: -4 -4
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: 2.5 2.5 0.0
+# expect: 0.0
+# expect: 1.5 2.5
+# expect: -2.5 -1.5
+# expect: 3.25 3.25
+# expect: inf -inf inf
+# expect: 42
+# expect: 20
+# expect: 24
+# expect: 42
+# expect: 10 0 7
+# expect: 4.0
+# expect: 6.0
+
+MINI: int = -9223372036854775807 - 1
+
+fn clamp(value: int, lo: int, hi: int) -> int:
+    return min(max(value, lo), hi)
+
+fn main():
+    # ints
+    print(abs(5), abs(-5), abs(0))
+    print(min(2, 3), max(2, 3))
+    print(min(-2, -3), max(-2, -3))
+    print(min(-7, 7), max(-7, 7))
+
+    # equal arguments must still answer with that value
+    print(min(4, 4), max(4, 4))
+    print(min(-4, -4), max(-4, -4))
+
+    # `abs` of i64::MIN wraps to itself, there is no positive counterpart
+    print(abs(MINI))
+    print(abs(9223372036854775807))
+
+    # floats
+    print(abs(2.5), abs(-2.5), abs(0.0))
+    print(abs(-0.0))
+    print(min(1.5, 2.5), max(1.5, 2.5))
+    print(min(-1.5, -2.5), max(-1.5, -2.5))
+    print(min(3.25, 3.25), max(3.25, 3.25))
+    print(abs(-1.0 / 0.0), min(-1.0 / 0.0, 1.0), max(1.0 / 0.0, 1.0))
+
+    # folded into larger expressions
+    x = -12
+    y = 30
+    print(abs(x) + max(x, y))
+    print(min(abs(x), 10) * 2)
+    print(max(x * 2, -x) - min(x, y))
+    print(abs(min(x, y) - max(x, y)))
+    print(clamp(42, 0, 10), clamp(-42, 0, 10), clamp(7, 0, 10))
+    d = 3.5
+    print(max(abs(-d), 1.0) + min(d, 0.5))
+    print(abs(float(x)) / 2.0)

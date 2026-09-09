@@ -1,0 +1,7 @@
+# Only `.Nf`, `d` and `s` are supported in M1 (DESIGN 3.7).
+# milestone: M1
+# error: unsupported format spec `x`
+
+fn main():
+    n = 255
+    print(f"{n:x}")

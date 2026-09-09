@@ -213,7 +213,8 @@ pub fn compile_source(name: &str, src: &str, opts: &BuildOptions) -> Result<Arti
 /// Runs
 ///
 /// ```sh
-/// clang -O<n> module.ll libtyphoon_runtime.a -L<gcdir> -lgc <native libs> -o <output>
+/// clang -O<n> -Wno-override-module module.ll libtyphoon_runtime.a \
+///     -L<gcdir> -lgc <native libs> -o <output>
 /// ```
 ///
 /// # Errors
@@ -255,6 +256,9 @@ pub fn link_ll(ll_text: &str, output: &Path, opts: &BuildOptions) -> Result<(), 
 
     let mut cmd = Command::new(&clang);
     cmd.arg(format!("-O{}", opts.opt_level))
+        // The generated module carries no target triple, so clang supplies the
+        // host's; that is intended and must not warn.
+        .arg("-Wno-override-module")
         .arg(&ll_path)
         .arg(&runtime)
         .arg(format!("-L{}", gc_dir.display()))
@@ -338,11 +342,17 @@ mod tests {
     }
 
     #[test]
+    fn compile_to_ir_produces_a_module() {
+        let ir = compile_to_ir("x.ty", "fn main():\n    print(1)\n").unwrap();
+        assert!(ir.contains("define i32 @main()"), "{ir}");
+    }
+
+    #[test]
     fn compile_error_carries_frontend_diagnostics() {
-        let err = compile_to_ir("x.ty", "fn main():\n    pass\n").unwrap_err();
+        let err = compile_to_ir("x.ty", "fn main():\n    print(nope)\n").unwrap_err();
         assert!(matches!(err, DriverError::Compile(_)));
-        assert_eq!(err.diagnostics(), ["frontend not implemented yet"]);
-        assert_eq!(err.to_string(), "frontend not implemented yet");
+        assert_eq!(err.diagnostics().len(), 1);
+        assert!(err.to_string().contains("cannot find value `nope`"));
     }
 
     #[test]

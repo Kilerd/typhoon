@@ -1,0 +1,6 @@
+# Every program needs an entry point (DESIGN 3.3).
+# milestone: M1
+# error: this program has no `main` function
+
+fn helper(n: int) -> int:
+    return n + 1

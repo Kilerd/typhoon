@@ -1,0 +1,8 @@
+# Modules are M4 (DESIGN 3.10); the keyword is reserved from day one.
+# milestone: M1
+# error: `import` is not supported yet
+
+import math
+
+fn main():
+    print(1)

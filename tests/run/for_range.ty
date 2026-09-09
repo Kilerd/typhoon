@@ -1,0 +1,134 @@
+# `for i in range(...)`: all three forms, negative steps, empty ranges, a step
+# bigger than the span, the loop variable after the loop and when assigned
+# inside the body, bounds from variables and a constant, and nesting.
+# milestone: M1
+# expect: 10
+# expect: 25
+# expect: 0
+# expect: 3
+# expect: 6
+# expect: 9
+# expect: 5
+# expect: 4
+# expect: 3
+# expect: 2
+# expect: 1
+# expect: 10
+# expect: 7
+# expect: 4
+# expect: 1
+# expect: 0
+# expect: j is 0
+# expect: 1
+# expect: 2
+# expect: -1
+# expect: 1
+# expect: before 0
+# expect: after 0
+# expect: before 1
+# expect: after 100
+# expect: before 2
+# expect: after 200
+# expect: 14
+# expect: 6
+# expect: s2 is 2
+# expect: s2 is 5
+# expect: 1 1
+# expect: 1 2
+# expect: 1 3
+# expect: 2 2
+# expect: 2 3
+# expect: 3 3
+# expect: 25
+
+STOP: int = 4
+
+fn main():
+    # range(stop)
+    s = 0
+    for a in range(5):
+        s = s + a
+    print(s)
+
+    # range(start, stop)
+    t = 0
+    for b in range(3, 8):
+        t = t + b
+    print(t)
+
+    # range(start, stop, step)
+    for c in range(0, 10, 3):
+        print(c)
+
+    # a negative step counts down while i > stop
+    for d in range(5, 0, -1):
+        print(d)
+    for e in range(10, 0, -3):
+        print(e)
+
+    # empty ranges run the body zero times
+    empty = 0
+    for f in range(5, 5):
+        empty = empty + 1
+    for g in range(3, 0):
+        empty = empty + 1
+    for h in range(0, 5, -1):
+        empty = empty + 1
+    for i2 in range(0):
+        empty = empty + 1
+    print(empty)
+
+    # a step larger than the span still runs once
+    once = 0
+    for j in range(0, 3, 10):
+        once = once + 1
+        print("j is", j)
+    print(once)
+
+    # the loop variable keeps the last iteration's value after the loop; it is
+    # pre-assigned so that it is readable even when the range is empty
+    k = -1
+    for k in range(3):
+        pass
+    print(k)
+    m = -1
+    for m in range(5, 5):
+        pass
+    print(m)
+    n = -1
+    for n in range(9, 0, -4):
+        pass
+    print(n)
+
+    # assigning to the loop variable inside the body does not change the
+    # iteration: the next one overwrites it
+    for p in range(3):
+        print("before", p)
+        p = p * 100
+        print("after", p)
+
+    # bounds taken from variables and from a top-level constant
+    lo = 2
+    hi = 6
+    var_total = 0
+    for q in range(lo, hi):
+        var_total = var_total + q
+    print(var_total)
+    const_total = 0
+    for r in range(STOP):
+        const_total = const_total + r
+    print(const_total)
+    for s2 in range(STOP - 2, STOP * 2, 3):
+        print("s2 is", s2)
+
+    # nested ranges, the inner bound depending on the outer variable
+    for u in range(1, 4):
+        for v in range(u, 4):
+            print(u, v)
+
+    # a range whose step comes from a variable
+    step = 2
+    stepped = 0
+    for w in range(1, 10, step):
+        stepped = stepped + w
+    print(stepped)

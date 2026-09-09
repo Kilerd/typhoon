@@ -32,18 +32,23 @@ tracked by milestone; each one has a measurable exit criterion
 
 | Milestone | Scope | Exit criterion | Status |
 |---|---|---|---|
-| **M0** Reset | Workspace skeleton, toolchain, runtime + Boehm GC linkage, golden test harness | `hello.ty` compiles and runs in CI | **In progress** |
-| M1 Numeric core | lexer/parser, `fn`, `int`/`float`/`bool`, operators, `if`/`while`/`for range`, recursion, `print`, type checking | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go | Not started |
+| **M0** Reset | Workspace skeleton, toolchain, runtime + Boehm GC linkage, golden test harness | `hello.ty` compiles and runs in CI | **Done** |
+| **M1** Numeric core | lexer/parser, `fn`, `int`/`float`/`bool`, operators, `if`/`while`/`for range`, recursion, `print`, type checking | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go | **In progress** — the language subset is complete and the whole golden suite is green; of the benchmarks, `fib` (0.79x), `nbody` (0.67x) and `mandelbrot` (0.99x) meet the target, `loops` is at 1.07x (where `clang -O2` on the identical C loop is no faster), and `spectral-norm` needs `list<float>` from M2 |
 | M2 Data | `class`, `str`, `list<T>`, `tuple`, `for-in` | binary-trees ≤ 2.0x, fannkuch ≤ 1.0x | Not started |
 | M3 Generics & inference | Monomorphised generics, `dict`/`set`, comprehensions, `T \| None`, comparison chains | k-nucleotide ≤ 1.5x | Not started |
 | M4 Errors & modules | `try`/`except`/`raise`, `import`, C FFI | fasta / k-nucleotide ≤ 1.0x | Not started |
 | M5 Performance & UX | Escape analysis, GC replacement study, JIT `run`, diagnostics, formatter | binary-trees ≤ 1.0x | Not started |
 | M6 Concurrency | Model undecided | TBD | Not started |
 
-The backend, runtime, driver, CLI and test harness exist today; the frontend
-(`lexer` → `parser` → `sema` → `codegen`) is being built, so every program
-currently fails with `frontend not implemented yet`. The golden case
-`examples/hello` is red on purpose — turning it green *is* the M0 exit criterion.
+The whole pipeline is in place for the M1 language subset: `lexer` → `parser`
+→ `sema` (name resolution, type checking, definite assignment) → `codegen`
+(textual LLVM IR) → `clang -O2` → native binary. `int`, `float`, `bool` and
+`str`, functions with default and keyword arguments, top-level constants,
+`if`/`while`/`for range`, recursion, f-strings and the `print` / `float` /
+`int` / `abs` / `min` / `max` builtins all work; everything else
+(`class`, `list`, `dict`, `tuple`, generics, `is`, `in`, indexing, attributes,
+comparison chains, `import`, `try`) is rejected with a diagnostic naming the
+milestone it arrives in.
 
 ## Building
 
@@ -98,6 +103,7 @@ overridden.
 | `TYPHOON_RUNTIME_LIB` | Path of `libtyphoon_runtime.a` | Searched next to the running executable and one directory up (covers `target/debug/` and `target/debug/deps/`) |
 | `TYPHOON_GC_LIB_DIR` | Directory holding Boehm GC (`libgc`) | `brew --prefix bdw-gc`/lib, then the usual system library directories |
 | `TYPHOON_MILESTONE` | Milestone the golden harness enforces | The `CURRENT_MILESTONE` constant in `crates/driver/tests/golden.rs` |
+| `TYPHOON_LLVM_AS` | `llvm-as` used by the codegen tests to verify the emitted IR | `llvm-as` if present, otherwise `clang -c -x ir` |
 
 ## Tests
 
@@ -109,6 +115,11 @@ comments (`docs/DESIGN.md` §7.1). Each file becomes its own named test case.
 | `tests/run/*.ty` | Compile, run, exit 0 | `# expect: <line>` — one per line of stdout, in order, compared exactly |
 | `examples/*.ty` | Compile, run, exit 0 | Same as `tests/run` — so the documentation examples can never rot |
 | `tests/fail/*.ty` | Fail to compile | `# error: <substring>` — every substring must appear in the diagnostics |
+
+A running case may also declare `# exit: <code>` (the expected exit status,
+`0` when absent) and `# stderr: <substring>`, which is how runtime panics are
+tested: `tests/run/panic_div_zero.ty` expects exit 101 and
+`panic: integer division by zero`.
 
 Every file also declares `# milestone: M0` … `M6`. Cases above the harness's
 current milestone are reported as **ignored** rather than failed, so the suite
@@ -128,8 +139,8 @@ cargo test -p typhoon-driver --test golden -- --ignored   # run the future cases
 | `crates/lexer` | Indentation-aware lexer (`INDENT`/`DEDENT`/`NEWLINE`) |
 | `crates/ast` | AST data structures |
 | `crates/parser` | Hand-written recursive-descent + Pratt parser |
-| `crates/sema` | Name resolution, type inference and checking, monomorphisation |
-| `crates/codegen` | Typed AST → textual LLVM IR |
+| `crates/sema` | Name resolution, type inference and checking, definite assignment; produces the typed HIR |
+| `crates/codegen` | Typed HIR → textual LLVM IR |
 | `crates/runtime` | `staticlib` runtime: `ty_alloc`, `ty_print_*`, `ty_panic` |
 | `crates/driver` | Compile → link → run pipeline, plus the golden test harness |
 | `crates/cli` | The `typhoon` binary |

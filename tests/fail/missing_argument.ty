@@ -1,0 +1,10 @@
+# A parameter without a default must be supplied.
+# milestone: M1
+# error: missing argument `b`
+# error: add
+
+fn add(a: int, b: int) -> int:
+    return a + b
+
+fn main():
+    print(add(1))

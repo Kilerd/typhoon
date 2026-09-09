@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn value() -> int:\\n    return 1\\n\\nfn value() -> int:\\n    return 2\\n\\nfn main():\\n    print(value())\\n\")"
+---
+error: the name `value` is defined multiple times
+ --> main.ty:4:4
+  |
+1 | fn value() -> int:
+  |    ----- previous definition here
+...
+4 | fn value() -> int:
+  |    ^^^^^ `value` redefined here

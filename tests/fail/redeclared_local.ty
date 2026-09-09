@@ -1,0 +1,8 @@
+# There is no shadowing inside a function (DESIGN 3.4).
+# milestone: M1
+# error: already declared in this function
+
+fn main():
+    x: int = 1
+    x: float = 2.0
+    print(x)

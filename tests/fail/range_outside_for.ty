@@ -1,0 +1,8 @@
+# `range` is a loop form, not a value: it compiles to a counting loop and
+# never allocates an object (DESIGN 3.5).
+# milestone: M1
+# error: `range` can only be used as the iterable of a `for` loop
+
+fn main():
+    r = range(10)
+    print(1)

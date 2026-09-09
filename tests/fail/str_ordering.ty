@@ -1,0 +1,7 @@
+# `str` has `==` and `!=` in M1; ordering needs the string API of M2.
+# milestone: M1
+# error: cannot be applied to `str` and `str`
+
+fn main():
+    if "a" < "b":
+        print("ordered")

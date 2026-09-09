@@ -1,0 +1,6 @@
+# `main` is the entry point and takes no arguments (DESIGN 3.3).
+# milestone: M1
+# error: `main` must not take parameters
+
+fn main(argc: int):
+    print(argc)

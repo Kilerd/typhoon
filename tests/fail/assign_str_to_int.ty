@@ -1,0 +1,9 @@
+# The same rule for an explicitly annotated local.
+# milestone: M1
+# error: mismatched types
+# error: expected `int`, found `str`
+
+fn main():
+    count: int = 0
+    count = "many"
+    print(count)

@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    r = range(10)\\n\")"
+---
+error: `range` can only be used as the iterable of a `for` loop
+ --> main.ty:2:9
+  |
+2 |     r = range(10)
+  |         ^^^^^^^^^ not a value
+  |
+  = note: `range` compiles to a counting loop and never builds an object, see DESIGN.md section 3.5

@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn add(a: int, b: int) -> int:\\n    return a + b\\n\\nfn main():\\n    print(add(1, 2, 3))\\n\")"
+---
+error: `add` takes 2 arguments but 3 were supplied
+ --> main.ty:5:21
+  |
+5 |     print(add(1, 2, 3))
+  |           ---       ^ unexpected argument
+  |           |
+  |           `add` declared here

@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n = 3\\n    print(f\\\"{n:.2f}\\\")\\n\")"
+---
+error: the format spec `.2f` requires a `float`, found `int`
+ --> main.ty:3:13
+  |
+3 |     print(f"{n:.2f}")
+  |             ^^^^^^^ this is an `int`
+  |
+  = help: use `float(x)` to convert an `int` to a `float`

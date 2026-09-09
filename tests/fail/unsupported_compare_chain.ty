@@ -1,0 +1,11 @@
+# Comparison chains are M3; the MVP spelling is `a < b and b < c`
+# (DESIGN 3.6, 3.10).
+# milestone: M1
+# error: a comparison chain is not supported yet (planned for M3)
+
+fn main():
+    a = 1
+    b = 2
+    c = 3
+    if a < b < c:
+        print("ordered")

@@ -3,4 +3,14 @@ name = "typhoon-codegen"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "typhoon_codegen"
+path = "src/lib.rs"
+
 [dependencies]
+typhoon-diag = { path = "../diag" }
+typhoon-parser = { path = "../parser" }
+typhoon-sema = { path = "../sema" }
+
+[dev-dependencies]
+insta = "1.48.0"

@@ -1,0 +1,101 @@
+# while loops: a loop that never runs, `break` from the middle of the body,
+# `continue`, a nested `if` inside the body, `break` out of `while True`,
+# and `return` from inside a loop.
+# milestone: M1
+# expect: 0 10
+# expect: 7 21
+# expect: 25 5
+# expect: 2 22
+# expect: 23
+# expect: 7 97 2
+# expect: 111 0 8
+# expect: 21 42
+
+fn first_divisor(n: int) -> int:
+    # returns n itself when n is prime
+    d = 2
+    while d < n:
+        if n % d == 0:
+            return d
+        d = d + 1
+    return n
+
+fn collatz_steps(n: int) -> int:
+    steps = 0
+    x = n
+    while x != 1:
+        if x % 2 == 0:
+            x = x // 2
+        else:
+            x = 3 * x + 1
+        steps = steps + 1
+    return steps
+
+fn main():
+    # a condition that is false to begin with runs the body zero times
+    i = 10
+    ran = 0
+    while i < 5:
+        ran = ran + 1
+        i = i + 1
+    print(ran, i)
+
+    # break from the middle: the statements after it are skipped, the ones
+    # before it already ran
+    n = 0
+    total = 0
+    while n < 100:
+        n = n + 1
+        if total > 20:
+            break
+        total = total + n
+    print(n, total)
+
+    # continue skips the rest of the body but not the update above it
+    k = 0
+    odd_sum = 0
+    skipped = 0
+    while k < 10:
+        k = k + 1
+        if k % 2 == 0:
+            skipped = skipped + 1
+            continue
+        odd_sum = odd_sum + k
+    print(odd_sum, skipped)
+
+    # a nested if / else inside the loop body
+    small = 0
+    big = 0
+    m = 0
+    while m < 8:
+        if m < 4:
+            if m % 2 == 0:
+                small = small + m
+        else:
+            big = big + m
+        m = m + 1
+    print(small, big)
+
+    # `while True` whose only exit is a break in the middle
+    guess = 1
+    while True:
+        if guess * guess > 500:
+            break
+        guess = guess + 1
+    print(guess)
+
+    # returning out of a loop from a function
+    print(first_divisor(91), first_divisor(97), first_divisor(2))
+    print(collatz_steps(27), collatz_steps(1), collatz_steps(6))
+
+    # a loop that both continues and breaks
+    v = 0
+    seen = 0
+    while v < 50:
+        v = v + 1
+        if v % 7 != 0:
+            continue
+        seen = seen + v
+        if seen > 30:
+            break
+    print(v, seen)

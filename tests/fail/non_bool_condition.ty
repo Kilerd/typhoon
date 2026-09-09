@@ -1,0 +1,10 @@
+# There is no truthiness (DESIGN 3.6): a condition must be a `bool`, and the
+# diagnostic says how to write it instead.
+# milestone: M1
+# error: expected `bool`, found `int`
+# error: compare explicitly
+
+fn main():
+    n = 3
+    if n:
+        print("non-zero")

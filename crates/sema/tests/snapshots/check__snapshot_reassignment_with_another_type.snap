@@ -1,0 +1,13 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    x = 1\\n    x = 1.5\\n    print(x)\\n\")"
+---
+error: mismatched types: expected `int`, found `float`
+ --> main.ty:3:9
+  |
+2 |     x = 1
+  |     - `x` was declared with type `int` here
+3 |     x = 1.5
+  |         ^^^ expected `int`, found `float`
+  |
+  = note: a variable's type is fixed by its first assignment, see DESIGN.md section 3.4

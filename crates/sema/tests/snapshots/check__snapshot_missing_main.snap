@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn helper() -> int:\\n    return 1\\n\")"
+---
+error: this program has no `main` function
+ --> main.ty:1:1
+  |
+1 | fn helper() -> int:
+  | ^ this file declares no entry point
+  |
+  = note: every program needs an entry point, see DESIGN.md section 3.3
+  = help: add `fn main():` as the entry point

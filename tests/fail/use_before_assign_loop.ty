@@ -1,0 +1,10 @@
+# A loop body may run zero times, so a variable first assigned inside it is
+# not definitely assigned after it (DESIGN 3.4).
+# milestone: M1
+# error: possibly-uninitialized
+# error: last
+
+fn main():
+    for i in range(3):
+        last = i
+    print(last)

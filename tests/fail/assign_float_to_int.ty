@@ -1,0 +1,12 @@
+# A local's type is fixed by its first assignment (DESIGN 3.4); assigning a
+# `float` to it later is an error, and the diagnostic shows where the type
+# was fixed.
+# milestone: M1
+# error: mismatched types
+# error: expected `int`, found `float`
+# error: declared with type `int`
+
+fn main():
+    x = 1
+    x = 1.5
+    print(x)

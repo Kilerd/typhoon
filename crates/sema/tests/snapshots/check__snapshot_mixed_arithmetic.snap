@@ -1,0 +1,14 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    total = 1 + 2.0\\n    print(total)\\n\")"
+---
+error: mismatched types: expected `int`, found `float`
+ --> main.ty:2:17
+  |
+2 |     total = 1 + 2.0
+  |             -   ^^^ expected `int`, found `float`
+  |             |
+  |             this is an `int`
+  |
+  = note: there are no implicit numeric conversions, see DESIGN.md section 4.3
+  = help: use `float(x)` to convert an `int` to a `float`

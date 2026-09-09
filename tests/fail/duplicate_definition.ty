@@ -1,0 +1,12 @@
+# Two top-level declarations may not share a name.
+# milestone: M1
+# error: the name `value` is defined multiple times
+
+fn value() -> int:
+    return 1
+
+fn value() -> int:
+    return 2
+
+fn main():
+    print(value())

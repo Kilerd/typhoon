@@ -1,0 +1,11 @@
+# The mirror image: a function that promises an `int` cannot `return` bare.
+# milestone: M1
+# error: `return` with no value in function `pick` returning `int`
+
+fn pick(n: int) -> int:
+    if n > 0:
+        return
+    return 0
+
+fn main():
+    print(pick(1))

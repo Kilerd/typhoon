@@ -1,0 +1,20 @@
+# A runtime panic: integer division by zero with a divisor that only becomes 0
+# at run time. Everything printed before the panic must still reach stdout,
+# and the process must exit 101 with the panic message on stderr.
+# milestone: M1
+# expect: dividing 10 by 2
+# expect: 5 0
+# expect: dividing 10 by 0
+# exit: 101
+# stderr: panic: integer division by zero
+
+fn divide(n: int, d: int) -> int:
+    print(f"dividing {n} by {d}")
+    return n // d
+
+fn main():
+    step = 2
+    print(divide(10, step), 10 % step)
+    zero = step - 2
+    print(divide(10, zero))
+    print("unreachable")

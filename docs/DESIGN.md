@@ -389,6 +389,8 @@ fn main():
 - `/` 在两个整数上返回 `float`；`//` 与 `%` 采用 Python 的向下取整（floor）语义，商向负无穷取整、余数符号跟随除数。
 - **除零 panic**（整数除零、`%` 零）；浮点除零遵循 IEEE 754，得到 `inf` / `nan`，不 panic。
 - **索引越界 panic**，`dict` 取不存在的 key panic。panic 打印消息与位置后以非零码退出（MVP 不可捕获，M4 与异常体系合并考虑）。
+- **浮点运算允许 FMA 合并**（与 Go 一致）：`a * b + c` 可以被降低为一条 fused multiply-add，因此 `fadd` / `fsub` / `fmul` 带 `contract` 标志，其余快速数学标志一律不开。**显式 `float(x)` 转换是合并屏障**（同 Go 的显式转换规则），在 IR 上是一次 `llvm.arithmetic.fence.f64`：需要逐位可复现的浮点结果时，用它把要保留的中间量括起来。
+- **幂运算的降低**：`x ** 0.5` 编译为 `sqrt`（硬件指令，不是 libm 的 `pow`），`x ** 2` / `x ** 2.0` 编译为 `x * x`；其余浮点幂走 `llvm.pow.f64`。整数幂由运行时的 `ty_int_pow` 按平方求幂计算，同样回绕；**负指数 panic**（`int ** int` 的结果必须是 `int`，需要负指数请写 `float(x) ** float(y)`）。
 
 ### 4.4 类型推断
 
@@ -455,8 +457,8 @@ MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换
 | `parser` | 手写递归下降 + Pratt 表达式解析；带错误恢复（同步到行首/DEDENT）；泛型 `<>` 的推测解析与 `>>` 拆分 |
 | `ast` | 纯数据结构，无逻辑；节点带 span |
 | `sema` | 名字解析、类型推断与检查、定值分析、单态化；类型经 interning 表示为 `TypeId` |
-| `ir` | 带类型的中间表示（CFG + 简单 SSA），后端无关；逃逸分析等优化在此层 |
-| `codegen` | IR → LLVM IR |
+| `ir` | 带类型的中间表示（CFG + 简单 SSA），后端无关；逃逸分析等优化在此层。**推迟到 M3**（排在逃逸分析之前）：M0–M2 没有独立的 IR crate，`codegen` 直接下降 `sema` 输出的 typed HIR |
+| `codegen` | IR → LLVM IR（M0–M2 是 typed HIR → LLVM IR） |
 | `runtime` | Rust `staticlib`，`extern "C"` 导出 `ty_alloc`、str/list/dict 操作、`ty_print_*`、`ty_panic` |
 | `cli` | `typhoon build <file>`、`typhoon run <file>`、`typhoon emit-ir <file>` |
 
@@ -496,7 +498,7 @@ source (.ty)
   → lexer      (tokens + INDENT/DEDENT/NEWLINE, spans)
   → parser     (AST)
   → sema       (name resolution → type inference/check → definite assignment → monomorphization ⇒ typed AST)
-  → ir lowering(typed CFG / SSA, escape analysis @M5)
+  → ir lowering(typed CFG / SSA, escape analysis @M5)          （M3 起）
   → codegen    (text LLVM IR)
   → clang -O2  (optimize + link with runtime & GC)
   → native binary

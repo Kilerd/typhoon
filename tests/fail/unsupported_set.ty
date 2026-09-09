@@ -1,0 +1,7 @@
+# Set literals arrive with `set<T>` in M3.
+# milestone: M1
+# error: a set literal is not supported yet (planned for M3)
+
+fn main():
+    s = {1, 2}
+    print(1)

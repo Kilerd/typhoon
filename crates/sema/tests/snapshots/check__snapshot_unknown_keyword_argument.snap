@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn add(a: int, b: int) -> int:\\n    return a + b\\n\\nfn main():\\n    print(add(a=1, c=2))\\n\")"
+---
+error: `add` has no parameter named `c`
+ --> main.ty:5:20
+  |
+5 |     print(add(a=1, c=2))
+  |           ---      ^ unknown keyword argument
+  |           |
+  |           `add` declared here

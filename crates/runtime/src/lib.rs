@@ -21,13 +21,17 @@
 
 use std::ffi::{c_int, c_void};
 use std::io::{self, BufWriter, Stdout, Write};
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{Mutex, MutexGuard, Once, OnceLock};
 
 // Boehm-Demers-Weiser GC. Declared only: the archive does not link it, the
 // final `clang` invocation does (`-lgc`).
 unsafe extern "C" {
     fn GC_init();
+    // Unused in `cfg(test)`, where allocation goes through Rust's allocator;
+    // see `raw_alloc`.
+    #[cfg_attr(test, allow(dead_code))]
     fn GC_malloc(n: usize) -> *mut c_void;
+    #[cfg_attr(test, allow(dead_code))]
     fn GC_malloc_atomic(n: usize) -> *mut c_void;
     fn atexit(cb: extern "C" fn()) -> c_int;
 }
@@ -63,13 +67,16 @@ extern "C" fn flush_at_exit() {
 
 /// Initialises the runtime: starts Boehm GC and installs the stdout flush hook.
 ///
-/// Must be the first runtime call made by a Typhoon program.
+/// Must be the first runtime call made by a Typhoon program. Calling it more
+/// than once, or from several threads at once, is harmless: the work happens
+/// exactly once (Boehm's `GC_init` is not itself reentrant).
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_rt_init() {
-    unsafe {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| unsafe {
         GC_init();
         atexit(flush_at_exit);
-    }
+    });
 }
 
 /// Flushes stdout and terminates the process with `code`.
@@ -83,13 +90,42 @@ pub extern "C" fn ty_rt_exit(code: i32) -> ! {
 // Allocation
 // ---------------------------------------------------------------------------
 
+/// The raw block allocator behind [`ty_alloc`] and [`ty_alloc_atomic`].
+///
+/// In a real Typhoon binary this is Boehm GC. Under `cargo test` it is Rust's
+/// allocator instead, because `cargo test` runs every test on its own thread
+/// and those threads are not registered with the GC — a Typhoon program is
+/// single-threaded, so the runtime never calls `GC_register_my_thread`, and
+/// allocating from an unregistered thread makes Boehm collect live objects and
+/// abort in `thread_suspend`. The GC path itself is covered end to end by the
+/// golden suite (`tests/run/gc_stress.ty` in particular), which runs real
+/// compiled programs.
+#[cfg(not(test))]
+fn raw_alloc(size: usize, atomic: bool) -> *mut u8 {
+    unsafe {
+        if atomic {
+            GC_malloc_atomic(size) as *mut u8
+        } else {
+            GC_malloc(size) as *mut u8
+        }
+    }
+}
+
+#[cfg(test)]
+fn raw_alloc(size: usize, _atomic: bool) -> *mut u8 {
+    // Leaked on purpose: a test process is short lived, and a Typhoon value
+    // is never freed explicitly.
+    let layout = std::alloc::Layout::from_size_align(size.max(1), 8).expect("a valid layout");
+    unsafe { std::alloc::alloc(layout) }
+}
+
 /// Allocates `size` GC-traced bytes. The block *is* scanned for pointers.
 ///
 /// Aborts the process with `panic: out of memory` when the GC cannot satisfy
 /// the request. Never returns null.
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_alloc(size: usize) -> *mut u8 {
-    let p = unsafe { GC_malloc(size) } as *mut u8;
+    let p = raw_alloc(size, false);
     if p.is_null() {
         out_of_memory();
     }
@@ -103,7 +139,7 @@ pub extern "C" fn ty_alloc(size: usize) -> *mut u8 {
 /// the request. Never returns null.
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_alloc_atomic(size: usize) -> *mut u8 {
-    let p = unsafe { GC_malloc_atomic(size) } as *mut u8;
+    let p = raw_alloc(size, true);
     if p.is_null() {
         out_of_memory();
     }
@@ -409,6 +445,155 @@ pub fn format_float(value: f64) -> String {
     s
 }
 
+// ---------------------------------------------------------------------------
+// Strings
+// ---------------------------------------------------------------------------
+
+/// A `str` value: a pointer to `{ len: i64, bytes: [u8; len] }` on the GC heap.
+///
+/// The header is what the compiler passes around; string literals are emitted
+/// as private LLVM constants with exactly this layout, so a literal costs no
+/// allocation at all. The payload holds no pointers, so it is allocated with
+/// [`ty_alloc_atomic`] and never scanned.
+///
+/// The length is stored as an `i64` to match the `int` type and to keep the
+/// bytes 8-byte aligned.
+const STR_HEADER: usize = 8;
+
+/// Allocates an uninitialised string of `len` bytes, returning the header.
+///
+/// # Safety
+///
+/// The caller must initialise all `len` payload bytes before the value is
+/// handed to any other function.
+unsafe fn str_alloc(len: usize) -> *mut u8 {
+    let p = ty_alloc_atomic(STR_HEADER + len);
+    unsafe { std::ptr::write_unaligned(p as *mut i64, len as i64) };
+    p
+}
+
+/// Copies `bytes` into a fresh GC-allocated string.
+pub fn str_new(bytes: &[u8]) -> *mut u8 {
+    unsafe {
+        let p = str_alloc(bytes.len());
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), p.add(STR_HEADER), bytes.len());
+        p
+    }
+}
+
+/// The payload of a string value.
+///
+/// # Safety
+///
+/// `s` must point at a well-formed string header.
+pub unsafe fn str_bytes<'a>(s: *const u8) -> &'a [u8] {
+    unsafe {
+        let len = std::ptr::read_unaligned(s as *const i64) as usize;
+        bytes(s.add(STR_HEADER), len)
+    }
+}
+
+/// Concatenates two strings into a new one (`str` is immutable).
+///
+/// # Safety
+///
+/// Both arguments must point at well-formed string headers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_str_concat(a: *const u8, b: *const u8) -> *mut u8 {
+    unsafe {
+        let (a, b) = (str_bytes(a), str_bytes(b));
+        let out = str_alloc(a.len() + b.len());
+        std::ptr::copy_nonoverlapping(a.as_ptr(), out.add(STR_HEADER), a.len());
+        std::ptr::copy_nonoverlapping(b.as_ptr(), out.add(STR_HEADER + a.len()), b.len());
+        out
+    }
+}
+
+/// Byte-wise string equality, `1` for equal.
+///
+/// # Safety
+///
+/// Both arguments must point at well-formed string headers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_str_eq(a: *const u8, b: *const u8) -> u8 {
+    unsafe { u8::from(str_bytes(a) == str_bytes(b)) }
+}
+
+/// Renders an `int` the way `print` does.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_str_from_int(value: i64) -> *mut u8 {
+    let mut buf = itoa(value);
+    str_new(buf.as_bytes_mut())
+}
+
+/// Renders a `float` the way `print` does (shortest round-trip, always a `.`).
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_str_from_float(value: f64) -> *mut u8 {
+    str_new(format_float(value).as_bytes())
+}
+
+/// Renders a `bool` as `True` / `False`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_str_from_bool(value: u8) -> *mut u8 {
+    str_new(if value != 0 { b"True" } else { b"False" })
+}
+
+/// Renders a `float` with exactly `precision` digits after the point, the
+/// `{x:.Nf}` format spec of DESIGN section 3.7.
+///
+/// Non-finite values ignore the precision and render as `inf`, `-inf`, `nan`,
+/// which is what Python's `format` does.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_str_from_float_fixed(value: f64, precision: i64) -> *mut u8 {
+    str_new(format_fixed(value, precision).as_bytes())
+}
+
+/// The text of `{value:.<precision>f}`.
+pub fn format_fixed(value: f64, precision: i64) -> String {
+    if !value.is_finite() {
+        return format_float(value);
+    }
+    let precision = precision.clamp(0, 32) as usize;
+    format!("{value:.precision$}")
+}
+
+// ---------------------------------------------------------------------------
+// Integer power
+// ---------------------------------------------------------------------------
+
+/// `base ** exp` by squaring, wrapping like every other `int` operation
+/// (DESIGN section 4.3); `None` for a negative exponent.
+pub fn int_pow_checked(base: i64, exp: i64) -> Option<i64> {
+    if exp < 0 {
+        return None;
+    }
+    let mut base = base;
+    let mut exp = exp;
+    let mut acc: i64 = 1;
+    while exp > 0 {
+        if exp & 1 == 1 {
+            acc = acc.wrapping_mul(base);
+        }
+        exp >>= 1;
+        if exp > 0 {
+            base = base.wrapping_mul(base);
+        }
+    }
+    Some(acc)
+}
+
+/// `base ** exp` for two `int`s; panics on a negative exponent.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_int_pow(base: i64, exp: i64) -> i64 {
+    match int_pow_checked(base, exp) {
+        Some(value) => value,
+        None => {
+            let msg = b"negative exponent in integer power";
+            unsafe { ty_panic(msg.as_ptr(), msg.len()) }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -609,12 +794,14 @@ mod tests {
     // -- allocation ----------------------------------------------------
 
     #[test]
-    fn gc_allocation_works() {
+    fn allocation_returns_distinct_writable_blocks() {
         ty_rt_init();
+        let mut blocks = Vec::new();
         for i in 1..=64usize {
             let size = i * 1024;
             let p = ty_alloc(size);
             assert!(!p.is_null());
+            assert_eq!(p as usize % 8, 0, "blocks are at least 8-byte aligned");
             unsafe { std::ptr::write_bytes(p, 0xAB, size) };
             assert_eq!(unsafe { *p }, 0xAB);
 
@@ -622,7 +809,149 @@ mod tests {
             assert!(!q.is_null());
             unsafe { std::ptr::write_bytes(q, 0xCD, size) };
             assert_eq!(unsafe { *q.add(size - 1) }, 0xCD);
+
+            blocks.push((p, size));
         }
+        // Nothing overlaps, and the first write is still there.
+        for (p, size) in &blocks {
+            assert_eq!(unsafe { **p }, 0xAB);
+            assert_eq!(unsafe { *p.add(size - 1) }, 0xAB);
+        }
+    }
+
+    // -- str -----------------------------------------------------------
+
+    /// Reads back a string value built by the runtime.
+    fn read(s: *mut u8) -> String {
+        String::from_utf8(unsafe { str_bytes(s) }.to_vec()).unwrap()
+    }
+
+    #[test]
+    fn strings_round_trip_through_the_heap() {
+        ty_rt_init();
+        for text in ["", "a", "Hello, Typhoon!", "台风", "\0\u{1}"] {
+            let s = str_new(text.as_bytes());
+            assert_eq!(read(s), text);
+            // The header holds the byte length, not the character count.
+            assert_eq!(
+                unsafe { std::ptr::read_unaligned(s as *const i64) },
+                text.len() as i64
+            );
+        }
+    }
+
+    #[test]
+    fn concatenation_allocates_a_new_string() {
+        ty_rt_init();
+        let a = str_new(b"Hello, ");
+        let b = str_new("Typhoon 台风".as_bytes());
+        let c = unsafe { ty_str_concat(a, b) };
+        assert_eq!(read(c), "Hello, Typhoon 台风");
+        // The operands are untouched: `str` is immutable.
+        assert_eq!(read(a), "Hello, ");
+        assert_eq!(read(b), "Typhoon 台风");
+
+        let empty = str_new(b"");
+        assert_eq!(read(unsafe { ty_str_concat(empty, empty) }), "");
+        assert_eq!(read(unsafe { ty_str_concat(empty, a) }), "Hello, ");
+        assert_eq!(read(unsafe { ty_str_concat(a, empty) }), "Hello, ");
+    }
+
+    #[test]
+    fn string_equality_is_by_bytes() {
+        ty_rt_init();
+        let a = str_new(b"abc");
+        let b = str_new(b"abc");
+        let c = str_new(b"abd");
+        let d = str_new(b"ab");
+        assert_eq!(unsafe { ty_str_eq(a, b) }, 1);
+        assert_eq!(unsafe { ty_str_eq(a, a) }, 1);
+        assert_eq!(unsafe { ty_str_eq(a, c) }, 0);
+        assert_eq!(unsafe { ty_str_eq(a, d) }, 0);
+        let empty = str_new(b"");
+        assert_eq!(unsafe { ty_str_eq(empty, empty) }, 1);
+        assert_eq!(unsafe { ty_str_eq(empty, a) }, 0);
+    }
+
+    #[test]
+    fn values_render_the_way_print_does() {
+        ty_rt_init();
+        assert_eq!(read(ty_str_from_int(-42)), "-42");
+        assert_eq!(read(ty_str_from_int(i64::MIN)), "-9223372036854775808");
+        assert_eq!(read(ty_str_from_float(5.0)), "5.0");
+        assert_eq!(read(ty_str_from_float(1e16)), "1e+16");
+        assert_eq!(read(ty_str_from_float(f64::NAN)), "nan");
+        assert_eq!(read(ty_str_from_bool(1)), "True");
+        assert_eq!(read(ty_str_from_bool(0)), "False");
+    }
+
+    #[test]
+    fn fixed_precision_matches_python_format() {
+        assert_eq!(format_fixed(3.5, 2), "3.50");
+        assert_eq!(format_fixed(-0.0, 1), "-0.0");
+        assert_eq!(format_fixed(2.675, 2), "2.67"); // the double is below 2.675
+        assert_eq!(format_fixed(0.125, 2), "0.12"); // exact tie, rounds to even
+        assert_eq!(format_fixed(0.375, 2), "0.38"); // exact tie, rounds to even
+        assert_eq!(format_fixed(1.0, 0), "1");
+        assert_eq!(format_fixed(1.5, 0), "2");
+        assert_eq!(format_fixed(2.5, 0), "2");
+        assert_eq!(format_fixed(1234.5678, 3), "1234.568");
+        assert_eq!(format_fixed(f64::INFINITY, 2), "inf");
+        assert_eq!(format_fixed(f64::NAN, 2), "nan");
+        // Out-of-range precisions are clamped rather than panicking.
+        assert_eq!(format_fixed(1.0, -3), "1");
+        assert_eq!(format_fixed(1.0, 1000).len(), 34);
+    }
+
+    #[test]
+    fn fixed_precision_allocates_a_string() {
+        ty_rt_init();
+        assert_eq!(read(ty_str_from_float_fixed(1.23456, 2)), "1.23");
+        assert_eq!(read(ty_str_from_float_fixed(1.23456, 0)), "1");
+    }
+
+    // -- int_pow -------------------------------------------------------
+
+    #[test]
+    fn integer_power_by_squaring() {
+        assert_eq!(int_pow_checked(2, 10), Some(1024));
+        assert_eq!(int_pow_checked(3, 5), Some(243));
+        assert_eq!(int_pow_checked(-2, 3), Some(-8));
+        assert_eq!(int_pow_checked(-2, 4), Some(16));
+        assert_eq!(int_pow_checked(7, 0), Some(1));
+        assert_eq!(int_pow_checked(0, 0), Some(1));
+        assert_eq!(int_pow_checked(0, 5), Some(0));
+        assert_eq!(int_pow_checked(1, i64::MAX), Some(1));
+        for base in [-5i64, -1, 0, 1, 2, 3, 10] {
+            for exp in 0..12u32 {
+                assert_eq!(
+                    int_pow_checked(base, i64::from(exp)),
+                    Some(base.wrapping_pow(exp)),
+                    "{base} ** {exp}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn integer_power_wraps_instead_of_trapping() {
+        assert_eq!(int_pow_checked(2, 63), Some(i64::MIN));
+        assert_eq!(int_pow_checked(2, 64), Some(0));
+        assert_eq!(int_pow_checked(10, 19), Some(10i64.wrapping_pow(19)));
+        assert_eq!(
+            int_pow_checked(i64::MAX, 2),
+            Some(i64::MAX.wrapping_mul(i64::MAX))
+        );
+    }
+
+    #[test]
+    fn a_negative_exponent_has_no_value() {
+        // `ty_int_pow` turns this into `panic: negative exponent in integer
+        // power`; the panic itself exits the process, so only the inner
+        // function can be tested here.
+        assert_eq!(int_pow_checked(2, -1), None);
+        assert_eq!(int_pow_checked(0, i64::MIN), None);
+        assert_eq!(ty_int_pow(2, 10), 1024);
     }
 
     #[test]

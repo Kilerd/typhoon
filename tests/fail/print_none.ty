@@ -1,0 +1,10 @@
+# A function without a return type produces no value, so it cannot be an
+# argument to `print`.
+# milestone: M1
+# error: cannot print a value of type `None`
+
+fn log(n: int):
+    print(n)
+
+fn main():
+    print(log(1))

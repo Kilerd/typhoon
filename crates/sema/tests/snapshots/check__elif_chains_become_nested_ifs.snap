@@ -1,0 +1,14 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn main() -> None
+  local n: int
+  n = 1:int
+  if (n:int > 1:int):bool:
+    print(1:int):None
+  else:
+    if (n:int > 0:int):bool:
+      print(2:int):None
+    else:
+      print(3:int):None

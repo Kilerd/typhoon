@@ -1,0 +1,108 @@
+# Float arithmetic: `+ - * /` (the `contract`-flagged path plus the `float()`
+# contraction barrier), IEEE-754 division by zero, floor `//` and `%` with
+# negative operands, `**` including square root and squaring, negative zero,
+# and `float()` / `int()` round trips.
+# milestone: M1
+# expect: 3.75
+# expect: -0.75
+# expect: 3.75
+# expect: 3.0
+# expect: 14.0
+# expect: 20.0
+# expect: 3.25
+# expect: 3.5
+# expect: inf
+# expect: -inf
+# expect: nan
+# expect: inf -inf
+# expect: -inf
+# expect: 3.0 1.0
+# expect: -4.0 1.0
+# expect: -4.0 -1.0
+# expect: 3.0 -1.0
+# expect: 3.0 1.5
+# expect: -3.0 0.0
+# expect: -0.0 0.0
+# expect: 1.4142135623730951
+# expect: 3.0
+# expect: 0.5
+# expect: 2.25
+# expect: 1024.0
+# expect: 0.25
+# expect: 1.0
+# expect: -8.0
+# expect: -0.0
+# expect: -0.0
+# expect: 0.0
+# expect: 0.0
+# expect: 42.0
+# expect: 42
+# expect: 2 -2 0 0
+# expect: 9.223372036854776e+18
+# expect: 9223372036854775807 -9223372036854775808
+# expect: 3.0
+
+fn div(a: float, b: float) -> float:
+    return a / b
+
+fn poly(a: float, b: float, c: float) -> float:
+    # `+`, `-` and `*` carry LLVM's `contract` flag, so the multiply may be
+    # fused into the add; every value here is an exact dyadic rational, so
+    # fusing cannot change the result.
+    return a * b + c
+
+fn main():
+    # `+ - * /` and precedence
+    print(1.5 + 2.25)
+    print(1.5 - 2.25)
+    print(1.5 * 2.5)
+    print(7.5 / 2.5)
+    print(2.0 + 3.0 * 4.0)
+    print((2.0 + 3.0) * 4.0)
+    print(poly(1.5, 2.0, 0.25))
+    print(float(1.5 * 2.0) + 0.5)
+
+    # IEEE-754 division by zero: inf / -inf / nan, never a panic
+    zero = 0.0
+    print(1.0 / zero)
+    print(-1.0 / zero)
+    print(zero / zero)
+    print(div(3.0, 0.0), div(-3.0, 0.0))
+    nz = -0.0
+    print(1.0 / nz)
+
+    # floor `//` and `%` on floats, Python semantics
+    print(7.0 // 2.0, 7.0 % 2.0)
+    print(-7.0 // 2.0, -7.0 % 2.0)
+    print(7.0 // -2.0, 7.0 % -2.0)
+    print(-7.0 // -2.0, -7.0 % -2.0)
+    print(7.5 // 2.0, 7.5 % 2.0)
+    print(-7.5 // 2.5, -7.5 % 2.5)
+    # a zero remainder keeps the sign of the divisor, like CPython's
+    # `float_rem` (`copysign(0.0, b)`): `4.0 % -2.0` is `-0.0`.
+    print(4.0 % -2.0, -4.0 % 2.0)
+
+    # `**`: 0.5 is a square root, 2.0 is a multiplication
+    print(2.0 ** 0.5)
+    print(9.0 ** 0.5)
+    print(0.25 ** 0.5)
+    print(1.5 ** 2.0)
+    print(2.0 ** 10.0)
+    print(2.0 ** -2.0)
+    print(0.0 ** 0.0)
+    print((-2.0) ** 3.0)
+
+    # negative zero
+    print(-0.0)
+    print(0.0 * -1.0)
+    print(-0.0 + 0.0)
+    print(-0.0 * -1.0)
+
+    # float(int) and int(float) round trips
+    n = 42
+    print(float(n))
+    print(int(float(n)))
+    print(int(2.9), int(-2.9), int(0.5), int(-0.5))
+    print(float(9223372036854775807))
+    print(int(1e30), int(-1e30))
+    print(float(int(3.75)))

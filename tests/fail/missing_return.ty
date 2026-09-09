@@ -1,0 +1,12 @@
+# A function with a return type must return on every path.
+# milestone: M1
+# error: missing return in function `classify` returning `int`
+
+fn classify(n: int) -> int:
+    if n > 0:
+        return 1
+    elif n < 0:
+        return -1
+
+fn main():
+    print(classify(0))

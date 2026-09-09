@@ -1,0 +1,9 @@
+# `str + int` has no meaning: `+` on strings concatenates two strings
+# (DESIGN 4.2), and there is no automatic stringification.
+# milestone: M1
+# error: mismatched types
+# error: expected `str`, found `int`
+
+fn main():
+    label = "count: " + 3
+    print(label)

@@ -1,0 +1,77 @@
+# Comparisons: the six ordered operators on `int` and `float`, `==` / `!=` on
+# `bool` and `str` (the only two defined there), NaN making every ordered
+# predicate false while `!=` stays true, and comparison results used as plain
+# bool values.
+# milestone: M1
+# expect: True False True False
+# expect: True False True False
+# expect: True False True False
+# expect: True True True False
+# expect: True True
+# expect: True False True False
+# expect: True True True False
+# expect: True False
+# expect: False True
+# expect: True True
+# expect: True True False True
+# expect: True True
+# expect: True False False True
+# expect: True False
+# expect: False True
+# expect: False True
+# expect: False False False False
+# expect: False False False True
+# expect: True False
+# expect: True True
+# expect: True True False
+# expect: True False False
+# expect: True True
+
+MINI: int = -9223372036854775807 - 1
+
+fn is_nan(x: float) -> bool:
+    return x != x
+
+fn between(lo: int, x: int, hi: int) -> bool:
+    # typhoon has no comparison chains, `lo < x < hi` is spelled out
+    return lo < x and x < hi
+
+fn main():
+    # ints
+    print(1 == 1, 1 == 2, 1 != 2, 1 != 1)
+    print(1 < 2, 2 < 1, 2 <= 2, 3 <= 2)
+    print(3 > 2, 2 > 3, 2 >= 2, 1 >= 2)
+    print(-1 < 0, -5 > -6, -5 <= -5, -5 >= -4)
+    print(9223372036854775807 > MINI, MINI < 0)
+
+    # floats
+    print(1.5 == 1.5, 1.5 == 2.5, 1.5 != 2.5, 1.5 != 1.5)
+    print(1.5 < 2.5, 2.5 <= 2.5, 2.5 > 1.5, 1.5 >= 2.5)
+    print(-0.0 == 0.0, -0.0 < 0.0)
+    print(0.1 + 0.2 == 0.3, 0.1 + 0.2 > 0.3)
+    print(1.0 / 0.0 > 1.7976931348623157e308, -1.0 / 0.0 < 0.0)
+
+    # `==` and `!=` are the only comparisons defined on bool and str
+    print(True == True, False == False, True == False, True != False)
+    b = 1 < 2
+    print(b == True, b != False)
+    print("abc" == "abc", "abc" == "abd", "abc" != "abc", "" == "")
+    print("abc" != "ab", "Abc" == "abc")
+
+    # NaN: every ordered comparison is false, `!=` alone is true
+    f = 0.0 / 0.0
+    print(f == f, f != f)
+    print(f == 1.0, f != 1.0)
+    print(f < 1.0, f > 1.0, f <= 1.0, f >= 1.0)
+    print(1.0 < f, 1.0 > f, 1.0 == f, 1.0 != f)
+    print(is_nan(f), is_nan(1.0))
+
+    # comparisons are ordinary bool values
+    lt: bool = 3 < 4
+    ge: bool = 3.5 >= 3.5
+    print(lt, ge)
+    print(lt and ge, lt or not ge, not lt)
+    print(between(0, 5, 10), between(0, 50, 10), between(0, 0, 10))
+    n = 7
+    parity = n % 2 == 1
+    print(parity, parity == (n % 2 != 0))

@@ -1,0 +1,90 @@
+# Integer arithmetic: `+ - * /` and precedence, two's complement wrapping at the
+# i64 boundaries, floor `//` and `%` in all four sign combinations, the
+# `i64::MIN // -1` / `i64::MIN % -1` corners, and `int / int` yielding a float.
+# milestone: M1
+# expect: 14
+# expect: 20
+# expect: 3
+# expect: 20
+# expect: -4
+# expect: 5
+# expect: -12
+# expect: -9223372036854775808
+# expect: 9223372036854775807
+# expect: -2
+# expect: -9223372036854775808
+# expect: 9223372036854775805
+# expect: 3 1
+# expect: -4 1
+# expect: -4 -1
+# expect: 3 -1
+# expect: 2 0
+# expect: -2 0
+# expect: -2 0
+# expect: 2 0
+# expect: -9223372036854775808
+# expect: 0
+# expect: 3.5
+# expect: -3.5
+# expect: 2.0
+# expect: 0.125
+# expect: 0.0
+# expect: 5 2 5.666666666666667
+# expect: -6
+# expect: -6 -2
+
+MAXI: int = 9223372036854775807
+MINI: int = -9223372036854775807 - 1
+
+fn mul(a: int, b: int) -> int:
+    return a * b
+
+fn floor_div(a: int, b: int) -> int:
+    return a // b
+
+fn main():
+    # `+ - *` and precedence
+    print(2 + 3 * 4)
+    print((2 + 3) * 4)
+    print(10 - 4 - 3)
+    print(2 * 3 + 4 * 5 - 6)
+    print(-7 + 3)
+    print(-(-5))
+    print(3 * -4)
+
+    # two's complement wrapping at the i64 boundaries
+    print(MAXI + 1)
+    print(MINI - 1)
+    print(MAXI * 2)
+    print(MINI * -1)
+    print(mul(MAXI, 3))
+
+    # floor division and remainder: all four sign combinations
+    print(7 // 2, 7 % 2)
+    print(-7 // 2, -7 % 2)
+    print(7 // -2, 7 % -2)
+    print(-7 // -2, -7 % -2)
+
+    # exact divisions leave no remainder
+    print(6 // 3, 6 % 3)
+    print(-6 // 3, -6 % 3)
+    print(6 // -3, 6 % -3)
+    print(-6 // -3, -6 % -3)
+
+    # the i64::MIN corner cases: the quotient wraps, the remainder is 0
+    print(MINI // -1)
+    print(MINI % -1)
+
+    # `int / int` is a float, Python style
+    print(7 / 2)
+    print(-7 / 2)
+    print(6 / 3)
+    print(1 / 8)
+    print(0 / 5)
+
+    # a divisor held in a variable exercises the runtime division path
+    d = 3
+    n = 17
+    print(n // d, n % d, n / d)
+    print(floor_div(-17, d))
+    print(floor_div(n, -d), -17 % -d)

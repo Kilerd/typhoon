@@ -1,0 +1,9 @@
+# `T | None` with flow-sensitive narrowing is M3 (DESIGN 3.10).
+# milestone: M1
+# error: an optional type (`T | None`) is not supported yet (planned for M3)
+
+fn find(n: int) -> int | None:
+    return n
+
+fn main():
+    print(1)

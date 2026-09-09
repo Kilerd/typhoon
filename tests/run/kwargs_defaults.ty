@@ -1,0 +1,133 @@
+# Default parameter values and keyword arguments: 1..4 parameters, all
+# positional / all keyword / mixed, keywords written in a different order
+# than the parameters, defaults omitted and overridden, a constant-expression
+# default, a default naming a top-level constant, and argument side effects
+# showing arguments are evaluated in the order they are WRITTEN.
+# milestone: M1
+# expect: 3
+# expect: 706
+# expect: 4-yes
+# expect: 0 10 0.50 kg
+# expect: 99
+# expect: 708
+# expect: 1=no
+# expect: 1 2 3.00 m
+# expect: 99
+# expect: 708
+# expect: 1=no
+# expect: 1 2 3.00 m
+# expect: 1 2 3.00 m
+# expect: 9=no
+# expect: 708
+# expect: 1 10 2.50 kg
+# expect: 1 2 0.50 lb
+# expect: 1 4 0.50 lb
+# expect: 5-no
+# expect: 6
+# expect: 0 10 0.12 kg
+# expect: call 1
+# expect: a
+# expect: b
+# expect: 102
+# expect: call 2
+# expect: b
+# expect: a
+# expect: 102
+# expect: call 3
+# expect: pos-a
+# expect: kw-d
+# expect: kw-b
+# expect: 1 2 0.25 x
+# expect: call 4
+# expect: c-first
+# expect: b-second
+# expect: a-last
+# expect: 6*no
+# expect: call 5
+# expect: only
+# expect: 506
+
+BASE: int = 10
+UNIT: str = "kg"
+
+fn one(a: int = 3) -> int:
+    return a
+
+fn two(a: int, b: int = 2 * 3) -> int:
+    return a * 100 + b
+
+fn three(a: int, b: str = "-", c: bool = True) -> str:
+    if c:
+        return f"{a}{b}yes"
+    return f"{a}{b}no"
+
+fn four(a: int, b: int = BASE, c: float = 0.5, d: str = UNIT) -> str:
+    return f"{a} {b} {c:.2f} {d}"
+
+fn mark(tag: str, value: int) -> int:
+    print(tag)
+    return value
+
+fn mark_str(tag: str, value: str) -> str:
+    print(tag)
+    return value
+
+fn mark_bool(tag: str, value: bool) -> bool:
+    print(tag)
+    return value
+
+fn main():
+    # Every default omitted.
+    print(one())
+    print(two(7))
+    print(three(4))
+    print(four(0))
+
+    # Every default overridden, all positional.
+    print(one(99))
+    print(two(7, 8))
+    print(three(1, "=", False))
+    print(four(1, 2, 3.0, "m"))
+
+    # All keyword.
+    print(one(a=99))
+    print(two(a=7, b=8))
+    print(three(a=1, b="=", c=False))
+    print(four(a=1, b=2, c=3.0, d="m"))
+
+    # Keyword arguments in a different order than the parameters.
+    print(four(d="m", c=3.0, b=2, a=1))
+    print(three(c=False, b="=", a=9))
+    print(two(b=8, a=7))
+
+    # Positional first, then keywords, skipping over defaults.
+    print(four(1, c=2.5))
+    print(four(1, 2, d="lb"))
+    print(four(1, d="lb", b=4))
+    print(three(5, c=False))
+
+    # The constant-expression default (2 * 3) and the constant defaults.
+    print(two(0))
+    print(four(0, c=0.125))
+
+    # Argument evaluation order is the order the arguments are written at the
+    # call site, even when keywords reorder them relative to the parameters.
+    print("call 1")
+    r1 = two(mark("a", 1), mark("b", 2))
+    print(r1)
+
+    print("call 2")
+    r2 = two(b=mark("b", 2), a=mark("a", 1))
+    print(r2)
+
+    print("call 3")
+    r3 = four(mark("pos-a", 1), d=mark_str("kw-d", "x"), c=0.25, b=mark("kw-b", 2))
+    print(r3)
+
+    print("call 4")
+    r4 = three(c=mark_bool("c-first", False), b=mark_str("b-second", "*"), a=mark("a-last", 6))
+    print(r4)
+
+    # A default still applies when the other argument has a side effect.
+    print("call 5")
+    print(two(mark("only", 5)))

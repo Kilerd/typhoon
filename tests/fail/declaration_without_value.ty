@@ -1,0 +1,8 @@
+# A local declaration always has an initializer: there is no uninitialized
+# state to observe (DESIGN 3.4).
+# milestone: M1
+# error: a local variable declaration must have an initializer
+
+fn main():
+    x: int
+    print(x)

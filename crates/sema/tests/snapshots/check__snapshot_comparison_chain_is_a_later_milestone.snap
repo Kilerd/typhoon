@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    a = 1\\n    b = 2\\n    c = 3\\n    print(a < b < c)\\n\")"
+---
+error: a comparison chain is not supported yet (planned for M3)
+ --> main.ty:5:11
+  |
+5 |     print(a < b < c)
+  |           ^^^^^^^^^ not supported yet
+  |
+  = note: see DESIGN.md section 3.10 for the roadmap

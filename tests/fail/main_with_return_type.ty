@@ -1,0 +1,6 @@
+# `main` returns unit; the process exit code is not its value (DESIGN 3.3).
+# milestone: M1
+# error: `main` must not have a return type
+
+fn main() -> int:
+    return 0

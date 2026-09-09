@@ -1,0 +1,9 @@
+# The operands of `and` / `or` must be `bool` (DESIGN 3.6).
+# milestone: M1
+# error: expected `bool`, found `int`
+
+fn main():
+    a = 1
+    b = 2
+    if a and b:
+        print("both")

@@ -1,0 +1,94 @@
+# Top-level constants of every scalar type, constants computed from earlier
+# constants and operators, and constants used as a range bound, as a default
+# parameter value, in arithmetic and in an f-string.
+# milestone: M1
+# expect: 5 2 22
+# expect: 17 7 1
+# expect: 1024 64 69 -22
+# expect: 1.5 3.0 0.125
+# expect: True True
+# expect: typhoon
+# expect: 10
+# expect: 2
+# expect: 3
+# expect: 4
+# expect: 0
+# expect: 5
+# expect: 10
+# expect: 15
+# expect: 20
+# expect: 28
+# expect: 52
+# expect: 22
+# expect: 44 110
+# expect: 32
+# expect: 33.0
+# expect: typhoon level=1/5 width=22
+# expect: typhoon: 22 wide, ratio 1.50, eighth 0.125
+# expect: enabled=True wide=True span=17
+
+MAX_LEVEL: int = 5
+STEP: int = 2
+WIDTH: int = MAX_LEVEL * 4 + 2
+SPAN: int = WIDTH - MAX_LEVEL
+QUOTIENT: int = WIDTH // 3
+REMAINDER: int = WIDTH % 3
+KILO: int = 2 ** 10
+SHIFTED: int = 1 << 6
+FLAGS: int = SHIFTED | 5
+NEGATIVE: int = -WIDTH
+
+RATIO: float = 1.5
+DOUBLE_RATIO: float = RATIO * 2.0
+EIGHTH: float = 1.0 / 8.0
+
+ENABLED: bool = True
+WIDE: bool = WIDTH > MAX_LEVEL
+
+NAME: str = "typhoon"
+
+fn scaled(x: int, factor: int = STEP) -> int:
+    return x * factor + WIDTH
+
+fn banner(level: int) -> str:
+    return f"{NAME} level={level}/{MAX_LEVEL} width={WIDTH}"
+
+fn area(height: int) -> int:
+    # WIDTH is used here as well as in scaled().
+    return WIDTH * height
+
+fn main():
+    # The constants themselves.
+    print(MAX_LEVEL, STEP, WIDTH)
+    print(SPAN, QUOTIENT, REMAINDER)
+    print(KILO, SHIFTED, FLAGS, NEGATIVE)
+    print(RATIO, DOUBLE_RATIO, EIGHTH)
+    print(ENABLED, WIDE)
+    print(NAME)
+
+    # A constant as a range bound, in all three range forms.
+    total = 0
+    for i in range(MAX_LEVEL):
+        total = total + i
+    print(total)
+
+    for j in range(STEP, MAX_LEVEL):
+        print(j)
+
+    for k in range(0, WIDTH, MAX_LEVEL):
+        print(k)
+
+    # A constant as a default parameter value, omitted and overridden.
+    print(scaled(3))
+    print(scaled(3, 10))
+    print(scaled(3, factor=0))
+
+    # Constants in arithmetic inside a function.
+    print(area(2), area(MAX_LEVEL))
+    print(WIDTH + STEP * MAX_LEVEL)
+    print(float(WIDTH) * RATIO)
+
+    # Constants inside f-strings, with and without a spec.
+    print(banner(1))
+    print(f"{NAME}: {WIDTH:d} wide, ratio {RATIO:.2f}, eighth {EIGHTH:.3f}")
+    print(f"enabled={ENABLED} wide={WIDE} span={SPAN}")

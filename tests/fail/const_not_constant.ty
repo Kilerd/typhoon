@@ -1,0 +1,12 @@
+# A top-level constant is evaluated at compile time (DESIGN 3.3), so its
+# initializer cannot call a function.
+# milestone: M1
+# error: expected a constant expression
+
+fn compute() -> int:
+    return 42
+
+LIMIT: int = compute()
+
+fn main():
+    print(LIMIT)

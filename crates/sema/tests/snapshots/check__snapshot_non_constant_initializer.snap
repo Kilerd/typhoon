@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn compute() -> int:\\n    return 42\\n\\nLIMIT: int = compute()\\n\\nfn main():\\n    print(LIMIT)\\n\")"
+---
+error: expected a constant expression
+ --> main.ty:4:14
+  |
+4 | LIMIT: int = compute()
+  |              ^^^^^^^^^ this is not a constant expression
+  |
+  = note: constants and default arguments are evaluated at compile time, see DESIGN.md section 3.3

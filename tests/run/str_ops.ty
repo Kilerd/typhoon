@@ -1,0 +1,120 @@
+# str: concatenation (chains, the empty string, in a loop), == / != on
+# literals, variables and computed values, strings across function
+# boundaries, an annotated str local, unicode and escape sequences.
+# milestone: M1
+# expect: typhoon
+# expect: typhoon
+# expect:
+# expect: wxyz!
+# expect: one two three
+# expect: hello, world
+# expect: *****
+# expect: -------
+# expect: <empty
+# expect: 1;2;3;4;
+# expect: True
+# expect: False
+# expect: True
+# expect: True
+# expect: True
+# expect: False
+# expect: False
+# expect: True
+# expect: False
+# expect: True
+# expect: True
+# expect: False
+# expect: hello, a / hello, b
+# expect: storm report
+# expect: storm report: ---
+# expect: 台风
+# expect: 🌀 typhoon 🌀
+# expect: naïve café
+# expect: 台风
+# expect: col1	col2
+# expect: first
+# expect: second
+# expect: quote: " backslash: \
+# expect: it's fine
+# expect: single quoted and double quoted
+# expect: trailing tab:	|
+
+fn greet(name: str) -> str:
+    return "hello, " + name
+
+fn join3(a: str, b: str, c: str) -> str:
+    return a + b + c
+
+fn repeat_dash(n: int) -> str:
+    out = ""
+    for i in range(n):
+        out = out + "-"
+    return out
+
+fn is_typhoon(word: str) -> bool:
+    return word == "typhoon"
+
+fn main():
+    # Concatenation, including chains and the empty string.
+    a = "ty"
+    b = "phoon"
+    print(a + b)
+    print("" + a + "" + b + "")
+    print("")
+    print("w" + "x" + "y" + "z" + "!")
+    print(join3("one ", "two ", "three"))
+    print(greet("world"))
+
+    # Building a string by repeated concatenation in a loop.
+    stars = ""
+    i = 0
+    while i < 5:
+        stars = stars + "*"
+        i = i + 1
+    print(stars)
+    print(repeat_dash(7))
+    print(repeat_dash(0) + "<empty")
+
+    row = ""
+    for k in range(1, 5):
+        row = row + f"{k};"
+    print(row)
+
+    # Equality and inequality on literals, variables and computed strings.
+    print("abc" == "abc")
+    print("abc" != "abc")
+    print("" == "")
+    print("" != "x")
+    x = "abc"
+    y = "ab" + "c"
+    print(x == y)
+    print(x != y)
+    print(x == "abd")
+    print(a + b == "typhoon")
+    print(a + b != "typhoon")
+    print(greet("world") == "hello, world")
+
+    # Strings as parameters and return values.
+    print(is_typhoon(a + b))
+    print(is_typhoon("cyclone"))
+    print(join3(greet("a"), " / ", greet("b")))
+
+    # A str local declared with an annotation.
+    title: str = "storm report"
+    print(title)
+    print(title + ": " + repeat_dash(3))
+
+    # Unicode, both as literals and via \u escapes.
+    print("台风")
+    print("🌀 typhoon 🌀")
+    print("naïve café")
+    print("\u{53F0}\u{98CE}")
+
+    # Escapes: a tab, an embedded newline (two output lines), a quote and a
+    # backslash.
+    print("col1\tcol2")
+    print("first\nsecond")
+    print("quote: \" backslash: \\")
+    print("it's fine")
+    print('single quoted' + " and " + "double quoted")
+    print("trailing tab:\t|")

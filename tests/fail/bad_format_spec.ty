@@ -1,0 +1,9 @@
+# `{x:.2f}` is a float format; using it on an `int` is a type error
+# (DESIGN 3.7).
+# milestone: M1
+# error: the format spec `.2f` requires a `float`, found `int`
+# error: use `float(x)`
+
+fn main():
+    n = 3
+    print(f"{n:.2f}")

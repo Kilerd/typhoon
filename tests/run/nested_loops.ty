@@ -1,0 +1,111 @@
+# Nested loops: two and three levels mixing `while` and `for`, a
+# multiplication-table accumulation, and `break` / `continue` in an inner loop
+# only affecting that loop.
+# milestone: M1
+# expect: 1 10
+# expect: 2 20
+# expect: 3 30
+# expect: 4 40
+# expect: 100
+# expect: 4
+# expect: 12
+# expect: 3 4 5
+# expect: 5 12 13
+# expect: 6 8 10
+# expect: 3
+# expect: 10
+# expect: 17 7
+# expect: 1 4
+# expect: 2 8
+# expect: 3 12
+# expect: 24
+
+fn count_divisors(n: int) -> int:
+    c = 0
+    d = 1
+    while d <= n:
+        if n % d == 0:
+            c = c + 1
+        d = d + 1
+    return c
+
+fn main():
+    # a multiplication table: the inner loop builds a row, the outer one
+    # accumulates the grand total
+    table_total = 0
+    for r in range(1, 5):
+        row = 0
+        for c in range(1, 5):
+            row = row + r * c
+        print(r, row)
+        table_total = table_total + row
+    print(table_total)
+
+    # `break` in the inner loop leaves only the inner loop: the outer one
+    # keeps going, which is how we count composites in 2..9
+    composites = 0
+    for a in range(2, 10):
+        for b in range(2, a):
+            if a % b == 0:
+                composites = composites + 1
+                break
+    print(composites)
+
+    # `continue` in the inner loop skips one inner iteration only
+    kept = 0
+    for x in range(4):
+        for y in range(4):
+            if x == y:
+                continue
+            kept = kept + 1
+    print(kept)
+
+    # three levels: for / while / for
+    triples = 0
+    for i in range(1, 15):
+        j = i
+        while j < 15:
+            for k in range(j, 15):
+                if i * i + j * j == k * k:
+                    triples = triples + 1
+                    print(i, j, k)
+            j = j + 1
+    print(triples)
+
+    # while outside, for inside, with an early break out of the inner for
+    partial = 0
+    p = 0
+    while p < 4:
+        for q in range(10):
+            if q > p:
+                break
+            partial = partial + q
+        p = p + 1
+    print(partial)
+
+    # a break in the outer loop of a nested pair
+    stop_at = 0
+    u = -1
+    for u in range(2, 20):
+        if count_divisors(u) == 2:
+            stop_at = stop_at + u
+        if stop_at > 15:
+            break
+    print(stop_at, u)
+
+    # nested while loops
+    outer = 0
+    o = 1
+    while o <= 3:
+        inner = 0
+        w = 1
+        while w <= 3:
+            if w == 2:
+                w = w + 1
+                continue
+            inner = inner + o * w
+            w = w + 1
+        print(o, inner)
+        outer = outer + inner
+        o = o + 1
+    print(outer)

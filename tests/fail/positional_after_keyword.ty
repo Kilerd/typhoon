@@ -1,0 +1,10 @@
+# Once a keyword argument is used the remaining arguments must be keywords
+# too; the parser reports this.
+# milestone: M1
+# error: positional argument follows keyword argument
+
+fn add(a: int, b: int) -> int:
+    return a + b
+
+fn main():
+    print(add(a=1, 2))

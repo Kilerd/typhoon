@@ -1,0 +1,22 @@
+# A range() whose step comes from a runtime variable that happens to be zero:
+# the loop must panic instead of spinning, and the stdout written before the
+# panic must still be flushed.
+# milestone: M1
+# expect: scanning levels
+# expect: limit=5 step is computed at runtime
+# exit: 101
+# stderr: panic: range() step must not be zero
+
+LIMIT: int = 5
+
+fn zero_step(n: int) -> int:
+    # Not a constant expression, so the compiler cannot fold the step away.
+    return n - n
+
+fn main():
+    print("scanning levels")
+    step = zero_step(3)
+    print(f"limit={LIMIT} step is computed at runtime")
+    for i in range(0, LIMIT, step):
+        print(i)
+    print("never reached")

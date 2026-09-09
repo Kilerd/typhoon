@@ -38,6 +38,32 @@ fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).into_owned()
 }
 
+/// Makes sure `libtyphoon_runtime.a` exists before a test links a binary.
+///
+/// The runtime is a `staticlib`, so no crate can depend on it and Cargo never
+/// builds it for us; the driver's harness does the same thing.
+fn ensure_runtime_lib() {
+    use std::sync::OnceLock;
+    static ONCE: OnceLock<()> = OnceLock::new();
+    ONCE.get_or_init(|| {
+        if std::env::var_os("TYPHOON_RUNTIME_LIB").is_some() {
+            return;
+        }
+        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+        let out = Command::new(cargo)
+            .args(["build", "-p", "typhoon-runtime", "--manifest-path"])
+            .arg(repo_root().join("Cargo.toml"))
+            .output();
+        if let Ok(out) = out {
+            assert!(
+                out.status.success(),
+                "`cargo build -p typhoon-runtime` failed:\n{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+    });
+}
+
 /// A unique path in the temp directory that no test writes to twice.
 fn temp_output(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("typhoon-cli-{label}-{}", std::process::id()))
@@ -91,13 +117,16 @@ fn missing_input_file_is_a_usage_error_for_every_subcommand() {
 
 // -- compile errors (exit 1) ----------------------------------------------
 
+/// A program that parses but does not type-check.
+const BAD_SOURCE: &str = "tests/fail/undefined_name.ty";
+
 #[test]
-fn build_reports_the_stub_frontend_error() {
-    let output = temp_output("build");
-    let out = typhoon(&["build", "examples/hello.ty", "-o", output.to_str().unwrap()]);
+fn build_reports_diagnostics_on_stderr() {
+    let output = temp_output("build-bad");
+    let out = typhoon(&["build", BAD_SOURCE, "-o", output.to_str().unwrap()]);
     assert_eq!(code(&out), 1, "stderr: {}", stderr(&out));
     assert!(
-        stderr(&out).contains("frontend not implemented yet"),
+        stderr(&out).contains("cannot find value `total`"),
         "{}",
         stderr(&out)
     );
@@ -109,18 +138,18 @@ fn build_reports_the_stub_frontend_error() {
 }
 
 #[test]
-fn check_reports_the_stub_frontend_error() {
-    let out = typhoon(&["check", "examples/hello.ty"]);
+fn check_reports_diagnostics_on_stderr() {
+    let out = typhoon(&["check", BAD_SOURCE]);
     assert_eq!(code(&out), 1);
-    assert!(stderr(&out).contains("frontend not implemented yet"));
+    assert!(stderr(&out).contains("cannot find value `total`"));
     assert!(stdout(&out).is_empty());
 }
 
 #[test]
-fn emit_ir_reports_the_stub_frontend_error() {
-    let out = typhoon(&["emit-ir", "examples/hello.ty"]);
+fn emit_ir_prints_no_ir_when_compilation_fails() {
+    let out = typhoon(&["emit-ir", BAD_SOURCE]);
     assert_eq!(code(&out), 1);
-    assert!(stderr(&out).contains("frontend not implemented yet"));
+    assert!(stderr(&out).contains("cannot find value `total`"));
     assert!(
         stdout(&out).is_empty(),
         "no IR may be printed when compilation fails"
@@ -128,16 +157,29 @@ fn emit_ir_reports_the_stub_frontend_error() {
 }
 
 #[test]
-fn run_reports_the_stub_frontend_error() {
-    let out = typhoon(&["run", "examples/hello.ty"]);
+fn run_reports_diagnostics_on_stderr() {
+    let out = typhoon(&["run", BAD_SOURCE]);
     assert_eq!(code(&out), 1);
-    assert!(stderr(&out).contains("frontend not implemented yet"));
+    assert!(stderr(&out).contains("cannot find value `total`"));
 }
 
 #[test]
-fn every_example_currently_fails_with_the_stub_frontend() {
-    // A blunt guard: once the frontend lands this test tells the Phase B
-    // executor to update it, rather than letting a silent regression hide.
+fn a_runtime_panic_propagates_its_exit_code() {
+    ensure_runtime_lib();
+    let out = typhoon(&["run", "tests/run/panic_div_zero.ty"]);
+    assert_eq!(code(&out), 101, "stderr: {}", stderr(&out));
+    assert!(
+        stderr(&out).contains("panic: integer division by zero"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+#[test]
+fn every_example_is_accepted_or_names_its_milestone() {
+    // M0/M1 examples must check; the ones carrying a later milestone must be
+    // rejected with a diagnostic that names that milestone, never with a
+    // crash or a silent success.
     let examples = std::fs::read_dir(repo_root().join("examples")).unwrap();
     let mut checked = 0;
     for entry in examples.flatten() {
@@ -145,9 +187,24 @@ fn every_example_currently_fails_with_the_stub_frontend() {
         if path.extension().is_none_or(|e| e != "ty") {
             continue;
         }
+        let source = std::fs::read_to_string(&path).unwrap();
+        let milestone = source
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("# milestone: M"))
+            .and_then(|m| m.trim().parse::<u32>().ok())
+            .unwrap_or_else(|| panic!("{} has no `# milestone:` line", path.display()));
         let rel = format!("examples/{}", path.file_name().unwrap().to_string_lossy());
         let out = typhoon(&["check", &rel]);
-        assert_eq!(code(&out), 1, "{rel}");
+        if milestone <= 1 {
+            assert_eq!(code(&out), 0, "{rel} must check:\n{}", stderr(&out));
+        } else {
+            assert_eq!(code(&out), 1, "{rel} must be rejected");
+            assert!(
+                stderr(&out).contains("not supported yet"),
+                "{rel} must say what is missing:\n{}",
+                stderr(&out)
+            );
+        }
         checked += 1;
     }
     assert!(
@@ -179,6 +236,51 @@ fn build_help_documents_every_flag() {
             "`{flag}` missing from `build --help`:\n{text}"
         );
     }
+}
+
+#[test]
+fn build_run_and_emit_ir_work_end_to_end() {
+    ensure_runtime_lib();
+    let output = temp_output("build-hello");
+    let _ = std::fs::remove_file(&output);
+    let out = typhoon(&[
+        "build",
+        "examples/hello.ty",
+        "-o",
+        output.to_str().unwrap(),
+        "--emit-ir",
+    ]);
+    assert_eq!(code(&out), 0, "stderr: {}", stderr(&out));
+    assert!(output.is_file(), "the executable was not produced");
+    let ir = output.with_extension("ll");
+    assert!(ir.is_file(), "--emit-ir must write the module next to it");
+    assert!(
+        std::fs::read_to_string(&ir)
+            .unwrap()
+            .contains("@ty_user_main")
+    );
+
+    let ran = Command::new(&output).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&ran.stdout), "Hello, Typhoon!\n");
+
+    let out = typhoon(&["run", "examples/hello.ty"]);
+    assert_eq!(code(&out), 0, "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out), "Hello, Typhoon!\n");
+
+    let out = typhoon(&["emit-ir", "examples/hello.ty"]);
+    assert_eq!(code(&out), 0);
+    assert!(
+        stdout(&out).contains("define i32 @main()"),
+        "{}",
+        stdout(&out)
+    );
+
+    let out = typhoon(&["check", "examples/hello.ty"]);
+    assert_eq!(code(&out), 0);
+    assert!(stdout(&out).is_empty(), "check prints nothing on success");
+
+    let _ = std::fs::remove_file(&output);
+    let _ = std::fs::remove_file(&ir);
 }
 
 #[test]

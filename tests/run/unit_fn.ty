@@ -1,0 +1,99 @@
+# Functions without a return type: called as statements, one with an early
+# bare `return` that skips the rest of the body, one that only prints, one
+# that takes parameters and calls another unit function, one called from
+# inside a loop, and a default / keyword argument call.
+# milestone: M1
+# expect: == start ==
+# expect: 4 is not negative
+# expect: 4 is even
+# expect: end of describe for 4
+# expect: 7 is not negative
+# expect: 7 is odd
+# expect: end of describe for 7
+# expect: -3 is negative, nothing more to say
+# expect: == pair ==
+# expect: 10 is not negative
+# expect: 10 is even
+# expect: end of describe for 10
+# expect: tick 0
+# expect: tick 1
+# expect: tick 2
+# expect: tick 0
+# expect: tick 10
+# expect: twice 0
+# expect: twice 1
+# expect: once 0
+# expect: kw 0
+# expect: kw 1
+# expect: kw 2
+# expect: 3
+# expect: 2
+# expect: 1
+# expect: liftoff
+# expect: liftoff
+# expect: == done ==
+
+fn banner(title: str):
+    # a unit function that only prints
+    print("==", title, "==")
+
+fn describe(n: int):
+    # a bare `return` in the middle skips everything after it
+    if n < 0:
+        print(n, "is negative, nothing more to say")
+        return
+    print(n, "is not negative")
+    if n % 2 == 0:
+        print(n, "is even")
+    else:
+        print(n, "is odd")
+    print("end of describe for", n)
+
+fn report(prefix: str, value: int):
+    # a unit function calling other unit functions
+    banner(prefix)
+    describe(value)
+
+fn tick(i: int):
+    print("tick", i)
+
+fn note(label: str, times: int = 2):
+    for i in range(times):
+        print(label, i)
+
+fn countdown(n: int):
+    # early return out of a loop-carrying unit function
+    i = n
+    while True:
+        if i == 0:
+            print("liftoff")
+            return
+        print(i)
+        i = i - 1
+    print("never reached")
+
+fn main():
+    banner("start")
+
+    describe(4)
+    describe(7)
+    describe(-3)
+
+    report("pair", 10)
+
+    for i in range(3):
+        tick(i)
+
+    n = 0
+    while n < 2:
+        tick(n * 10)
+        n = n + 1
+
+    note("twice")
+    note("once", 1)
+    note(label="kw", times=3)
+
+    countdown(3)
+    countdown(0)
+
+    banner("done")

@@ -1,0 +1,9 @@
+# Top-level constants are not variables (DESIGN 3.3).
+# milestone: M1
+# error: cannot assign to the constant `LIMIT`
+
+LIMIT: int = 10
+
+fn main():
+    LIMIT = 11
+    print(LIMIT)

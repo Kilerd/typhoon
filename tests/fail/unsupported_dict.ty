@@ -1,0 +1,7 @@
+# Dicts arrive in M3 (DESIGN 8).
+# milestone: M1
+# error: a dict literal is not supported yet (planned for M3)
+
+fn main():
+    d = {"a": 1}
+    print(1)

@@ -1,0 +1,90 @@
+# print(): zero arguments, one argument of each type, many mixed arguments,
+# expressions and calls, and the exact separator/terminator rules -- one
+# space between arguments, one newline at the end (DESIGN 4.6).
+# milestone: M1
+# expect:
+# expect: between two empty lines
+# expect:
+# expect: 7
+# expect: 2.5
+# expect: True
+# expect: False
+# expect: hello
+# expect: 1 2.0 True four
+# expect: str 42 3.25 False end
+# expect: 1 2 3 4 5 6 7 8
+# expect: [ ]
+# expect: | 1 |
+# expect: a  b
+# expect:  empty first
+# expect: 25 2.5 False tag
+# expect: 14 3 1 1024
+# expect: 3.5
+# expect: 9 3 4
+# expect: 9 vs 9
+# expect: True and False
+# expect: 11 11
+# expect: 11
+# expect: 11
+# expect: echo echo echo
+# expect: line 1
+# expect: line 2
+# expect: line 3
+
+fn square(n: int) -> int:
+    return n * n
+
+fn half(n: int) -> float:
+    return float(n) / 2.0
+
+fn positive(n: int) -> bool:
+    return n > 0
+
+fn tag() -> str:
+    return "tag"
+
+fn main():
+    # No arguments at all: just the newline, so an empty line.
+    print()
+    print("between two empty lines")
+    print()
+
+    # One argument of each type.
+    print(7)
+    print(2.5)
+    print(True)
+    print(False)
+    print("hello")
+
+    # Many arguments mixing all four types.
+    print(1, 2.0, True, "four")
+    print("str", 42, 3.25, False, "end")
+    print(1, 2, 3, 4, 5, 6, 7, 8)
+
+    # The separator is exactly one space; the markers make it visible, and an
+    # empty string argument still gets a separator on both sides.
+    print("[", "]")
+    print("|", 1, "|")
+    print("a", "", "b")
+    print("", "empty first")
+
+    # Expressions and calls as arguments.
+    print(square(5), half(5), positive(-1), tag())
+    print(2 + 3 * 4, 10 // 3, 10 % 3, 2 ** 10)
+    print(7 / 2)
+    print(abs(-9), min(3, 4), max(3, 4))
+    print(f"{square(3)}", "vs", square(3))
+    print(1 < 2, "and", not True)
+
+    # The same value twice in one call, and twice in a row.
+    x = 11
+    print(x, x)
+    print(x)
+    print(x)
+    s = "echo"
+    print(s, s, s)
+
+    # Each print terminates its own line.
+    print("line 1")
+    print("line 2")
+    print("line 3")

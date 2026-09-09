@@ -1,0 +1,9 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    print(total)\\n\")"
+---
+error: cannot find value `total` in this scope
+ --> main.ty:2:11
+  |
+2 |     print(total)
+  |           ^^^^^ not found in this scope

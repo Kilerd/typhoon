@@ -1,0 +1,111 @@
+# if / elif / else: a three-way chain, a long chain, nested ifs, an `if`
+# without `else`, conditions built from and / or / not, and functions where
+# every path returns from inside a branch.
+# milestone: M1
+# expect: negative zero positive
+# expect: A
+# expect: B
+# expect: C
+# expect: D
+# expect: E
+# expect: F
+# expect: True False True False
+# expect: 1 2 3 4
+# expect: 0 0 0
+# expect: 5 1 10
+# expect: a < b < 20
+# expect: a is not greater than b
+# expect: at least one is even
+# expect: compound condition holds
+# expect: 14
+
+fn classify(n: int) -> str:
+    if n < 0:
+        return "negative"
+    elif n == 0:
+        return "zero"
+    else:
+        return "positive"
+
+fn grade(score: int) -> str:
+    # a long chain: every arm returns, so the function has no fall-through
+    if score >= 90:
+        return "A"
+    elif score >= 80:
+        return "B"
+    elif score >= 70:
+        return "C"
+    elif score >= 60:
+        return "D"
+    elif score >= 50:
+        return "E"
+    else:
+        return "F"
+
+fn is_leap(year: int) -> bool:
+    return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
+
+fn quadrant(x: int, y: int) -> int:
+    # nested ifs, the inner chains have no `else`
+    if x > 0:
+        if y > 0:
+            return 1
+        elif y < 0:
+            return 4
+        return 0
+    if x < 0:
+        if y > 0:
+            return 2
+        if y < 0:
+            return 3
+        return 0
+    return 0
+
+fn clamp(v: int, lo: int, hi: int) -> int:
+    # two `if`s without `else`, mutating a local instead of returning
+    r = v
+    if v < lo:
+        r = lo
+    if v > hi:
+        r = hi
+    return r
+
+fn main():
+    print(classify(-5), classify(0), classify(5))
+
+    print(grade(95))
+    print(grade(83))
+    print(grade(71))
+    print(grade(60))
+    print(grade(55))
+    print(grade(12))
+
+    print(is_leap(2000), is_leap(1900), is_leap(2024), is_leap(2023))
+
+    print(quadrant(2, 3), quadrant(-2, 3), quadrant(-2, -3), quadrant(2, -3))
+    print(quadrant(0, 5), quadrant(4, 0), quadrant(0, 0))
+
+    print(clamp(5, 1, 10), clamp(-4, 1, 10), clamp(42, 1, 10))
+
+    # conditions built out of and / or / not
+    a = 7
+    b = 12
+    if a < b and b < 20:
+        print("a < b < 20")
+    if not (a > b):
+        print("a is not greater than b")
+    if a % 2 == 0 or b % 2 == 0:
+        print("at least one is even")
+    if a > 100 or (b > 10 and a > 5):
+        print("compound condition holds")
+    if a > 100 and b > 10:
+        print("never printed")
+
+    # an `if` without `else` only sometimes fires
+    hits = 0
+    for n in range(10):
+        if n % 3 == 0:
+            hits = hits + 1
+        if n % 5 == 0 and n != 0:
+            hits = hits + 10
+    print(hits)

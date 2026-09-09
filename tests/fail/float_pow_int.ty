@@ -1,0 +1,9 @@
+# `**` follows the same rule as every other binary operator: both operands
+# must have the same type, so a float base needs a float exponent.
+# milestone: M1
+# error: mismatched types
+# error: expected `float`, found `int`
+
+fn main():
+    x: float = 3.0
+    print(x ** 2)

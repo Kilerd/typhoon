@@ -1,0 +1,9 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn scale(x: float, factor: float) -> float
+  return (x:float * factor:float):float
+fn main() -> None
+  print(scale(1.0:float, 2.0:float):float):None
+  print(scale(1.0:float, 3.0:float):float):None

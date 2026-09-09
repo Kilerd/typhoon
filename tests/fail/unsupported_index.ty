@@ -1,0 +1,7 @@
+# Indexing needs `list` / `dict` / `str` indexing, M2 at the earliest.
+# milestone: M1
+# error: indexing is not supported yet (planned for M2)
+
+fn main():
+    s = "abc"
+    print(s[0])

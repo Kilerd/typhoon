@@ -1,0 +1,9 @@
+# The same parameter cannot be filled twice, positionally and by keyword.
+# milestone: M1
+# error: argument `a` specified twice
+
+fn add(a: int, b: int) -> int:
+    return a + b
+
+fn main():
+    print(add(1, a=2))

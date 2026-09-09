@@ -1,0 +1,8 @@
+# `is` is for `None` narrowing, which arrives with `T | None` in M3.
+# milestone: M1
+# error: the `is` operator is not supported yet (planned for M3)
+
+fn main():
+    n = 1
+    if n is None:
+        print("none")

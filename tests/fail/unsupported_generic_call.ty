@@ -1,0 +1,10 @@
+# Explicit instantiation `f<int>(...)` parses (DESIGN 3.9) but monomorphisation
+# is M3.
+# milestone: M1
+# error: a generic call is not supported yet (planned for M3)
+
+fn identity(a: int) -> int:
+    return a
+
+fn main():
+    print(identity<int>(1))

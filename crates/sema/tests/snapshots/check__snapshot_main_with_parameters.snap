@@ -1,0 +1,9 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main(argc: int):\\n    print(argc)\\n\")"
+---
+error: `main` must not take parameters
+ --> main.ty:1:9
+  |
+1 | fn main(argc: int):
+  |         ^^^^^^^^^ unexpected parameter

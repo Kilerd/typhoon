@@ -175,11 +175,30 @@ fn run_binary_reports_a_missing_executable() {
 }
 
 #[test]
-fn compile_source_reports_the_stub_frontend_error() {
+fn compile_source_builds_and_runs_a_real_program() {
+    ensure_runtime_lib();
     let src = std::fs::read_to_string(common::repo_root().join("examples/hello.ty")).unwrap();
-    let err = compile_source("hello.ty", &src, &BuildOptions::default()).unwrap_err();
+    let artifact = compile_source("hello.ty", &src, &BuildOptions::default()).unwrap();
+    let out = run_binary(artifact.binary(), &[]).unwrap();
+    assert_eq!(out.stdout, "Hello, Typhoon!\n");
+    assert_eq!(out.status, 0);
+}
+
+#[test]
+fn compile_source_reports_frontend_diagnostics() {
+    let err = compile_source(
+        "bad.ty",
+        "fn main():\n    print(nope)\n",
+        &BuildOptions::default(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DriverError::Compile(_)), "{err:?}");
-    assert_eq!(err.diagnostics(), ["frontend not implemented yet"]);
+    assert_eq!(err.diagnostics().len(), 1);
+    assert!(
+        err.diagnostics()[0].contains("cannot find value `nope`"),
+        "{:?}",
+        err.diagnostics()
+    );
 }
 
 #[test]

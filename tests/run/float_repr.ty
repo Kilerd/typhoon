@@ -1,0 +1,64 @@
+# Float printing (DESIGN 4.6): CPython's `repr(float)` spelling -- shortest
+# round-trip digits, fixed notation while -4 < decpt <= 16 and exponent
+# notation outside it, always a `.` or an `e`, signed zero, subnormals and
+# ties broken to even.
+# milestone: M1
+# expect: 0.1
+# expect: 0.30000000000000004
+# expect: 0.3333333333333333
+# expect: 1.4142135623730951
+# expect: 1000000000000000.0
+# expect: 1234567890123456.0
+# expect: 1e+16
+# expect: 9999999999999998.0
+# expect: 1.2345678901234568e+16
+# expect: 1e+22
+# expect: 1e+100
+# expect: 0.0001
+# expect: 1e-05
+# expect: 2.5e-10
+# expect: 100.0
+# expect: 123456789.123
+# expect: -0.0
+# expect: 5e-324
+# expect: 1e-323
+# expect: 1.7976931348623157e+308
+# expect: 2.2250738585072014e-308
+# expect: -2227059643032627.2
+# expect: 9007199254740992.0
+
+fn main():
+    # the classic binary-floating-point surprise
+    print(0.1)
+    print(0.1 + 0.2)
+    print(1.0 / 3.0)
+    print(2.0 ** 0.5)
+
+    # the fixed / exponent notation boundary sits at decpt > 16
+    print(1e15)
+    print(1234567890123456.0)
+    print(1e16)
+    print(1e16 - 2.0)
+    print(12345678901234567.0)
+    print(1e22)
+    print(1e100)
+
+    # small magnitudes switch to exponent notation at decpt <= -4
+    print(1e-4)
+    print(1e-5)
+    print(2.5e-10)
+
+    # plain values still always carry a `.` or an `e`
+    print(100.0)
+    print(123456789.123)
+    print(-0.0)
+
+    # the extremes of the f64 range, including a subnormal
+    print(5e-324)
+    print(1e-323)
+    print(1.7976931348623157e308)
+    print(2.2250738585072014e-308)
+
+    # ties are broken to even, like CPython's dtoa
+    print(-2227059643032627.25)
+    print(9007199254740993.0)

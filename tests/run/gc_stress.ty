@@ -1,0 +1,32 @@
+# Allocation pressure on the Boehm heap (DESIGN 5.1). Every f-string and every
+# concatenation allocates, so this loop runs several collections; the point of
+# the test is that values that are still live survive them and that nothing is
+# corrupted along the way.
+# milestone: M1
+# expect: True
+# expect: 199999-199999
+# expect: kept: typhoon
+# expect: True
+# expect: 20
+
+fn label(n: int) -> str:
+    return f"{n}-{n}"
+
+fn main():
+    kept = "typhoon"
+    last = ""
+    for i in range(200000):
+        last = label(i)
+    print(kept == "typhoon")
+    print(last)
+    print(f"kept: {kept}")
+    print(last == "199999-199999")
+
+    # A string built by repeated concatenation keeps every intermediate alive
+    # for exactly one iteration.
+    grown = ""
+    count = 0
+    for i in range(20):
+        grown = grown + "ab"
+        count = count + 1
+    print(count)

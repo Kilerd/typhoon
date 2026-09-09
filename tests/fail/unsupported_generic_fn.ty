@@ -1,0 +1,9 @@
+# Generic functions need monomorphisation, which is M3.
+# milestone: M1
+# error: a generic function is not supported yet (planned for M3)
+
+fn pick<T>(a: T, b: T) -> T:
+    return a
+
+fn main():
+    print(1)

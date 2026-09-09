@@ -13,10 +13,15 @@
 //! | `# expect: <line>` | one expected line of stdout, in order |
 //! | `# error: <substring>` | a substring the rendered diagnostics must contain |
 //! | `# milestone: M0` | the milestone this file starts being enforced at |
+//! | `# exit: <code>` | the expected exit status, `0` when absent |
+//! | `# stderr: <substring>` | a substring the program's stderr must contain |
 //!
-//! `tests/run/` and `examples/` files must compile, run with exit code 0 and
-//! produce exactly the `# expect:` lines. `tests/fail/` files must fail to
-//! compile with diagnostics containing every `# error:` substring.
+//! `tests/run/` and `examples/` files must compile, run with the expected exit
+//! code (`0` unless `# exit:` says otherwise) and produce exactly the
+//! `# expect:` lines. `# exit:` and `# stderr:` are what makes a runtime panic
+//! testable: a panicking program exits 101 and prints `panic: ...` on stderr.
+//! `tests/fail/` files must fail to compile with diagnostics containing every
+//! `# error:` substring.
 //!
 //! # Milestones
 //!
@@ -37,7 +42,7 @@ use common::{Scratch, repo_root, unified_diff};
 /// The milestone whose test cases are currently enforced (DESIGN section 8).
 ///
 /// Raise this as milestones land; anything above it is reported as ignored.
-const CURRENT_MILESTONE: &str = "M0";
+const CURRENT_MILESTONE: &str = "M1";
 
 /// What a `.ty` file asserts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,9 +59,36 @@ struct Case {
     name: String,
     path: PathBuf,
     kind: Kind,
-    milestone: u32,
+    directives: Directives,
+}
+
+/// Everything a `.ty` file declares about itself.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Directives {
+    /// The milestone this case starts being enforced at, `None` when the file
+    /// forgot to declare one.
+    milestone: Option<u32>,
+    /// The expected lines of stdout, in order.
     expect: Vec<String>,
+    /// Substrings every rendered diagnostic set must contain.
     errors: Vec<String>,
+    /// The expected exit status; `None` means `0`.
+    exit: Option<i32>,
+    /// Substrings the program's stderr must contain.
+    stderr: Vec<String>,
+}
+
+impl Directives {
+    /// The milestone the case is enforced at; a file without the directive is
+    /// treated as M0 and flagged by the manifest meta-test.
+    fn milestone(&self) -> u32 {
+        self.milestone.unwrap_or(0)
+    }
+
+    /// The exit status the program must have.
+    fn exit(&self) -> i32 {
+        self.exit.unwrap_or(0)
+    }
 }
 
 /// Parses `M<n>` into its ordinal. Anything else is treated as M0.
@@ -86,20 +118,24 @@ fn directive<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 }
 
 /// Reads all directives out of a source file.
-fn parse_directives(source: &str) -> (u32, Option<u32>, Vec<String>, Vec<String>) {
-    let mut declared = None;
-    let mut expect = Vec::new();
-    let mut errors = Vec::new();
+fn parse_directives(source: &str) -> Directives {
+    let mut directives = Directives::default();
     for line in source.lines() {
         if let Some(v) = directive(line, "milestone") {
-            declared = Some(milestone_rank(v));
+            directives.milestone = Some(milestone_rank(v));
         } else if let Some(v) = directive(line, "expect") {
-            expect.push(v.to_string());
+            directives.expect.push(v.to_string());
         } else if let Some(v) = directive(line, "error") {
-            errors.push(v.to_string());
+            directives.errors.push(v.to_string());
+        } else if let Some(v) = directive(line, "exit") {
+            directives.exit = Some(v.trim().parse().unwrap_or_else(|_| {
+                panic!("`# exit: {v}` is not a number");
+            }));
+        } else if let Some(v) = directive(line, "stderr") {
+            directives.stderr.push(v.to_string());
         }
     }
-    (declared.unwrap_or(0), declared, expect, errors)
+    directives
 }
 
 /// Collects every `.ty` file in `dir`, naming the cases `<prefix>/<stem>`.
@@ -119,15 +155,13 @@ fn collect_dir(dir: &Path, prefix: &str, kind: Kind, into: &mut Vec<Case>) {
             Ok(s) => s,
             Err(err) => panic!("cannot read {}: {err}", path.display()),
         };
-        let (milestone, _declared, expect, errors) = parse_directives(&source);
+        let directives = parse_directives(&source);
         let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
         into.push(Case {
             name: format!("{prefix}/{stem}"),
             path,
             kind,
-            milestone,
-            expect,
-            errors,
+            directives,
         });
     }
 }
@@ -162,7 +196,20 @@ fn run_case(case: &Case) -> Result<(), Failed> {
 
     let output = run_binary(artifact.binary(), &[])?;
 
-    let expected: String = case.expect.iter().map(|line| format!("{line}\n")).collect();
+    let expected_exit = case.directives.exit();
+    if output.status != expected_exit {
+        return Err(Failed::from(format!(
+            "{} exited with {} (expected {expected_exit})\nstdout:\n{}\nstderr:\n{}",
+            case.name, output.status, output.stdout, output.stderr
+        )));
+    }
+
+    let expected: String = case
+        .directives
+        .expect
+        .iter()
+        .map(|line| format!("{line}\n"))
+        .collect();
     if output.stdout != expected {
         return Err(Failed::from(format!(
             "{}: stdout does not match the `# expect:` lines\n{}",
@@ -170,10 +217,17 @@ fn run_case(case: &Case) -> Result<(), Failed> {
             unified_diff(&expected, &output.stdout)
         )));
     }
-    if output.status != 0 {
+
+    let missing: Vec<&String> = case
+        .directives
+        .stderr
+        .iter()
+        .filter(|want| !output.stderr.contains(want.as_str()))
+        .collect();
+    if !missing.is_empty() {
         return Err(Failed::from(format!(
-            "{} exited with {} (expected 0)\nstderr:\n{}",
-            case.name, output.status, output.stderr
+            "{}: stderr is missing {missing:?}\nstderr:\n{}",
+            case.name, output.stderr
         )));
     }
     Ok(())
@@ -197,6 +251,7 @@ fn fail_case(case: &Case) -> Result<(), Failed> {
         Err(DriverError::Compile(diagnostics)) => {
             let rendered = diagnostics.join("\n");
             let missing: Vec<&String> = case
+                .directives
                 .errors
                 .iter()
                 .filter(|e| !rendered.contains(e.as_str()))
@@ -239,17 +294,27 @@ fn manifest_check() -> Result<(), Failed> {
             problems.push(format!("{} contains no .ty files", dir.display()));
         }
         for case in cases {
-            let source = std::fs::read_to_string(&case.path)?;
-            let (_, declared, _, _) = parse_directives(&source);
-            if declared.is_none() {
+            if case.directives.milestone.is_none() {
                 problems.push(format!("{} has no `# milestone:` line", case.name));
             }
             match case.kind {
-                Kind::Run if case.expect.is_empty() => {
+                // A case that only asserts a panic needs no stdout, but it
+                // must then say what it expects instead.
+                Kind::Run
+                    if case.directives.expect.is_empty()
+                        && case.directives.exit() == 0
+                        && case.directives.stderr.is_empty() =>
+                {
                     problems.push(format!("{} has no `# expect:` lines", case.name));
                 }
-                Kind::Fail if case.errors.is_empty() => {
+                Kind::Fail if case.directives.errors.is_empty() => {
                     problems.push(format!("{} has no `# error:` lines", case.name));
+                }
+                Kind::Fail if case.directives.exit.is_some() => {
+                    problems.push(format!(
+                        "{} declares `# exit:`, which only applies to a running case",
+                        case.name
+                    ));
                 }
                 _ => {}
             }
@@ -271,22 +336,40 @@ fn directive_parser_check() -> Result<(), Failed> {
 # expect: 1
 # expect:
 # error: mismatched types
+# exit: 101
+# stderr: panic: integer division by zero
 
 fn main():
     print(1)        # expect: not a directive, this is a trailing comment
 ";
-    let (milestone, declared, expect, errors) = parse_directives(source);
+    let parsed = parse_directives(source);
     let mut problems = Vec::new();
-    if milestone != 2 || declared != Some(2) {
+    if parsed.milestone != Some(2) || parsed.milestone() != 2 {
         problems.push(format!(
-            "milestone parsed as {milestone:?}/{declared:?}, want 2"
+            "milestone parsed as {:?}, want 2",
+            parsed.milestone
         ));
     }
-    if expect != ["1", ""] {
-        problems.push(format!("expect parsed as {expect:?}, want [\"1\", \"\"]"));
+    if parsed.expect != ["1", ""] {
+        problems.push(format!(
+            "expect parsed as {:?}, want [\"1\", \"\"]",
+            parsed.expect
+        ));
     }
-    if errors != ["mismatched types"] {
-        problems.push(format!("errors parsed as {errors:?}"));
+    if parsed.errors != ["mismatched types"] {
+        problems.push(format!("errors parsed as {:?}", parsed.errors));
+    }
+    if parsed.exit != Some(101) || parsed.exit() != 101 {
+        problems.push(format!("exit parsed as {:?}, want 101", parsed.exit));
+    }
+    if parsed.stderr != ["panic: integer division by zero"] {
+        problems.push(format!("stderr parsed as {:?}", parsed.stderr));
+    }
+    if Directives::default().exit() != 0 || Directives::default().milestone() != 0 {
+        problems.push("an absent `# exit:` must default to 0".into());
+    }
+    if parse_directives("fn main():\n    pass\n") != Directives::default() {
+        problems.push("a file without directives must parse as the default".into());
     }
     if milestone_rank("M10") != 10 || milestone_rank("M0") != 0 {
         problems.push("milestone_rank is wrong".into());
@@ -311,7 +394,7 @@ fn main() {
     ];
 
     for case in collect_cases() {
-        let ignored = case.milestone > current;
+        let ignored = case.directives.milestone() > current;
         let kind = case.kind;
         let name = case.name.clone();
         trials.push(

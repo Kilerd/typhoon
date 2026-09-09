@@ -1,0 +1,7 @@
+# Attribute access needs classes, which are M2 (DESIGN 3.8).
+# milestone: M1
+# error: attribute access is not supported yet (planned for M2)
+
+fn main():
+    x = 1.0
+    print(x.imag)

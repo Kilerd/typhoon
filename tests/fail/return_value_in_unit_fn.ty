@@ -1,0 +1,11 @@
+# A function without `->` returns nothing, so `return <value>` is an error.
+# milestone: M1
+# error: cannot return a value from function `log`
+# error: add `-> int`
+
+fn log(n: int):
+    print(n)
+    return n
+
+fn main():
+    log(1)

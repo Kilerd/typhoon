@@ -1,0 +1,9 @@
+# There is no augmented assignment; the parser says what to write instead.
+# milestone: M1
+# error: augmented assignment is not supported yet
+# error: total = total +
+
+fn main():
+    total = 0
+    total += 1
+    print(total)

@@ -1,0 +1,7 @@
+# `list<int>` as a type annotation needs M2.
+# milestone: M1
+# error: the type `list` is not supported yet (planned for M2)
+
+fn main():
+    xs: list<int> = [1]
+    print(1)

@@ -1,0 +1,13 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n = 1\\n    if n > 0:\\n        answer = 1\\n    print(answer)\\n\")"
+---
+error: use of possibly-uninitialized variable `answer`
+ --> main.ty:5:11
+  |
+4 |         answer = 1
+  |         ------ it is only assigned on some paths
+5 |     print(answer)
+  |           ^^^^^^ `answer` may be uninitialized here
+  |
+  = note: every path reaching a read must assign the variable, see DESIGN.md section 3.4

@@ -1,0 +1,95 @@
+# Recursion: fibonacci, Euclid's gcd, Ackermann, fast exponentiation, digit
+# sums and a pair of mutually recursive predicates.
+# milestone: M1
+# expect: 0
+# expect: 1
+# expect: 1
+# expect: 2
+# expect: 3
+# expect: 5
+# expect: 8
+# expect: 13
+# expect: 21
+# expect: 34
+# expect: 75025
+# expect: 21 6 1 48
+# expect: 1 4 9 61
+# expect: 1 1 3628800 2432902008176640000
+# expect: 1024 1594323 1 5
+# expect: 7 45
+# expect: True False
+# expect: True False
+# expect: False True
+# expect: 27
+
+fn fib(n: int) -> int:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn gcd(a: int, b: int) -> int:
+    if b == 0:
+        return a
+    return gcd(b, a % b)
+
+fn ackermann(m: int, n: int) -> int:
+    if m == 0:
+        return n + 1
+    if n == 0:
+        return ackermann(m - 1, 1)
+    return ackermann(m - 1, ackermann(m, n - 1))
+
+fn fact(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * fact(n - 1)
+
+fn power(base: int, exp: int) -> int:
+    # fast exponentiation: one recursive call, two ways to combine it
+    if exp == 0:
+        return 1
+    half = power(base, exp // 2)
+    if exp % 2 == 0:
+        return half * half
+    return half * half * base
+
+fn sum_digits(n: int) -> int:
+    if n < 10:
+        return n
+    return n % 10 + sum_digits(n // 10)
+
+fn is_even(n: int) -> bool:
+    # mutually recursive with is_odd
+    if n == 0:
+        return True
+    return is_odd(n - 1)
+
+fn is_odd(n: int) -> bool:
+    if n == 0:
+        return False
+    return is_even(n - 1)
+
+fn main():
+    for i in range(10):
+        print(fib(i))
+    print(fib(25))
+
+    print(gcd(1071, 462), gcd(270, 192), gcd(17, 5), gcd(48, 0))
+
+    print(ackermann(0, 0), ackermann(1, 2), ackermann(2, 3), ackermann(3, 3))
+
+    print(fact(0), fact(1), fact(10), fact(20))
+
+    print(power(2, 10), power(3, 13), power(7, 0), power(5, 1))
+
+    print(sum_digits(7), sum_digits(987654321))
+
+    print(is_even(0), is_odd(0))
+    print(is_even(10), is_odd(10))
+    print(is_even(7), is_odd(7))
+
+    # recursion driven from a loop
+    total = 0
+    for j in range(1, 11):
+        total = total + gcd(j, 12)
+    print(total)

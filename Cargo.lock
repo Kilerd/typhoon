@@ -329,6 +329,12 @@ dependencies = [
 [[package]]
 name = "typhoon-codegen"
 version = "0.1.0"
+dependencies = [
+ "insta",
+ "typhoon-diag",
+ "typhoon-parser",
+ "typhoon-sema",
+]
 
 [[package]]
 name = "typhoon-diag"
@@ -371,6 +377,12 @@ version = "0.1.0"
 [[package]]
 name = "typhoon-sema"
 version = "0.1.0"
+dependencies = [
+ "insta",
+ "typhoon-ast",
+ "typhoon-diag",
+ "typhoon-parser",
+]
 
 [[package]]
 name = "unicode-ident"

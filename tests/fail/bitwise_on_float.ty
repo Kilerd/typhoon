@@ -1,0 +1,7 @@
+# Bitwise operators are integer-only (DESIGN 3.6).
+# milestone: M1
+# error: bitwise operators require `int` operands
+
+fn main():
+    x = 1.5
+    print(x & 2.0)

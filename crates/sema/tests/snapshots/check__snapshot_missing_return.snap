@@ -1,0 +1,11 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn classify(n: int) -> int:\\n    if n > 0:\\n        return 1\\n\\nfn main():\\n    print(classify(0))\\n\")"
+---
+error: missing return in function `classify` returning `int`
+ --> main.ty:1:4
+  |
+1 | fn classify(n: int) -> int:
+  |    ^^^^^^^^ this function can reach its end without returning a value
+  |
+  = help: add a `return <int>` on every path

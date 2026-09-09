@@ -1,0 +1,9 @@
+# Exceptions are M4 (DESIGN 3.10).
+# milestone: M1
+# error: `try` is not supported yet
+
+fn main():
+    try:
+        print(1)
+    except:
+        print(2)

@@ -1,0 +1,14 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    print(not 1)\\n\")"
+---
+error: `not` cannot be applied to a value of type `int`
+ --> main.ty:2:11
+  |
+2 |     print(not 1)
+  |           ^^^ - this is an `int`
+  |           |
+  |           no `not` operator for `int`
+  |
+  = note: typhoon has no truthiness, see DESIGN.md section 3.6
+  = help: compare explicitly, e.g. `x != 0`

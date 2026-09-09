@@ -1,0 +1,14 @@
+---
+source: crates/sema/tests/check.rs
+expression: dump
+---
+fn main() -> None
+  local i: int
+  local j: int
+  local k: int
+  for i in range(0:int, 10:int, 1:int):
+    print(i:int):None
+  for j in range(1:int, 10:int, 1:int):
+    print(j:int):None
+  for k in range(10:int, 0:int, -2:int):
+    print(k:int):None

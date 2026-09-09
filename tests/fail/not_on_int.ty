@@ -1,0 +1,8 @@
+# `not` is a boolean operator, not a zero test.
+# milestone: M1
+# error: `not` cannot be applied to a value of type `int`
+# error: compare explicitly
+
+fn main():
+    n = 0
+    print(not n)

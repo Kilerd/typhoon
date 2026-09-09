@@ -1,0 +1,6 @@
+# Calling a function that was never declared.
+# milestone: M1
+# error: cannot find function `helper` in this scope
+
+fn main():
+    print(helper(1))

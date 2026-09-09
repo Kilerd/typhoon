@@ -1,0 +1,11 @@
+# There are no implicit numeric conversions, not even int -> float
+# (DESIGN 4.3): mixing the two in one operation is a type error, and the
+# diagnostic points at the conversion that is missing.
+# milestone: M1
+# error: mismatched types
+# error: expected `int`, found `float`
+# error: use `float(x)`
+
+fn main():
+    total = 1 + 2.0
+    print(total)

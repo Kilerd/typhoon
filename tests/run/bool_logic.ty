@@ -1,0 +1,118 @@
+# Booleans: `and` / `or` short-circuiting proven with printing side effects,
+# `not`, nested boolean expressions, bools in locals, bool parameters and
+# return values, and boolean conditions in `if`.
+# milestone: M1
+# expect: no
+# expect: False
+# expect: --
+# expect: yes
+# expect: no
+# expect: False
+# expect: --
+# expect: yes
+# expect: True
+# expect: --
+# expect: no
+# expect: yes
+# expect: True
+# expect: --
+# expect: no
+# expect: guarded
+# expect: --
+# expect: False True
+# expect: True False False
+# expect: True
+# expect: True
+# expect: True
+# expect: True
+# expect: True
+# expect: True True True
+# expect: True False True
+# expect: flag and c > b
+# expect: else branch
+# expect: False False False False True
+# expect: False True False True True
+# expect: True False False True False
+# expect: True True True True False
+# expect: safe
+
+fn yes() -> bool:
+    print("yes")
+    return True
+
+fn no() -> bool:
+    print("no")
+    return False
+
+fn both(p: bool, q: bool) -> bool:
+    return p and q
+
+fn either(p: bool, q: bool) -> bool:
+    return p or q
+
+fn in_range(v: int, lo: int, hi: int) -> bool:
+    return v >= lo and v <= hi
+
+fn main():
+    # `and` stops at the first False: `yes` is never called
+    print(no() and yes())
+    print("--")
+    # a True left operand forces the right one to be evaluated
+    print(yes() and no())
+    print("--")
+    # `or` stops at the first True
+    print(yes() or no())
+    print("--")
+    print(no() or yes())
+    print("--")
+
+    # short-circuiting inside an `if` condition, still no `yes` marker
+    if no() and yes():
+        print("unreachable")
+    else:
+        print("guarded")
+    print("--")
+
+    # not
+    t = True
+    f = False
+    print(not t, not f)
+    print(not (t and f), not t or f, not (t or f))
+
+    # nested boolean expressions over comparisons
+    a = 5
+    b = 12
+    c = 30
+    print((a < b and b < c) or a == 0)
+    print(not (a < b) or (c % a == 0 and c % b != 0))
+    print(a < b and (b > c or c % b == 6))
+
+    # booleans stored in locals and passed around
+    flag = a < b
+    print(flag)
+    other = flag and not (b > c)
+    print(other)
+    print(both(flag, other), either(flag, other), both(True, True))
+    print(in_range(7, 1, 10), in_range(0, 1, 10), in_range(10, 1, 10))
+
+    # boolean conditions in if / elif / else
+    if flag and c > b:
+        print("flag and c > b")
+    if not flag or c < b:
+        print("unreachable")
+    else:
+        print("else branch")
+
+    # the full truth table of and / or / not
+    for i in range(2):
+        for j in range(2):
+            x = i == 1
+            y = j == 1
+            print(x, y, x and y, x or y, not x)
+
+    # short-circuiting guards a division that would panic
+    d = 0
+    if d != 0 and 10 // d > 1:
+        print("unreachable")
+    else:
+        print("safe")

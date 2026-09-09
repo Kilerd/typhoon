@@ -1,0 +1,10 @@
+# A constant's value must have its declared type; there is no int -> float
+# conversion (DESIGN 4.3).
+# milestone: M1
+# error: mismatched types
+# error: expected `float`, found `int`
+
+RATIO: float = 1
+
+fn main():
+    print(RATIO)

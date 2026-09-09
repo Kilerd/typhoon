@@ -1,0 +1,7 @@
+# Iterating anything but `range(...)` needs containers (M2).
+# milestone: M1
+# error: iterating over anything but `range(...)` is not supported yet
+
+fn main():
+    for c in "abc":
+        print(1)

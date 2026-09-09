@@ -1,0 +1,12 @@
+# Definite assignment (DESIGN 3.4): `answer` is only assigned in one arm of
+# the `if`, so reading it afterwards is rejected at compile time instead of
+# raising Python's UnboundLocalError at run time.
+# milestone: M1
+# error: possibly-uninitialized
+# error: answer
+
+fn main():
+    n = 3
+    if n > 0:
+        answer = 1
+    print(answer)

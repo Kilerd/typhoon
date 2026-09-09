@@ -1,0 +1,21 @@
+# A runtime panic: `int ** int` with a negative exponent. `int` has no
+# fractional results, so a negative exponent panics instead of returning a
+# float. The exponent comes from a variable, so the check happens at run time.
+# milestone: M1
+# expect: 2 ** 3 = 8
+# expect: 2 ** 0 = 1
+# expect: raising 2 to the power -3
+# exit: 101
+# stderr: panic: negative exponent in integer power
+
+fn power(base: int, exp: int) -> int:
+    return base ** exp
+
+fn main():
+    e = 3
+    print(f"2 ** {e} = {power(2, e)}")
+    zero = e - 3
+    print(f"2 ** {zero} = {power(2, zero)}")
+    print(f"raising 2 to the power {-e}")
+    print(power(2, -e))
+    print("unreachable")

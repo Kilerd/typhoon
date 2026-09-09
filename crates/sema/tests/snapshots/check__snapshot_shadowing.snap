@@ -1,0 +1,13 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    x: int = 1\\n    x: float = 2.0\\n    print(x)\\n\")"
+---
+error: the variable `x` is already declared in this function
+ --> main.ty:3:5
+  |
+2 |     x: int = 1
+  |     - first declared here
+3 |     x: float = 2.0
+  |     ^ declared a second time here
+  |
+  = note: typhoon has no shadowing, see DESIGN.md section 3.4
