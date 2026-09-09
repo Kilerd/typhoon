@@ -1,0 +1,101 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @222..224
+Ident `main` @225..229
+LParen @229..230
+RParen @230..231
+Colon @231..232
+Newline @232..233
+Indent @237..237
+Ident `a` @237..238
+Colon @238..239
+Ident `int` @240..243
+Eq @244..245
+Int 7 @246..247
+Newline @247..248
+Ident `b` @252..253
+Colon @253..254
+Ident `int` @255..258
+Eq @259..260
+Int 2 @261..262
+Newline @262..263
+Ident `print` @268..273
+LParen @273..274
+Ident `a` @274..275
+Plus @276..277
+Ident `b` @278..279
+RParen @279..280
+Newline @280..281
+Ident `print` @285..290
+LParen @290..291
+Ident `a` @291..292
+Minus @293..294
+Ident `b` @295..296
+RParen @296..297
+Newline @297..298
+Ident `print` @302..307
+LParen @307..308
+Ident `a` @308..309
+Star @310..311
+Ident `b` @312..313
+RParen @313..314
+Newline @314..315
+Ident `print` @319..324
+LParen @324..325
+Ident `a` @325..326
+Slash @327..328
+Ident `b` @329..330
+RParen @330..331
+Newline @373..374
+Ident `print` @378..383
+LParen @383..384
+Ident `a` @384..385
+SlashSlash @386..388
+Ident `b` @389..390
+RParen @390..391
+Newline @424..425
+Ident `print` @429..434
+LParen @434..435
+Ident `a` @435..436
+Percent @437..438
+Ident `b` @439..440
+RParen @440..441
+Newline @441..442
+Ident `print` @446..451
+LParen @451..452
+Ident `a` @452..453
+StarStar @454..456
+Ident `b` @457..458
+RParen @458..459
+Newline @485..486
+Ident `x` @556..557
+Colon @557..558
+Ident `float` @559..564
+Eq @565..566
+Ident `float` @567..572
+LParen @572..573
+Ident `a` @573..574
+RParen @574..575
+Newline @575..576
+Ident `print` @580..585
+LParen @585..586
+Ident `x` @586..587
+RParen @587..588
+Newline @588..589
+Ident `print` @593..598
+LParen @598..599
+FString @599..615
+    Expr "x / 2.0" @602..609 spec ".2f" @610..613 full @601..614
+RParen @615..616
+Newline @616..617
+Ident `print` @621..626
+LParen @626..627
+Float 2.0 @627..630
+StarStar @631..633
+Float 3.0 @634..637
+RParen @637..638
+Newline @638..639
+Dedent @639..639
+Eof @639..639

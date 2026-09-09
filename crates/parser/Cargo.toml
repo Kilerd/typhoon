@@ -3,4 +3,14 @@ name = "typhoon-parser"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "typhoon_parser"
+path = "src/lib.rs"
+
 [dependencies]
+typhoon-ast = { path = "../ast" }
+typhoon-diag = { path = "../diag" }
+typhoon-lexer = { path = "../lexer" }
+
+[dev-dependencies]
+insta = "1.48.0"

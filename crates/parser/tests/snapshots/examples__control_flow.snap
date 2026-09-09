@@ -1,0 +1,138 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..752
+  FnDecl `classify` @205..347
+    param `n` @217..223
+      type Named `int` @220..223
+    ret Named `str` @228..231
+    body Block @237..347
+      If @237..347
+        cond Compare @240..245
+          left Name `n` @240..241
+          cmp `<` @242..243
+            Int 0 @244..245
+        then Block @255..272
+          Return @255..272
+            Str "negative" @262..272
+        elif ElifBranch @277..311
+          cond Compare @282..288
+            left Name `n` @282..283
+            cmp `==` @284..286
+              Int 0 @287..288
+          body Block @298..311
+            Return @298..311
+              Str "zero" @305..311
+        else Block @330..347
+          Return @330..347
+            Str "positive" @337..347
+  FnDecl `main` @349..751
+    body Block @364..751
+      ExprStmt @364..383
+        Call @364..383
+          callee Name `print` @364..369
+          arg positional @370..382
+            Call @370..382
+              callee Name `classify` @370..378
+              arg positional @379..381
+                Unary - @379..381
+                  op Op @379..380
+                  Int 3 @380..381
+      ExprStmt @388..406
+        Call @388..406
+          callee Name `print` @388..393
+          arg positional @394..405
+            Call @394..405
+              callee Name `classify` @394..402
+              arg positional @403..404
+                Int 0 @403..404
+      ExprStmt @411..429
+        Call @411..429
+          callee Name `print` @411..416
+          arg positional @417..428
+            Call @417..428
+              callee Name `classify` @417..425
+              arg positional @426..427
+                Int 7 @426..427
+      Assign @435..440
+        target Name `i` @435..436
+        value Int 0 @439..440
+      Assign @445..454
+        target Name `total` @445..450
+        value Int 0 @453..454
+      While @459..515
+        cond Compare @465..470
+          left Name `i` @465..466
+          cmp `<` @467..468
+            Int 5 @469..470
+        body Block @480..515
+          Assign @480..497
+            target Name `total` @480..485
+            value Binary + @488..497
+              op Op @494..495
+              lhs Name `total` @488..493
+              rhs Name `i` @496..497
+          Assign @506..515
+            target Name `i` @506..507
+            value Binary + @510..515
+              op Op @512..513
+              lhs Name `i` @510..511
+              rhs Int 1 @514..515
+      ExprStmt @520..532
+        Call @520..532
+          callee Name `print` @520..525
+          arg positional @526..531
+            Name `total` @526..531
+      For `n` @538..654
+        iter Call @547..556
+          callee Name `range` @547..552
+          arg positional @553..555
+            Int 10 @553..555
+        body Block @566..654
+          If @566..601
+            cond Compare @569..579
+              left Binary % @569..574
+                op Op @571..572
+                lhs Name `n` @569..570
+                rhs Int 2 @573..574
+              cmp `==` @575..577
+                Int 0 @578..579
+            then Block @593..601
+              Continue @593..601
+          If @610..637
+            cond Compare @613..618
+              left Name `n` @613..614
+              cmp `>` @615..616
+                Int 6 @617..618
+            then Block @632..637
+              Break @632..637
+          ExprStmt @646..654
+            Call @646..654
+              callee Name `print` @646..651
+              arg positional @652..653
+                Name `n` @652..653
+      Assign @659..670
+        target Name `stepped` @659..666
+        value Int 0 @669..670
+      For `n2` @675..732
+        iter Call @685..700
+          callee Name `range` @685..690
+          arg positional @691..692
+            Int 0 @691..692
+          arg positional @694..696
+            Int 10 @694..696
+          arg positional @698..699
+            Int 3 @698..699
+        body Block @710..732
+          Assign @710..732
+            target Name `stepped` @710..717
+            value Binary + @720..732
+              op Op @728..729
+              lhs Name `stepped` @720..727
+              rhs Name `n2` @730..732
+      ExprStmt @737..751
+        Call @737..751
+          callee Name `print` @737..742
+          arg positional @743..750
+            Name `stepped` @743..750

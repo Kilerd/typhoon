@@ -1,0 +1,80 @@
+---
+source: crates/ast/tests/dump.rs
+expression: dump(&module)
+---
+Module @0..374
+  ConstDecl `PI` @0..15
+    type Named `float` @4..9
+    value Float 3.5 @12..15
+  ClassDecl `Stack` @16..134
+    generic `T` @28..29
+    field `items` @36..55
+      type Named `list` @43..50
+        arg Named `T` @48..49
+      default List @53..55
+    method FnDecl `push` @97..134
+      param `self` (self) @105..109
+      param `value` @111..123
+        type Named `T` @118..119
+        default Int 1 @122..123
+      body Block @130..134
+        Pass @130..134
+  FnDecl `main` @140..374
+    ret NoneType @147..151
+    body Block @150..374
+      AnnAssign `x` @150..160
+        type Named `int` @153..156
+        value Int 1 @159..160
+      Assign @165..170
+        target Name `x` @165..166
+        value Int 2 @169..170
+      If @172..236
+        cond Compare @175..180
+          left Name `x` @175..176
+          cmp `<` @177..178
+            Int 3 @179..180
+        then Block @185..190
+          Break @185..190
+        elif ElifBranch @195..218
+          cond Bool True @200..204
+          body Block @210..218
+            Continue @210..218
+        else Block @230..236
+          Return @230..236
+      While @237..274
+        cond BoolOp and @243..261
+          op Op @248..251
+          lhs Bool True @243..247
+          rhs Unary not @252..261
+            op Op @252..255
+            Bool False @256..261
+        body Block @270..274
+          Pass @270..274
+      For `i` @276..325
+        iter Call @285..306
+          callee Name `range` @285..290
+          typearg Named `int` @291..294
+          arg positional @296..297
+            Int 0 @296..297
+          arg `stop`= @299..305
+            Int 9 @304..305
+        body Block @313..325
+          ExprStmt @313..325
+            FString @313..325
+              literal "x=" @315..317
+              hole Hole @317..324
+                Name `x` @318..319
+                spec ".2f" @320..323
+      Return @332..359
+        Dict @339..359
+          key Str "k" @340..343
+          value Index @345..358
+            base Attribute `items` @345..355
+              base Name `self` @345..349
+            index Int 0 @356..357
+      ExprStmt @364..374
+        Tuple @364..374
+          List @365..368
+            Int 1 @366..367
+          Set @370..373
+            Int 2 @371..372

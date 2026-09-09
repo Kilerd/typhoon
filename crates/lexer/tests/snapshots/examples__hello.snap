@@ -1,0 +1,18 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @84..86
+Ident `main` @87..91
+LParen @91..92
+RParen @92..93
+Colon @93..94
+Newline @94..95
+Indent @99..99
+Ident `print` @99..104
+LParen @104..105
+Str "Hello, Typhoon!" @105..122
+RParen @122..123
+Newline @123..124
+Dedent @124..124
+Eof @124..124

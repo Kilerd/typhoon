@@ -1,0 +1,11 @@
+---
+source: crates/parser/tests/errors.rs
+expression: "rendered_errors(\"fn main():\\n    total += 1\\n\")"
+---
+error: augmented assignment is not supported yet
+ --> test.ty:2:11
+  |
+2 |     total += 1
+  |           ^^ `+=` is not supported
+  |
+  = help: write `total = total + ...` instead

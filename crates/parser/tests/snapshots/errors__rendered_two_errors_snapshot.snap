@@ -1,0 +1,17 @@
+---
+source: crates/parser/tests/errors.rs
+expression: "rendered_errors(\"fn a():\\n    x = \\n\\nfn b():\\n    y = 1;\\n\")"
+---
+error: expected an expression, found end of line
+ --> test.ty:2:9
+  |
+2 |     x = 
+  |         ^ expected an expression
+
+error: semicolons are not used in typhoon
+ --> test.ty:5:10
+  |
+5 |     y = 1;
+  |          ^ remove this `;`
+  |
+  = help: write each statement on its own line

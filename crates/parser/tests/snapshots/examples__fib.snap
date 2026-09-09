@@ -1,0 +1,59 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..322
+  FnDecl `fib` @157..245
+    param `n` @164..170
+      type Named `int` @167..170
+    ret Named `int` @175..178
+    body Block @184..245
+      If @184..210
+        cond Compare @187..192
+          left Name `n` @187..188
+          cmp `<` @189..190
+            Int 2 @191..192
+        then Block @202..210
+          Return @202..210
+            Name `n` @209..210
+      Return @215..245
+        Binary + @222..245
+          op Op @233..234
+          lhs Call @222..232
+            callee Name `fib` @222..225
+            arg positional @226..231
+              Binary - @226..231
+                op Op @228..229
+                lhs Name `n` @226..227
+                rhs Int 1 @230..231
+          rhs Call @235..245
+            callee Name `fib` @235..238
+            arg positional @239..244
+              Binary - @239..244
+                op Op @241..242
+                lhs Name `n` @239..240
+                rhs Int 2 @243..244
+  FnDecl `main` @247..321
+    body Block @262..321
+      ExprStmt @262..276
+        Call @262..276
+          callee Name `print` @262..267
+          arg positional @268..275
+            Call @268..275
+              callee Name `fib` @268..271
+              arg positional @272..274
+                Int 30 @272..274
+      For `i` @281..321
+        iter Call @290..298
+          callee Name `range` @290..295
+          arg positional @296..297
+            Int 5 @296..297
+        body Block @308..321
+          ExprStmt @308..321
+            Call @308..321
+              callee Name `print` @308..313
+              arg positional @314..320
+                Call @314..320
+                  callee Name `fib` @314..317
+                  arg positional @318..319
+                    Name `i` @318..319

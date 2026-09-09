@@ -1,0 +1,155 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @186..188
+Ident `sum_all` @189..196
+LParen @196..197
+Ident `xs` @197..199
+Colon @199..200
+Ident `list` @201..205
+Lt @205..206
+Ident `int` @206..209
+Gt @209..210
+RParen @210..211
+Arrow @212..214
+Ident `int` @215..218
+Colon @218..219
+Newline @219..220
+Indent @224..224
+Ident `total` @224..229
+Eq @230..231
+Int 0 @232..233
+Newline @233..234
+For @238..241
+Ident `x` @242..243
+In @244..246
+Ident `xs` @247..249
+Colon @249..250
+Newline @250..251
+Indent @259..259
+Ident `total` @259..264
+Eq @265..266
+Ident `total` @267..272
+Plus @273..274
+Ident `x` @275..276
+Newline @276..277
+Dedent @281..281
+Return @281..287
+Ident `total` @288..293
+Newline @293..294
+Dedent @295..295
+Fn @295..297
+Ident `main` @298..302
+LParen @302..303
+RParen @303..304
+Colon @304..305
+Newline @305..306
+Indent @310..310
+Ident `xs` @310..312
+Colon @312..313
+Ident `list` @314..318
+Lt @318..319
+Ident `int` @319..322
+Gt @322..323
+Eq @324..325
+LBracket @326..327
+Int 10 @327..329
+Comma @329..330
+Int 20 @331..333
+RBracket @333..334
+Newline @334..335
+Ident `xs` @339..341
+Dot @341..342
+Ident `append` @342..348
+LParen @348..349
+Int 30 @349..351
+RParen @351..352
+Newline @352..353
+Ident `print` @357..362
+LParen @362..363
+Ident `len` @363..366
+LParen @366..367
+Ident `xs` @367..369
+RParen @369..370
+RParen @370..371
+Newline @371..372
+Ident `print` @376..381
+LParen @381..382
+Ident `xs` @382..384
+LBracket @384..385
+Int 0 @385..386
+RBracket @386..387
+RParen @387..388
+Newline @388..389
+Ident `print` @393..398
+LParen @398..399
+Ident `xs` @399..401
+LBracket @401..402
+Int 2 @402..403
+RBracket @403..404
+RParen @404..405
+Newline @405..406
+For @411..414
+Ident `x` @415..416
+In @417..419
+Ident `xs` @420..422
+Colon @422..423
+Newline @423..424
+Indent @432..432
+Ident `print` @432..437
+LParen @437..438
+Ident `x` @438..439
+RParen @439..440
+Newline @440..441
+Dedent @445..445
+Ident `print` @445..450
+LParen @450..451
+Ident `sum_all` @451..458
+LParen @458..459
+Ident `xs` @459..461
+RParen @461..462
+RParen @462..463
+Newline @463..464
+Ident `squares` @544..551
+Colon @551..552
+Ident `list` @553..557
+Lt @557..558
+Ident `int` @558..561
+Gt @561..562
+Eq @563..564
+LBracket @565..566
+RBracket @566..567
+Newline @567..568
+For @572..575
+Ident `i` @576..577
+In @578..580
+Ident `range` @581..586
+LParen @586..587
+Int 1 @587..588
+Comma @588..589
+Int 4 @590..591
+RParen @591..592
+Colon @592..593
+Newline @593..594
+Indent @602..602
+Ident `squares` @602..609
+Dot @609..610
+Ident `append` @610..616
+LParen @616..617
+Ident `i` @617..618
+Star @619..620
+Ident `i` @621..622
+RParen @622..623
+Newline @623..624
+Dedent @628..628
+Ident `print` @628..633
+LParen @633..634
+Ident `sum_all` @634..641
+LParen @641..642
+Ident `squares` @642..649
+RParen @649..650
+RParen @650..651
+Newline @651..652
+Dedent @652..652
+Eof @652..652

@@ -1,0 +1,9 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: unexpected end of file
+ --> main.ty:5:17
+  |
+5 |     print(totl)
+  |                ^ expected a statement

@@ -1,0 +1,198 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @189..191
+Ident `count_words` @192..203
+LParen @203..204
+Ident `words` @204..209
+Colon @209..210
+Ident `list` @211..215
+Lt @215..216
+Ident `str` @216..219
+Gt @219..220
+RParen @220..221
+Arrow @222..224
+Ident `dict` @225..229
+Lt @229..230
+Ident `str` @230..233
+Comma @233..234
+Ident `int` @235..238
+Gt @238..239
+Colon @239..240
+Newline @240..241
+Indent @245..245
+Ident `counts` @245..251
+Colon @251..252
+Ident `dict` @253..257
+Lt @257..258
+Ident `str` @258..261
+Comma @261..262
+Ident `int` @263..266
+Gt @266..267
+Eq @268..269
+LBrace @270..271
+RBrace @271..272
+Newline @272..273
+For @277..280
+Ident `w` @281..282
+In @283..285
+Ident `words` @286..291
+Colon @291..292
+Newline @292..293
+Indent @301..301
+If @301..303
+Ident `w` @304..305
+In @306..308
+Ident `counts` @309..315
+Colon @315..316
+Newline @316..317
+Indent @329..329
+Ident `counts` @329..335
+LBracket @335..336
+Ident `w` @336..337
+RBracket @337..338
+Eq @339..340
+Ident `counts` @341..347
+LBracket @347..348
+Ident `w` @348..349
+RBracket @349..350
+Plus @351..352
+Int 1 @353..354
+Newline @354..355
+Dedent @363..363
+Else @363..367
+Colon @367..368
+Newline @368..369
+Indent @381..381
+Ident `counts` @381..387
+LBracket @387..388
+Ident `w` @388..389
+RBracket @389..390
+Eq @391..392
+Int 1 @393..394
+Newline @394..395
+Dedent @399..399
+Dedent @399..399
+Return @399..405
+Ident `counts` @406..412
+Newline @412..413
+Dedent @414..414
+Fn @414..416
+Ident `main` @417..421
+LParen @421..422
+RParen @422..423
+Colon @423..424
+Newline @424..425
+Indent @429..429
+Ident `words` @429..434
+Colon @434..435
+Ident `list` @436..440
+Lt @440..441
+Ident `str` @441..444
+Gt @444..445
+Eq @446..447
+LBracket @448..449
+Str "typhoon" @449..458
+Comma @458..459
+Str "is" @460..464
+Comma @464..465
+Str "fast" @466..472
+Comma @472..473
+Str "typhoon" @474..483
+Comma @483..484
+Str "fast" @485..491
+Comma @491..492
+Str "typhoon" @493..502
+RBracket @502..503
+Newline @503..504
+Ident `counts` @508..514
+Eq @515..516
+Ident `count_words` @517..528
+LParen @528..529
+Ident `words` @529..534
+RParen @534..535
+Newline @535..536
+For @541..544
+Ident `key` @545..548
+In @549..551
+Ident `sorted` @552..558
+LParen @558..559
+Ident `counts` @559..565
+Dot @565..566
+Ident `keys` @566..570
+LParen @570..571
+RParen @571..572
+RParen @572..573
+Colon @573..574
+Newline @574..575
+Indent @583..583
+Ident `print` @583..588
+LParen @588..589
+FString @589..612
+    Expr "key" @592..595 full @591..596
+    Literal ": " @596..598
+    Expr "counts[key]" @599..610 full @598..611
+RParen @612..613
+Newline @613..614
+Dedent @619..619
+Ident `print` @619..624
+LParen @624..625
+Ident `len` @625..628
+LParen @628..629
+Ident `counts` @629..635
+RParen @635..636
+RParen @636..637
+Newline @637..638
+Ident `total` @643..648
+Eq @649..650
+Int 0 @651..652
+Newline @652..653
+For @657..660
+Ident `key` @661..664
+In @665..667
+Ident `counts` @668..674
+Dot @674..675
+Ident `keys` @675..679
+LParen @679..680
+RParen @680..681
+Colon @681..682
+Newline @682..683
+Indent @691..691
+Ident `total` @691..696
+Eq @697..698
+Ident `total` @699..704
+Plus @705..706
+Ident `counts` @707..713
+LBracket @713..714
+Ident `key` @714..717
+RBracket @717..718
+Newline @718..719
+Dedent @723..723
+Ident `print` @723..728
+LParen @728..729
+Ident `total` @729..734
+RParen @734..735
+Newline @735..736
+Ident `empty` @741..746
+Colon @746..747
+Ident `dict` @748..752
+Lt @752..753
+Ident `str` @753..756
+Comma @756..757
+Ident `int` @758..761
+Gt @761..762
+Eq @763..764
+LBrace @765..766
+RBrace @766..767
+Newline @767..768
+Ident `print` @772..777
+LParen @777..778
+Ident `len` @778..781
+LParen @781..782
+Ident `empty` @782..787
+RParen @787..788
+RParen @788..789
+Newline @789..790
+Dedent @790..790
+Eof @790..790

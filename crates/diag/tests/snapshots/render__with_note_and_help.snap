@@ -1,0 +1,15 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error[E0425]: cannot find value `totl` in this scope
+ --> main.ty:5:11
+  |
+2 |     total = 0
+  |     --------- a similar name is declared here
+...
+5 |     print(totl)
+  |           ^^^^ not found in this scope
+  |
+  = note: names are resolved per function
+  = help: did you mean `total`?

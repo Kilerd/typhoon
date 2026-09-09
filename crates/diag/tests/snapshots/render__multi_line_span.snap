@@ -1,0 +1,10 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: this loop never terminates
+ --> main.ty:3:5
+  |
+3 | /     for i in range(10):
+4 | |         total = total + i
+  | |_________________________^ loop body

@@ -1,0 +1,79 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @157..159
+Ident `fib` @160..163
+LParen @163..164
+Ident `n` @164..165
+Colon @165..166
+Ident `int` @167..170
+RParen @170..171
+Arrow @172..174
+Ident `int` @175..178
+Colon @178..179
+Newline @179..180
+Indent @184..184
+If @184..186
+Ident `n` @187..188
+Lt @189..190
+Int 2 @191..192
+Colon @192..193
+Newline @193..194
+Indent @202..202
+Return @202..208
+Ident `n` @209..210
+Newline @210..211
+Dedent @215..215
+Return @215..221
+Ident `fib` @222..225
+LParen @225..226
+Ident `n` @226..227
+Minus @228..229
+Int 1 @230..231
+RParen @231..232
+Plus @233..234
+Ident `fib` @235..238
+LParen @238..239
+Ident `n` @239..240
+Minus @241..242
+Int 2 @243..244
+RParen @244..245
+Newline @245..246
+Dedent @247..247
+Fn @247..249
+Ident `main` @250..254
+LParen @254..255
+RParen @255..256
+Colon @256..257
+Newline @257..258
+Indent @262..262
+Ident `print` @262..267
+LParen @267..268
+Ident `fib` @268..271
+LParen @271..272
+Int 30 @272..274
+RParen @274..275
+RParen @275..276
+Newline @276..277
+For @281..284
+Ident `i` @285..286
+In @287..289
+Ident `range` @290..295
+LParen @295..296
+Int 5 @296..297
+RParen @297..298
+Colon @298..299
+Newline @299..300
+Indent @308..308
+Ident `print` @308..313
+LParen @313..314
+Ident `fib` @314..317
+LParen @317..318
+Ident `i` @318..319
+RParen @319..320
+RParen @320..321
+Newline @321..322
+Dedent @322..322
+Dedent @322..322
+Eof @322..322

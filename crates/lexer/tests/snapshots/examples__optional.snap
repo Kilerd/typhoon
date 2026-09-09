@@ -1,0 +1,235 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @158..160
+Ident `find` @161..165
+LParen @165..166
+Ident `xs` @166..168
+Colon @168..169
+Ident `list` @170..174
+Lt @174..175
+Ident `int` @175..178
+Gt @178..179
+Comma @179..180
+Ident `target` @181..187
+Colon @187..188
+Ident `int` @189..192
+RParen @192..193
+Arrow @194..196
+Ident `int` @197..200
+Pipe @201..202
+None @203..207
+Colon @207..208
+Newline @208..209
+Indent @213..213
+For @213..216
+Ident `i` @217..218
+In @219..221
+Ident `range` @222..227
+LParen @227..228
+Ident `len` @228..231
+LParen @231..232
+Ident `xs` @232..234
+RParen @234..235
+RParen @235..236
+Colon @236..237
+Newline @237..238
+Indent @246..246
+If @246..248
+Ident `xs` @249..251
+LBracket @251..252
+Ident `i` @252..253
+RBracket @253..254
+EqEq @255..257
+Ident `target` @258..264
+Colon @264..265
+Newline @265..266
+Indent @278..278
+Return @278..284
+Ident `i` @285..286
+Newline @286..287
+Dedent @291..291
+Dedent @291..291
+Return @291..297
+None @298..302
+Newline @302..303
+Dedent @304..304
+Fn @304..306
+Ident `find_or` @307..314
+LParen @314..315
+Ident `xs` @315..317
+Colon @317..318
+Ident `list` @319..323
+Lt @323..324
+Ident `int` @324..327
+Gt @327..328
+Comma @328..329
+Ident `target` @330..336
+Colon @336..337
+Ident `int` @338..341
+Comma @341..342
+Ident `fallback` @343..351
+Colon @351..352
+Ident `int` @353..356
+RParen @356..357
+Arrow @358..360
+Ident `int` @361..364
+Colon @364..365
+Newline @365..366
+Indent @370..370
+Ident `r` @370..371
+Eq @372..373
+Ident `find` @374..378
+LParen @378..379
+Ident `xs` @379..381
+Comma @381..382
+Ident `target` @383..389
+RParen @389..390
+Newline @390..391
+If @395..397
+Ident `r` @398..399
+Is @400..402
+None @403..407
+Colon @407..408
+Newline @408..409
+Indent @417..417
+Return @417..423
+Ident `fallback` @424..432
+Newline @432..433
+Dedent @437..437
+Return @437..443
+Ident `r` @444..445
+Newline @485..486
+Dedent @487..487
+Fn @487..489
+Ident `main` @490..494
+LParen @494..495
+RParen @495..496
+Colon @496..497
+Newline @497..498
+Indent @502..502
+Ident `xs` @502..504
+Colon @504..505
+Ident `list` @506..510
+Lt @510..511
+Ident `int` @511..514
+Gt @514..515
+Eq @516..517
+LBracket @518..519
+Int 10 @519..521
+Comma @521..522
+Int 20 @523..525
+Comma @525..526
+Int 30 @527..529
+RBracket @529..530
+Newline @530..531
+Ident `r` @536..537
+Eq @538..539
+Ident `find` @540..544
+LParen @544..545
+Ident `xs` @545..547
+Comma @547..548
+Int 30 @549..551
+RParen @551..552
+Newline @552..553
+If @557..559
+Ident `r` @560..561
+Is @562..564
+None @565..569
+Colon @569..570
+Newline @570..571
+Indent @579..579
+Ident `print` @579..584
+LParen @584..585
+Str "not found" @585..596
+RParen @596..597
+Newline @597..598
+Dedent @602..602
+Else @602..606
+Colon @606..607
+Newline @607..608
+Indent @616..616
+Ident `print` @616..621
+LParen @621..622
+FString @622..637
+    Literal "found at " @624..633
+    Expr "r" @634..635 full @633..636
+RParen @637..638
+Newline @638..639
+Dedent @644..644
+Ident `r2` @644..646
+Eq @647..648
+Ident `find` @649..653
+LParen @653..654
+Ident `xs` @654..656
+Comma @656..657
+Int 99 @658..660
+RParen @660..661
+Newline @661..662
+If @666..668
+Ident `r2` @669..671
+Is @672..674
+None @675..679
+Colon @679..680
+Newline @680..681
+Indent @689..689
+Ident `print` @689..694
+LParen @694..695
+Str "not found" @695..706
+RParen @706..707
+Newline @707..708
+Dedent @712..712
+Else @712..716
+Colon @716..717
+Newline @717..718
+Indent @726..726
+Ident `print` @726..731
+LParen @731..732
+FString @732..748
+    Literal "found at " @734..743
+    Expr "r2" @744..746 full @743..747
+RParen @748..749
+Newline @749..750
+Dedent @755..755
+Ident `idx` @755..758
+Eq @759..760
+Ident `find` @761..765
+LParen @765..766
+Ident `xs` @766..768
+Comma @768..769
+Int 20 @770..772
+RParen @772..773
+Newline @773..774
+If @778..780
+Ident `idx` @781..784
+Is @785..787
+Not @788..791
+None @792..796
+Colon @796..797
+Newline @797..798
+Indent @806..806
+Ident `print` @806..811
+LParen @811..812
+Ident `xs` @812..814
+LBracket @814..815
+Ident `idx` @815..818
+RBracket @818..819
+RParen @819..820
+Newline @820..821
+Dedent @826..826
+Ident `print` @826..831
+LParen @831..832
+Ident `find_or` @832..839
+LParen @839..840
+Ident `xs` @840..842
+Comma @842..843
+Int 99 @844..846
+Comma @846..847
+Minus @848..849
+Int 1 @849..850
+RParen @850..851
+RParen @851..852
+Newline @852..853
+Dedent @853..853
+Eof @853..853

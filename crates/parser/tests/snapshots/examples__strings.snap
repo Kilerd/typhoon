@@ -1,0 +1,107 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..655
+  FnDecl `shout` @241..298
+    param `text` @250..259
+      type Named `str` @256..259
+    ret Named `str` @264..267
+    body Block @273..298
+      Return @273..298
+        Binary + @280..298
+          op Op @293..294
+          lhs Call @280..292
+            callee Attribute `upper` @280..290
+              base Name `text` @280..284
+          rhs Str "!" @295..298
+  FnDecl `main` @300..654
+    body Block @315..654
+      AnnAssign `name` @315..336
+        type Named `str` @321..324
+        value Str "Typhoon" @327..336
+      Assign @341..374
+        target Name `greeting` @341..349
+        value Binary + @352..374
+          op Op @369..370
+          lhs Binary + @352..368
+            op Op @362..363
+            lhs Str "Hello, " @352..361
+            rhs Name `name` @364..368
+          rhs Str "!" @371..374
+      ExprStmt @379..394
+        Call @379..394
+          callee Name `print` @379..384
+          arg positional @385..393
+            Name `greeting` @385..393
+      ExprStmt @399..419
+        Call @399..419
+          callee Name `print` @399..404
+          arg positional @405..418
+            Call @405..418
+              callee Name `len` @405..408
+              arg positional @409..417
+                Name `greeting` @409..417
+      ExprStmt @425..446
+        Call @425..446
+          callee Name `print` @425..430
+          arg positional @431..445
+            Call @431..445
+              callee Name `shout` @431..436
+              arg positional @437..444
+                Str "hello" @437..444
+      AnnAssign `words` @452..499
+        type Named `list` @459..468
+          arg Named `str` @464..467
+        value Call @471..499
+          callee Attribute `split` @471..494
+            base Str "a fast language" @471..488
+          arg positional @495..498
+            Str " " @495..498
+      ExprStmt @504..521
+        Call @504..521
+          callee Name `print` @504..509
+          arg positional @510..520
+            Call @510..520
+              callee Name `len` @510..513
+              arg positional @514..519
+                Name `words` @514..519
+      ExprStmt @526..541
+        Call @526..541
+          callee Name `print` @526..531
+          arg positional @532..540
+            Index @532..540
+              base Name `words` @532..537
+              index Int 1 @538..539
+      ExprStmt @546..568
+        Call @546..568
+          callee Name `print` @546..551
+          arg positional @552..567
+            Call @552..567
+              callee Attribute `join` @552..560
+                base Str "-" @552..555
+              arg positional @561..566
+                Name `words` @561..566
+      Assign @574..585
+        target Name `year` @574..578
+        value Int 2026 @581..585
+      ExprStmt @590..623
+        Call @590..623
+          callee Name `print` @590..595
+          arg positional @596..622
+            FString @596..622
+              literal "name=" @598..603
+              hole Hole @603..609
+                Name `name` @604..608
+              literal " year=" @609..615
+              hole Hole @615..621
+                Name `year` @616..620
+      ExprStmt @628..654
+        Call @628..654
+          callee Name `print` @628..633
+          arg positional @634..653
+            FString @634..653
+              literal "pi=" @636..639
+              hole Hole @639..652
+                Float 3.14159 @640..647
+                spec ".2f" @648..651

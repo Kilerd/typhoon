@@ -1,0 +1,11 @@
+---
+source: crates/parser/tests/errors.rs
+expression: "rendered_errors(\"fn main() {\\n    print(1)\\n}\\n\")"
+---
+error: expected `:` after the function header, found `{`
+ --> test.ty:1:11
+  |
+1 | fn main() {
+  |           ^ expected `:` after the function header
+  |
+  = help: typhoon uses indentation blocks, not braces

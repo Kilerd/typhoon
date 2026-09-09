@@ -1,0 +1,7 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: no `fn main()` found in `main.ty`
+  |
+  = help: every program needs an entry point

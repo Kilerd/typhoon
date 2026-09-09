@@ -1,0 +1,15 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render_all([&first, &second], &sm, false)"
+---
+error: first problem
+ --> main.ty:2:5
+  |
+2 |     total = 0
+  |     ^^^^^^^^^ here
+
+error: second problem
+ --> main.ty:5:11
+  |
+5 |     print(totl)
+  |           ^^^^ and here

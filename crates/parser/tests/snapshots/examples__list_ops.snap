@@ -1,0 +1,106 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..652
+  FnDecl `sum_all` @186..293
+    param `xs` @197..210
+      type Named `list` @201..210
+        arg Named `int` @206..209
+    ret Named `int` @215..218
+    body Block @224..293
+      Assign @224..233
+        target Name `total` @224..229
+        value Int 0 @232..233
+      For `x` @238..276
+        iter Name `xs` @247..249
+        body Block @259..276
+          Assign @259..276
+            target Name `total` @259..264
+            value Binary + @267..276
+              op Op @273..274
+              lhs Name `total` @267..272
+              rhs Name `x` @275..276
+      Return @281..293
+        Name `total` @288..293
+  FnDecl `main` @295..651
+    body Block @310..651
+      AnnAssign `xs` @310..334
+        type Named `list` @314..323
+          arg Named `int` @319..322
+        value List @326..334
+          Int 10 @327..329
+          Int 20 @331..333
+      ExprStmt @339..352
+        Call @339..352
+          callee Attribute `append` @339..348
+            base Name `xs` @339..341
+          arg positional @349..351
+            Int 30 @349..351
+      ExprStmt @357..371
+        Call @357..371
+          callee Name `print` @357..362
+          arg positional @363..370
+            Call @363..370
+              callee Name `len` @363..366
+              arg positional @367..369
+                Name `xs` @367..369
+      ExprStmt @376..388
+        Call @376..388
+          callee Name `print` @376..381
+          arg positional @382..387
+            Index @382..387
+              base Name `xs` @382..384
+              index Int 0 @385..386
+      ExprStmt @393..405
+        Call @393..405
+          callee Name `print` @393..398
+          arg positional @399..404
+            Index @399..404
+              base Name `xs` @399..401
+              index Int 2 @402..403
+      For `x` @411..440
+        iter Name `xs` @420..422
+        body Block @432..440
+          ExprStmt @432..440
+            Call @432..440
+              callee Name `print` @432..437
+              arg positional @438..439
+                Name `x` @438..439
+      ExprStmt @445..463
+        Call @445..463
+          callee Name `print` @445..450
+          arg positional @451..462
+            Call @451..462
+              callee Name `sum_all` @451..458
+              arg positional @459..461
+                Name `xs` @459..461
+      AnnAssign `squares` @544..567
+        type Named `list` @553..562
+          arg Named `int` @558..561
+        value List @565..567
+      For `i` @572..623
+        iter Call @581..592
+          callee Name `range` @581..586
+          arg positional @587..588
+            Int 1 @587..588
+          arg positional @590..591
+            Int 4 @590..591
+        body Block @602..623
+          ExprStmt @602..623
+            Call @602..623
+              callee Attribute `append` @602..616
+                base Name `squares` @602..609
+              arg positional @617..622
+                Binary * @617..622
+                  op Op @619..620
+                  lhs Name `i` @617..618
+                  rhs Name `i` @621..622
+      ExprStmt @628..651
+        Call @628..651
+          callee Name `print` @628..633
+          arg positional @634..650
+            Call @634..650
+              callee Name `sum_all` @634..641
+              arg positional @642..649
+                Name `squares` @642..649

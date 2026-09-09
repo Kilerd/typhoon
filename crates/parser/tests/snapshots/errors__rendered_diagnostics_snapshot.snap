@@ -1,0 +1,11 @@
+---
+source: crates/parser/tests/errors.rs
+expression: "rendered_errors(\"def main():\\n    pass\\n\")"
+---
+error: unknown keyword `def`
+ --> test.ty:1:1
+  |
+1 | def main():
+  | ^^^ `def` is not a typhoon keyword
+  |
+  = help: use `fn` to declare a function

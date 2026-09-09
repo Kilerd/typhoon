@@ -1,0 +1,122 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..677
+  ClassDecl `Point` @184..411
+    field `x` @201..209
+      type Named `float` @204..209
+    field `y` @214..222
+      type Named `float` @217..222
+    method FnDecl `dist` @228..309
+      param `self` (self) @236..240
+      ret Named `float` @245..250
+      body Block @260..309
+        Return @260..309
+          Binary ** @268..309
+            op Op @303..305
+            lhs Binary + @268..301
+              op Op @284..285
+              lhs Binary * @268..283
+                op Op @275..276
+                lhs Attribute `x` @268..274
+                  base Name `self` @268..272
+                rhs Attribute `x` @277..283
+                  base Name `self` @277..281
+              rhs Binary * @286..301
+                op Op @293..294
+                lhs Attribute `y` @286..292
+                  base Name `self` @286..290
+                rhs Attribute `y` @295..301
+                  base Name `self` @295..299
+            rhs Float 0.5 @306..309
+    method FnDecl `scale` @315..411
+      param `self` (self) @324..328
+      param `factor` @330..343
+        type Named `float` @338..343
+      body Block @354..411
+        Assign @354..378
+          target Attribute `x` @354..360
+            base Name `self` @354..358
+          value Binary * @363..378
+            op Op @370..371
+            lhs Attribute `x` @363..369
+              base Name `self` @363..367
+            rhs Name `factor` @372..378
+        Assign @387..411
+          target Attribute `y` @387..393
+            base Name `self` @387..391
+          value Binary * @396..411
+            op Op @403..404
+            lhs Attribute `y` @396..402
+              base Name `self` @396..400
+            rhs Name `factor` @405..411
+  FnDecl `main` @413..676
+    body Block @428..676
+      Assign @428..451
+        target Name `p` @428..429
+        value Call @432..451
+          callee Name `Point` @432..437
+          arg `x`= @438..443
+            Float 3.0 @440..443
+          arg `y`= @445..450
+            Float 4.0 @447..450
+      ExprStmt @456..485
+        Call @456..485
+          callee Name `print` @456..461
+          arg positional @462..484
+            FString @462..484
+              literal "Point(" @464..470
+              hole Hole @470..475
+                Attribute `x` @471..474
+                  base Name `p` @471..472
+              literal ", " @475..477
+              hole Hole @477..482
+                Attribute `y` @478..481
+                  base Name `p` @478..479
+              literal ")" @482..483
+      ExprStmt @490..505
+        Call @490..505
+          callee Name `print` @490..495
+          arg positional @496..504
+            Call @496..504
+              callee Attribute `dist` @496..502
+                base Name `p` @496..497
+      ExprStmt @510..539
+        Call @510..539
+          callee Name `print` @510..515
+          arg positional @516..538
+            FString @516..538
+              literal "dist=" @518..523
+              hole Hole @523..537
+                Call @524..532
+                  callee Attribute `dist` @524..530
+                    base Name `p` @524..525
+                spec ".3f" @533..536
+      ExprStmt @610..622
+        Call @610..622
+          callee Attribute `scale` @610..617
+            base Name `p` @610..611
+          arg positional @618..621
+            Float 2.0 @618..621
+      ExprStmt @627..656
+        Call @627..656
+          callee Name `print` @627..632
+          arg positional @633..655
+            FString @633..655
+              literal "Point(" @635..641
+              hole Hole @641..646
+                Attribute `x` @642..645
+                  base Name `p` @642..643
+              literal ", " @646..648
+              hole Hole @648..653
+                Attribute `y` @649..652
+                  base Name `p` @649..650
+              literal ")" @653..654
+      ExprStmt @661..676
+        Call @661..676
+          callee Name `print` @661..666
+          arg positional @667..675
+            Call @667..675
+              callee Attribute `dist` @667..673
+                base Name `p` @667..668

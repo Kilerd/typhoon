@@ -1,0 +1,19 @@
+---
+source: crates/parser/tests/items.rs
+expression: "typhoon_ast::dump(&module(\"fn scale<T>(x: T, factor: float = 1.0, name: str = \\\"x\\\") -> T:\\n    return x\\n\"))"
+---
+Module @0..75
+  FnDecl `scale` @0..74
+    generic `T` @9..10
+    param `x` @12..16
+      type Named `T` @15..16
+    param `factor` @18..37
+      type Named `float` @26..31
+      default Float 1.0 @34..37
+    param `name` @39..54
+      type Named `str` @45..48
+      default Str "x" @51..54
+    ret Named `T` @59..60
+    body Block @66..74
+      Return @66..74
+        Name `x` @73..74

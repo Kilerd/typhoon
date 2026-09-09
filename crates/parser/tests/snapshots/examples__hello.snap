@@ -1,0 +1,12 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..124
+  FnDecl `main` @84..123
+    body Block @99..123
+      ExprStmt @99..123
+        Call @99..123
+          callee Name `print` @99..104
+          arg positional @105..122
+            Str "Hello, Typhoon!" @105..122

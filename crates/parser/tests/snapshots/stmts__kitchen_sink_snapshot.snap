@@ -1,0 +1,91 @@
+---
+source: crates/parser/tests/stmts.rs
+expression: stmts_dump(body)
+---
+Module @0..337
+  FnDecl `main` @0..336
+    body Block @15..336
+      AnnAssign `x` @15..25
+        type Named `int` @18..21
+        value Int 1 @24..25
+      Assign @30..39
+        target Name `x` @30..31
+        value Binary + @34..39
+          op Op @36..37
+          lhs Name `x` @34..35
+          rhs Int 1 @38..39
+      If @44..150
+        cond Compare @47..52
+          left Name `x` @47..48
+          cmp `<` @49..50
+            Int 2 @51..52
+        then Block @62..76
+          ExprStmt @62..76
+            Call @62..76
+              callee Name `print` @62..67
+              arg positional @68..75
+                Str "small" @68..75
+        elif ElifBranch @81..117
+          cond Compare @86..92
+            left Name `x` @86..87
+            cmp `<` @88..89
+              Int 10 @90..92
+          body Block @102..117
+            ExprStmt @102..117
+              Call @102..117
+                callee Name `print` @102..107
+                arg positional @108..116
+                  Str "medium" @108..116
+        else Block @136..150
+          ExprStmt @136..150
+            Call @136..150
+              callee Name `print` @136..141
+              arg positional @142..149
+                Str "large" @142..149
+      While @155..262
+        cond Compare @161..166
+          left Name `x` @161..162
+          cmp `>` @163..164
+            Int 0 @165..166
+        body Block @176..262
+          Assign @176..185
+            target Name `x` @176..177
+            value Binary - @180..185
+              op Op @182..183
+              lhs Name `x` @180..181
+              rhs Int 1 @184..185
+          If @194..225
+            cond Compare @197..203
+              left Name `x` @197..198
+              cmp `==` @199..201
+                Int 3 @202..203
+            then Block @217..225
+              Continue @217..225
+          If @234..262
+            cond Compare @237..243
+              left Name `x` @237..238
+              cmp `==` @239..241
+                Int 1 @242..243
+            then Block @257..262
+              Break @257..262
+      For `i` @267..320
+        iter Call @276..291
+          callee Name `range` @276..281
+          arg positional @282..283
+            Int 0 @282..283
+          arg positional @285..287
+            Int 10 @285..287
+          arg positional @289..290
+            Int 2 @289..290
+        body Block @301..320
+          ExprStmt @301..320
+            Call @301..320
+              callee Name `print` @301..306
+              arg positional @307..319
+                FString @307..319
+                  literal "i=" @309..311
+                  hole Hole @311..318
+                    Name `i` @312..313
+                    spec ".2f" @314..317
+      Return @325..336
+        None @332..336

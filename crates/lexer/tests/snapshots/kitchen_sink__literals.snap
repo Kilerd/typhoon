@@ -1,0 +1,33 @@
+---
+source: crates/lexer/tests/kitchen_sink.rs
+expression: report(src)
+---
+Ident `ints` @0..4
+Eq @5..6
+Int 0 @7..8
+Int 42 @9..11
+Int 1000000 @12..21
+Int 31 @22..26
+Int 255 @27..31
+Int 10 @32..38
+Int 240 @39..50
+Int 493 @51..56
+Int 63 @57..62
+Newline @62..63
+Ident `floats` @63..69
+Eq @70..71
+Float 1.5 @72..75
+Float 10000000000.0 @76..80
+Float 10000000000.0 @81..85
+Float 0.0015 @86..92
+Float 1000.5 @93..100
+Float 0.0 @101..104
+Float 2.0 @105..108
+Newline @108..109
+Ident `strings` @109..116
+Eq @117..118
+Str "double" @119..127
+Str "single" @128..136
+Str "esc \n \t \r \\ \" ' \0 A 😀" @137..178
+Newline @178..179
+Eof @179..179

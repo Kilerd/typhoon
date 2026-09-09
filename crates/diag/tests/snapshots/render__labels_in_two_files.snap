@@ -1,0 +1,14 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: this function takes 0 arguments but 1 was supplied
+ --> b.ty:2:12
+  |
+2 |     helper(1)
+  |            ^ unexpected argument
+  |
+ ::: a.ty:1:1
+  |
+1 | fn helper() -> int:
+  | ------------------ function defined here

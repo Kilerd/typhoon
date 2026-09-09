@@ -1,0 +1,182 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @205..207
+Ident `classify` @208..216
+LParen @216..217
+Ident `n` @217..218
+Colon @218..219
+Ident `int` @220..223
+RParen @223..224
+Arrow @225..227
+Ident `str` @228..231
+Colon @231..232
+Newline @232..233
+Indent @237..237
+If @237..239
+Ident `n` @240..241
+Lt @242..243
+Int 0 @244..245
+Colon @245..246
+Newline @246..247
+Indent @255..255
+Return @255..261
+Str "negative" @262..272
+Newline @272..273
+Dedent @277..277
+Elif @277..281
+Ident `n` @282..283
+EqEq @284..286
+Int 0 @287..288
+Colon @288..289
+Newline @289..290
+Indent @298..298
+Return @298..304
+Str "zero" @305..311
+Newline @311..312
+Dedent @316..316
+Else @316..320
+Colon @320..321
+Newline @321..322
+Indent @330..330
+Return @330..336
+Str "positive" @337..347
+Newline @347..348
+Dedent @349..349
+Dedent @349..349
+Fn @349..351
+Ident `main` @352..356
+LParen @356..357
+RParen @357..358
+Colon @358..359
+Newline @359..360
+Indent @364..364
+Ident `print` @364..369
+LParen @369..370
+Ident `classify` @370..378
+LParen @378..379
+Minus @379..380
+Int 3 @380..381
+RParen @381..382
+RParen @382..383
+Newline @383..384
+Ident `print` @388..393
+LParen @393..394
+Ident `classify` @394..402
+LParen @402..403
+Int 0 @403..404
+RParen @404..405
+RParen @405..406
+Newline @406..407
+Ident `print` @411..416
+LParen @416..417
+Ident `classify` @417..425
+LParen @425..426
+Int 7 @426..427
+RParen @427..428
+RParen @428..429
+Newline @429..430
+Ident `i` @435..436
+Eq @437..438
+Int 0 @439..440
+Newline @440..441
+Ident `total` @445..450
+Eq @451..452
+Int 0 @453..454
+Newline @454..455
+While @459..464
+Ident `i` @465..466
+Lt @467..468
+Int 5 @469..470
+Colon @470..471
+Newline @471..472
+Indent @480..480
+Ident `total` @480..485
+Eq @486..487
+Ident `total` @488..493
+Plus @494..495
+Ident `i` @496..497
+Newline @497..498
+Ident `i` @506..507
+Eq @508..509
+Ident `i` @510..511
+Plus @512..513
+Int 1 @514..515
+Newline @515..516
+Dedent @520..520
+Ident `print` @520..525
+LParen @525..526
+Ident `total` @526..531
+RParen @531..532
+Newline @532..533
+For @538..541
+Ident `n` @542..543
+In @544..546
+Ident `range` @547..552
+LParen @552..553
+Int 10 @553..555
+RParen @555..556
+Colon @556..557
+Newline @557..558
+Indent @566..566
+If @566..568
+Ident `n` @569..570
+Percent @571..572
+Int 2 @573..574
+EqEq @575..577
+Int 0 @578..579
+Colon @579..580
+Newline @580..581
+Indent @593..593
+Continue @593..601
+Newline @601..602
+Dedent @610..610
+If @610..612
+Ident `n` @613..614
+Gt @615..616
+Int 6 @617..618
+Colon @618..619
+Newline @619..620
+Indent @632..632
+Break @632..637
+Newline @637..638
+Dedent @646..646
+Ident `print` @646..651
+LParen @651..652
+Ident `n` @652..653
+RParen @653..654
+Newline @654..655
+Dedent @659..659
+Ident `stepped` @659..666
+Eq @667..668
+Int 0 @669..670
+Newline @670..671
+For @675..678
+Ident `n2` @679..681
+In @682..684
+Ident `range` @685..690
+LParen @690..691
+Int 0 @691..692
+Comma @692..693
+Int 10 @694..696
+Comma @696..697
+Int 3 @698..699
+RParen @699..700
+Colon @700..701
+Newline @701..702
+Indent @710..710
+Ident `stepped` @710..717
+Eq @718..719
+Ident `stepped` @720..727
+Plus @728..729
+Ident `n2` @730..732
+Newline @732..733
+Dedent @737..737
+Ident `print` @737..742
+LParen @742..743
+Ident `stepped` @743..750
+RParen @750..751
+Newline @751..752
+Dedent @752..752
+Eof @752..752

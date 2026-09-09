@@ -1,0 +1,9 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+warning: unused variable `i`
+ --> main.ty:3:9
+  |
+3 |     for i in range(10):
+  |         ^^^^ never read

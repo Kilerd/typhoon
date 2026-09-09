@@ -1,0 +1,164 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..853
+  FnDecl `find` @158..302
+    param `xs` @166..179
+      type Named `list` @170..179
+        arg Named `int` @175..178
+    param `target` @181..192
+      type Named `int` @189..192
+    ret Union @197..207
+      Named `int` @197..200
+      NoneType @203..207
+    body Block @213..302
+      For `i` @213..286
+        iter Call @222..236
+          callee Name `range` @222..227
+          arg positional @228..235
+            Call @228..235
+              callee Name `len` @228..231
+              arg positional @232..234
+                Name `xs` @232..234
+        body Block @246..286
+          If @246..286
+            cond Compare @249..264
+              left Index @249..254
+                base Name `xs` @249..251
+                index Name `i` @252..253
+              cmp `==` @255..257
+                Name `target` @258..264
+            then Block @278..286
+              Return @278..286
+                Name `i` @285..286
+      Return @291..302
+        None @298..302
+  FnDecl `find_or` @304..445
+    param `xs` @315..328
+      type Named `list` @319..328
+        arg Named `int` @324..327
+    param `target` @330..341
+      type Named `int` @338..341
+    param `fallback` @343..356
+      type Named `int` @353..356
+    ret Named `int` @361..364
+    body Block @370..445
+      Assign @370..390
+        target Name `r` @370..371
+        value Call @374..390
+          callee Name `find` @374..378
+          arg positional @379..381
+            Name `xs` @379..381
+          arg positional @383..389
+            Name `target` @383..389
+      If @395..432
+        cond Compare @398..407
+          left Name `r` @398..399
+          cmp `is` @400..402
+            None @403..407
+        then Block @417..432
+          Return @417..432
+            Name `fallback` @424..432
+      Return @437..445
+        Name `r` @444..445
+  FnDecl `main` @487..852
+    body Block @502..852
+      AnnAssign `xs` @502..530
+        type Named `list` @506..515
+          arg Named `int` @511..514
+        value List @518..530
+          Int 10 @519..521
+          Int 20 @523..525
+          Int 30 @527..529
+      Assign @536..552
+        target Name `r` @536..537
+        value Call @540..552
+          callee Name `find` @540..544
+          arg positional @545..547
+            Name `xs` @545..547
+          arg positional @549..551
+            Int 30 @549..551
+      If @557..638
+        cond Compare @560..569
+          left Name `r` @560..561
+          cmp `is` @562..564
+            None @565..569
+        then Block @579..597
+          ExprStmt @579..597
+            Call @579..597
+              callee Name `print` @579..584
+              arg positional @585..596
+                Str "not found" @585..596
+        else Block @616..638
+          ExprStmt @616..638
+            Call @616..638
+              callee Name `print` @616..621
+              arg positional @622..637
+                FString @622..637
+                  literal "found at " @624..633
+                  hole Hole @633..636
+                    Name `r` @634..635
+      Assign @644..661
+        target Name `r2` @644..646
+        value Call @649..661
+          callee Name `find` @649..653
+          arg positional @654..656
+            Name `xs` @654..656
+          arg positional @658..660
+            Int 99 @658..660
+      If @666..749
+        cond Compare @669..679
+          left Name `r2` @669..671
+          cmp `is` @672..674
+            None @675..679
+        then Block @689..707
+          ExprStmt @689..707
+            Call @689..707
+              callee Name `print` @689..694
+              arg positional @695..706
+                Str "not found" @695..706
+        else Block @726..749
+          ExprStmt @726..749
+            Call @726..749
+              callee Name `print` @726..731
+              arg positional @732..748
+                FString @732..748
+                  literal "found at " @734..743
+                  hole Hole @743..747
+                    Name `r2` @744..746
+      Assign @755..773
+        target Name `idx` @755..758
+        value Call @761..773
+          callee Name `find` @761..765
+          arg positional @766..768
+            Name `xs` @766..768
+          arg positional @770..772
+            Int 20 @770..772
+      If @778..820
+        cond Compare @781..796
+          left Name `idx` @781..784
+          cmp `is not` @785..791
+            None @792..796
+        then Block @806..820
+          ExprStmt @806..820
+            Call @806..820
+              callee Name `print` @806..811
+              arg positional @812..819
+                Index @812..819
+                  base Name `xs` @812..814
+                  index Name `idx` @815..818
+      ExprStmt @826..852
+        Call @826..852
+          callee Name `print` @826..831
+          arg positional @832..851
+            Call @832..851
+              callee Name `find_or` @832..839
+              arg positional @840..842
+                Name `xs` @840..842
+              arg positional @844..846
+                Int 99 @844..846
+              arg positional @848..850
+                Unary - @848..850
+                  op Op @848..849
+                  Int 1 @849..850

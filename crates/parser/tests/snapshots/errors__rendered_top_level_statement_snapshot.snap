@@ -1,0 +1,11 @@
+---
+source: crates/parser/tests/errors.rs
+expression: "rendered_errors(\"print(1)\\n\")"
+---
+error: top-level statements are not allowed
+ --> test.ty:1:1
+  |
+1 | print(1)
+  | ^^^^^ only `fn`, `class` and constant declarations may appear here
+  |
+  = help: put code in `fn main():`

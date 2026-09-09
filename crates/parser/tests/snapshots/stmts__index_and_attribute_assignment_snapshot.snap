@@ -1,0 +1,13 @@
+---
+source: crates/parser/tests/stmts.rs
+expression: "stmts_dump(\"self.items[i] = v\")"
+---
+Module @0..33
+  FnDecl `main` @0..32
+    body Block @15..32
+      Assign @15..32
+        target Index @15..28
+          base Attribute `items` @15..25
+            base Name `self` @15..19
+          index Name `i` @26..27
+        value Name `v` @31..32

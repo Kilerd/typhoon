@@ -1,0 +1,34 @@
+---
+source: crates/parser/tests/items.rs
+expression: "typhoon_ast::dump(&module(\"class Stack<T>:\\n    items: list<T>\\n    count: int = 0\\n\\n    fn push(self, value: T):\\n        self.items.append(value)\\n\\n    fn pop(self) -> T:\\n        return self.items.pop()\\n\"))"
+---
+Module @0..173
+  ClassDecl `Stack` @0..172
+    generic `T` @12..13
+    field `items` @20..34
+      type Named `list` @27..34
+        arg Named `T` @32..33
+    field `count` @39..53
+      type Named `int` @46..49
+      default Int 0 @52..53
+    method FnDecl `push` @59..116
+      param `self` (self) @67..71
+      param `value` @73..81
+        type Named `T` @80..81
+      body Block @92..116
+        ExprStmt @92..116
+          Call @92..116
+            callee Attribute `append` @92..109
+              base Attribute `items` @92..102
+                base Name `self` @92..96
+            arg positional @110..115
+              Name `value` @110..115
+    method FnDecl `pop` @122..172
+      param `self` (self) @129..133
+      ret Named `T` @138..139
+      body Block @149..172
+        Return @149..172
+          Call @156..172
+            callee Attribute `pop` @156..170
+              base Attribute `items` @156..166
+                base Name `self` @156..160

@@ -1,0 +1,9 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: cannot find value `totl` in this scope
+ --> main.ty:5:11
+  |
+5 |     print(totl)
+  |           ^^^^ not found in this scope

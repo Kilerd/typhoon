@@ -3,4 +3,12 @@ name = "typhoon-diag"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "typhoon_diag"
+path = "src/lib.rs"
+
 [dependencies]
+annotate-snippets = "0.12.16"
+
+[dev-dependencies]
+insta = "1.48.0"

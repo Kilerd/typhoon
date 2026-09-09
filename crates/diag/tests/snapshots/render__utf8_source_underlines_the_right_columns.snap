@@ -1,0 +1,9 @@
+---
+source: crates/diag/tests/render.rs
+expression: "render(&d, &sm, false)"
+---
+error: unknown word
+ --> utf8.ty:2:16
+  |
+2 |     s = "héllo wörld"
+  |                ^^^^^ here

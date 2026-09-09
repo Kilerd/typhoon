@@ -1,0 +1,34 @@
+---
+source: crates/lexer/tests/kitchen_sink.rs
+expression: report(src)
+---
+Ident `a` @0..1
+Eq @2..3
+FString @4..12
+    Literal "plain" @6..11
+Newline @12..13
+Ident `b` @13..14
+Eq @15..16
+FString @17..23
+    Expr "x" @20..21 full @19..22
+Newline @23..24
+Ident `c` @24..25
+Eq @26..27
+FString @28..47
+    Expr "x" @31..32 spec ".2f" @33..36 full @30..37
+    Literal " " @37..38
+    Expr "y" @39..40 spec ">{w}" @41..45 full @38..46
+Newline @47..48
+Ident `d` @48..49
+Eq @50..51
+FString @52..83
+    Literal "{literal} " @54..66
+    Expr "d['k']" @67..73 full @66..74
+    Literal " " @74..75
+    Expr "a + b" @76..81 full @75..82
+Newline @83..84
+Ident `e` @84..85
+Eq @86..87
+FString @88..91
+Newline @91..92
+Eof @92..92

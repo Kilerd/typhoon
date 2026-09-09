@@ -1,0 +1,125 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..790
+  FnDecl `count_words` @189..412
+    param `words` @204..220
+      type Named `list` @211..220
+        arg Named `str` @216..219
+    ret Named `dict` @225..239
+      arg Named `str` @230..233
+      arg Named `int` @235..238
+    body Block @245..412
+      AnnAssign `counts` @245..272
+        type Named `dict` @253..267
+          arg Named `str` @258..261
+          arg Named `int` @263..266
+        value Dict @270..272
+      For `w` @277..394
+        iter Name `words` @286..291
+        body Block @301..394
+          If @301..394
+            cond Compare @304..315
+              left Name `w` @304..305
+              cmp `in` @306..308
+                Name `counts` @309..315
+            then Block @329..354
+              Assign @329..354
+                target Index @329..338
+                  base Name `counts` @329..335
+                  index Name `w` @336..337
+                value Binary + @341..354
+                  op Op @351..352
+                  lhs Index @341..350
+                    base Name `counts` @341..347
+                    index Name `w` @348..349
+                  rhs Int 1 @353..354
+            else Block @381..394
+              Assign @381..394
+                target Index @381..390
+                  base Name `counts` @381..387
+                  index Name `w` @388..389
+                value Int 1 @393..394
+      Return @399..412
+        Name `counts` @406..412
+  FnDecl `main` @414..789
+    body Block @429..789
+      AnnAssign `words` @429..503
+        type Named `list` @436..445
+          arg Named `str` @441..444
+        value List @448..503
+          Str "typhoon" @449..458
+          Str "is" @460..464
+          Str "fast" @466..472
+          Str "typhoon" @474..483
+          Str "fast" @485..491
+          Str "typhoon" @493..502
+      Assign @508..535
+        target Name `counts` @508..514
+        value Call @517..535
+          callee Name `count_words` @517..528
+          arg positional @529..534
+            Name `words` @529..534
+      For `key` @541..613
+        iter Call @552..573
+          callee Name `sorted` @552..558
+          arg positional @559..572
+            Call @559..572
+              callee Attribute `keys` @559..570
+                base Name `counts` @559..565
+        body Block @583..613
+          ExprStmt @583..613
+            Call @583..613
+              callee Name `print` @583..588
+              arg positional @589..612
+                FString @589..612
+                  hole Hole @591..596
+                    Name `key` @592..595
+                  literal ": " @596..598
+                  hole Hole @598..611
+                    Index @599..610
+                      base Name `counts` @599..605
+                      index Name `key` @606..609
+      ExprStmt @619..637
+        Call @619..637
+          callee Name `print` @619..624
+          arg positional @625..636
+            Call @625..636
+              callee Name `len` @625..628
+              arg positional @629..635
+                Name `counts` @629..635
+      Assign @643..652
+        target Name `total` @643..648
+        value Int 0 @651..652
+      For `key` @657..718
+        iter Call @668..681
+          callee Attribute `keys` @668..679
+            base Name `counts` @668..674
+        body Block @691..718
+          Assign @691..718
+            target Name `total` @691..696
+            value Binary + @699..718
+              op Op @705..706
+              lhs Name `total` @699..704
+              rhs Index @707..718
+                base Name `counts` @707..713
+                index Name `key` @714..717
+      ExprStmt @723..735
+        Call @723..735
+          callee Name `print` @723..728
+          arg positional @729..734
+            Name `total` @729..734
+      AnnAssign `empty` @741..767
+        type Named `dict` @748..762
+          arg Named `str` @753..756
+          arg Named `int` @758..761
+        value Dict @765..767
+      ExprStmt @772..789
+        Call @772..789
+          callee Name `print` @772..777
+          arg positional @778..788
+            Call @778..788
+              callee Name `len` @778..781
+              arg positional @782..787
+                Name `empty` @782..787

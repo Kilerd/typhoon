@@ -1,0 +1,130 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @241..243
+Ident `shout` @244..249
+LParen @249..250
+Ident `text` @250..254
+Colon @254..255
+Ident `str` @256..259
+RParen @259..260
+Arrow @261..263
+Ident `str` @264..267
+Colon @267..268
+Newline @268..269
+Indent @273..273
+Return @273..279
+Ident `text` @280..284
+Dot @284..285
+Ident `upper` @285..290
+LParen @290..291
+RParen @291..292
+Plus @293..294
+Str "!" @295..298
+Newline @298..299
+Dedent @300..300
+Fn @300..302
+Ident `main` @303..307
+LParen @307..308
+RParen @308..309
+Colon @309..310
+Newline @310..311
+Indent @315..315
+Ident `name` @315..319
+Colon @319..320
+Ident `str` @321..324
+Eq @325..326
+Str "Typhoon" @327..336
+Newline @336..337
+Ident `greeting` @341..349
+Eq @350..351
+Str "Hello, " @352..361
+Plus @362..363
+Ident `name` @364..368
+Plus @369..370
+Str "!" @371..374
+Newline @374..375
+Ident `print` @379..384
+LParen @384..385
+Ident `greeting` @385..393
+RParen @393..394
+Newline @394..395
+Ident `print` @399..404
+LParen @404..405
+Ident `len` @405..408
+LParen @408..409
+Ident `greeting` @409..417
+RParen @417..418
+RParen @418..419
+Newline @419..420
+Ident `print` @425..430
+LParen @430..431
+Ident `shout` @431..436
+LParen @436..437
+Str "hello" @437..444
+RParen @444..445
+RParen @445..446
+Newline @446..447
+Ident `words` @452..457
+Colon @457..458
+Ident `list` @459..463
+Lt @463..464
+Ident `str` @464..467
+Gt @467..468
+Eq @469..470
+Str "a fast language" @471..488
+Dot @488..489
+Ident `split` @489..494
+LParen @494..495
+Str " " @495..498
+RParen @498..499
+Newline @499..500
+Ident `print` @504..509
+LParen @509..510
+Ident `len` @510..513
+LParen @513..514
+Ident `words` @514..519
+RParen @519..520
+RParen @520..521
+Newline @521..522
+Ident `print` @526..531
+LParen @531..532
+Ident `words` @532..537
+LBracket @537..538
+Int 1 @538..539
+RBracket @539..540
+RParen @540..541
+Newline @541..542
+Ident `print` @546..551
+LParen @551..552
+Str "-" @552..555
+Dot @555..556
+Ident `join` @556..560
+LParen @560..561
+Ident `words` @561..566
+RParen @566..567
+RParen @567..568
+Newline @568..569
+Ident `year` @574..578
+Eq @579..580
+Int 2026 @581..585
+Newline @585..586
+Ident `print` @590..595
+LParen @595..596
+FString @596..622
+    Literal "name=" @598..603
+    Expr "name" @604..608 full @603..609
+    Literal " year=" @609..615
+    Expr "year" @616..620 full @615..621
+RParen @622..623
+Newline @623..624
+Ident `print` @628..633
+LParen @633..634
+FString @634..653
+    Literal "pi=" @636..639
+    Expr "3.14159" @640..647 spec ".2f" @648..651 full @639..652
+RParen @653..654
+Newline @654..655
+Dedent @655..655
+Eof @655..655

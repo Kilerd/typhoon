@@ -1,0 +1,99 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..639
+  FnDecl `main` @222..638
+    body Block @237..638
+      AnnAssign `a` @237..247
+        type Named `int` @240..243
+        value Int 7 @246..247
+      AnnAssign `b` @252..262
+        type Named `int` @255..258
+        value Int 2 @261..262
+      ExprStmt @268..280
+        Call @268..280
+          callee Name `print` @268..273
+          arg positional @274..279
+            Binary + @274..279
+              op Op @276..277
+              lhs Name `a` @274..275
+              rhs Name `b` @278..279
+      ExprStmt @285..297
+        Call @285..297
+          callee Name `print` @285..290
+          arg positional @291..296
+            Binary - @291..296
+              op Op @293..294
+              lhs Name `a` @291..292
+              rhs Name `b` @295..296
+      ExprStmt @302..314
+        Call @302..314
+          callee Name `print` @302..307
+          arg positional @308..313
+            Binary * @308..313
+              op Op @310..311
+              lhs Name `a` @308..309
+              rhs Name `b` @312..313
+      ExprStmt @319..331
+        Call @319..331
+          callee Name `print` @319..324
+          arg positional @325..330
+            Binary / @325..330
+              op Op @327..328
+              lhs Name `a` @325..326
+              rhs Name `b` @329..330
+      ExprStmt @378..391
+        Call @378..391
+          callee Name `print` @378..383
+          arg positional @384..390
+            Binary // @384..390
+              op Op @386..388
+              lhs Name `a` @384..385
+              rhs Name `b` @389..390
+      ExprStmt @429..441
+        Call @429..441
+          callee Name `print` @429..434
+          arg positional @435..440
+            Binary % @435..440
+              op Op @437..438
+              lhs Name `a` @435..436
+              rhs Name `b` @439..440
+      ExprStmt @446..459
+        Call @446..459
+          callee Name `print` @446..451
+          arg positional @452..458
+            Binary ** @452..458
+              op Op @454..456
+              lhs Name `a` @452..453
+              rhs Name `b` @457..458
+      AnnAssign `x` @556..575
+        type Named `float` @559..564
+        value Call @567..575
+          callee Name `float` @567..572
+          arg positional @573..574
+            Name `a` @573..574
+      ExprStmt @580..588
+        Call @580..588
+          callee Name `print` @580..585
+          arg positional @586..587
+            Name `x` @586..587
+      ExprStmt @593..616
+        Call @593..616
+          callee Name `print` @593..598
+          arg positional @599..615
+            FString @599..615
+              hole Hole @601..614
+                Binary / @602..609
+                  op Op @604..605
+                  lhs Name `x` @602..603
+                  rhs Float 2.0 @606..609
+                spec ".2f" @610..613
+      ExprStmt @621..638
+        Call @621..638
+          callee Name `print` @621..626
+          arg positional @627..637
+            Binary ** @627..637
+              op Op @631..633
+              lhs Float 2.0 @627..630
+              rhs Float 3.0 @634..637

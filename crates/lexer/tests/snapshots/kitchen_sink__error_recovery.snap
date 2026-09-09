@@ -1,0 +1,175 @@
+---
+source: crates/lexer/tests/kitchen_sink.rs
+expression: report(src)
+---
+Fn @0..2
+Ident `main` @3..7
+LParen @7..8
+RParen @8..9
+Colon @9..10
+Newline @10..11
+Indent @15..15
+Ident `a` @15..16
+Eq @17..18
+Int 0 @19..21
+Newline @21..22
+Ident `b` @26..27
+Eq @28..29
+Float 0.5 @30..32
+Newline @32..33
+Ident `c` @37..38
+Eq @39..40
+Float 1.0 @41..43
+Newline @43..44
+Ident `d` @48..49
+Eq @50..51
+Float 1.0 @52..54
+Newline @54..55
+Ident `e` @59..60
+Eq @61..62
+Int 123 @63..69
+Newline @69..70
+Ident `f` @74..75
+Eq @76..77
+Int 0 @78..97
+Newline @97..98
+Ident `g` @102..103
+Eq @104..105
+Str "bad q escape" @106..121
+Newline @121..122
+Ident `h` @126..127
+Eq @128..129
+Str "unterminated" @130..143
+Newline @143..144
+Ident `i` @148..149
+Eq @150..151
+FString @152..157
+Newline @157..158
+Ident `j` @162..163
+Eq @164..165
+FString @166..181
+    Literal "lone } brace" @168..180
+Newline @181..182
+Ident `k` @186..187
+Eq @188..189
+Ident `a` @190..191
+Ident `b` @194..195
+Newline @195..196
+Dedent @197..197
+Ident `l` @197..198
+Eq @199..200
+Int 1 @201..202
+Newline @202..203
+Indent @211..211
+Ident `m` @211..212
+Eq @213..214
+Int 2 @215..216
+Newline @216..217
+Dedent @217..217
+Eof @217..217
+
+--- diagnostics ---
+error: missing digits after the `0x` base prefix
+ --> main.ty:2:9
+  |
+2 |     a = 0x
+  |         ^^ expected at least one digit here
+  |
+  = help: write `0x0` for zero
+
+error: floats must have a digit before the decimal point
+ --> main.ty:3:9
+  |
+3 |     b = .5
+  |         ^^ missing a digit before `.`
+  |
+  = help: write `0.5`
+
+error: floats must have a digit after the decimal point
+ --> main.ty:4:9
+  |
+4 |     c = 1.
+  |         ^^ missing a digit after `.`
+  |
+  = help: write `1.0`
+
+error: expected at least one digit in the exponent
+ --> main.ty:5:10
+  |
+5 |     d = 1e
+  |          ^ this exponent has no digits
+  |
+  = help: write `1e10` or `1e-3`
+
+error: invalid suffix `abc` on a numeric literal
+ --> main.ty:6:12
+  |
+6 |     e = 123abc
+  |            ^^^ invalid suffix
+  |
+  = help: typhoon has no literal suffixes; separate them with a space
+
+error: integer literal is too large for `int`
+ --> main.ty:7:9
+  |
+7 |     f = 9223372036854775808
+  |         ^^^^^^^^^^^^^^^^^^^ does not fit in a 64-bit signed integer
+  |
+  = note: `int` is a 64-bit signed integer, see DESIGN 1.4
+
+error: unknown character escape `\q`
+ --> main.ty:8:14
+  |
+8 |     g = "bad \q escape"
+  |              ^^ unknown escape sequence
+  |
+  = help: write `\\` for a literal backslash
+
+error: unterminated string literal
+ --> main.ty:9:9
+  |
+9 |     h = "unterminated
+  |         ^ this string is never closed
+  |
+  = note: typhoon string literals may not span multiple lines
+  = help: add a closing `"`
+
+error: empty expression in f-string
+  --> main.ty:10:11
+   |
+10 |     i = f"{}"
+   |           ^^ this hole has no expression
+   |
+   = help: write an expression between `{` and `}`, or `{{` for a brace
+
+error: single `}` is not allowed in an f-string
+  --> main.ty:11:16
+   |
+11 |     j = f"lone } brace"
+   |                ^ unmatched `}`
+   |
+   = help: write `}}` for a literal brace
+
+error: unknown character `!`
+  --> main.ty:12:11
+   |
+12 |     k = a ! b
+   |           ^ not a typhoon operator
+   |
+   = help: use `not` for logical negation, `!=` for inequality
+
+error: tabs are not allowed in indentation
+  --> main.ty:13:1
+   |
+13 |     l = 1
+   | ^^^^ tab used here
+   |
+   = help: use 4 spaces per indentation level
+
+error: unindent does not match any outer indentation level
+  --> main.ty:13:2
+   |
+13 |     l = 1
+   |     ^ this line is indented by 1 space
+   |
+   = note: the open indentation levels are 0

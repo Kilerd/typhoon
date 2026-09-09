@@ -1,0 +1,351 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..1231
+  ClassDecl `Body` @207..288
+    field `x` @223..231
+      type Named `float` @226..231
+    field `y` @236..244
+      type Named `float` @239..244
+    field `vx` @249..258
+      type Named `float` @253..258
+    field `vy` @263..272
+      type Named `float` @267..272
+    field `mass` @277..288
+      type Named `float` @283..288
+  FnDecl `energy` @290..525
+    param `a` @300..307
+      type Named `Body` @303..307
+    param `b` @309..316
+      type Named `Body` @312..316
+    ret Named `float` @321..326
+    body Block @332..525
+      Assign @332..346
+        target Name `dx` @332..334
+        value Binary - @337..346
+          op Op @341..342
+          lhs Attribute `x` @337..340
+            base Name `a` @337..338
+          rhs Attribute `x` @343..346
+            base Name `b` @343..344
+      Assign @351..365
+        target Name `dy` @351..353
+        value Binary - @356..365
+          op Op @360..361
+          lhs Attribute `y` @356..359
+            base Name `a` @356..357
+          rhs Attribute `y` @362..365
+            base Name `b` @362..363
+      Assign @370..462
+        target Name `ke` @370..372
+        value Binary + @375..461
+          op Op @418..419
+          lhs Binary * @375..416
+            op Op @388..389
+            lhs Binary * @375..387
+              op Op @379..380
+              lhs Float 0.5 @375..378
+              rhs Attribute `mass` @381..387
+                base Name `a` @381..382
+            rhs Binary + @391..416
+              op Op @403..404
+              lhs Binary * @391..402
+                op Op @396..397
+                lhs Attribute `vx` @391..395
+                  base Name `a` @391..392
+                rhs Attribute `vx` @398..402
+                  base Name `a` @398..399
+              rhs Binary * @405..416
+                op Op @410..411
+                lhs Attribute `vy` @405..409
+                  base Name `a` @405..406
+                rhs Attribute `vy` @412..416
+                  base Name `a` @412..413
+          rhs Binary * @420..461
+            op Op @433..434
+            lhs Binary * @420..432
+              op Op @424..425
+              lhs Float 0.5 @420..423
+              rhs Attribute `mass` @426..432
+                base Name `b` @426..427
+            rhs Binary + @436..461
+              op Op @448..449
+              lhs Binary * @436..447
+                op Op @441..442
+                lhs Attribute `vx` @436..440
+                  base Name `b` @436..437
+                rhs Attribute `vx` @443..447
+                  base Name `b` @443..444
+              rhs Binary * @450..461
+                op Op @455..456
+                lhs Attribute `vy` @450..454
+                  base Name `b` @450..451
+                rhs Attribute `vy` @457..461
+                  base Name `b` @457..458
+      Return @467..525
+        Binary - @474..524
+          op Op @477..478
+          lhs Name `ke` @474..476
+          rhs Binary / @479..524
+            op Op @495..496
+            lhs Binary * @479..494
+              op Op @486..487
+              lhs Attribute `mass` @479..485
+                base Name `a` @479..480
+              rhs Attribute `mass` @488..494
+                base Name `b` @488..489
+            rhs Binary ** @499..524
+              op Op @518..520
+              lhs Binary + @499..516
+                op Op @507..508
+                lhs Binary * @499..506
+                  op Op @502..503
+                  lhs Name `dx` @499..501
+                  rhs Name `dx` @504..506
+                rhs Binary * @509..516
+                  op Op @512..513
+                  lhs Name `dy` @509..511
+                  rhs Name `dy` @514..516
+              rhs Float 0.5 @521..524
+  FnDecl `advance` @527..914
+    param `a` @538..545
+      type Named `Body` @541..545
+    param `b` @547..554
+      type Named `Body` @550..554
+    param `dt` @556..565
+      type Named `float` @560..565
+    body Block @572..914
+      Assign @572..586
+        target Name `dx` @572..574
+        value Binary - @577..586
+          op Op @581..582
+          lhs Attribute `x` @577..580
+            base Name `a` @577..578
+          rhs Attribute `x` @583..586
+            base Name `b` @583..584
+      Assign @591..605
+        target Name `dy` @591..593
+        value Binary - @596..605
+          op Op @600..601
+          lhs Attribute `y` @596..599
+            base Name `a` @596..597
+          rhs Attribute `y` @602..605
+            base Name `b` @602..603
+      Assign @610..632
+        target Name `d2` @610..612
+        value Binary + @615..632
+          op Op @623..624
+          lhs Binary * @615..622
+            op Op @618..619
+            lhs Name `dx` @615..617
+            rhs Name `dx` @620..622
+          rhs Binary * @625..632
+            op Op @628..629
+            lhs Name `dy` @625..627
+            rhs Name `dy` @630..632
+      Assign @637..666
+        target Name `mag` @637..640
+        value Binary / @643..664
+          op Op @646..647
+          lhs Name `dt` @643..645
+          rhs Binary * @649..664
+            op Op @652..653
+            lhs Name `d2` @649..651
+            rhs Binary ** @655..664
+              op Op @658..660
+              lhs Name `d2` @655..657
+              rhs Float 0.5 @661..664
+      Assign @671..702
+        target Attribute `vx` @671..675
+          base Name `a` @671..672
+        value Binary - @678..702
+          op Op @683..684
+          lhs Attribute `vx` @678..682
+            base Name `a` @678..679
+          rhs Binary * @685..702
+            op Op @697..698
+            lhs Binary * @685..696
+              op Op @688..689
+              lhs Name `dx` @685..687
+              rhs Attribute `mass` @690..696
+                base Name `b` @690..691
+            rhs Name `mag` @699..702
+      Assign @707..738
+        target Attribute `vy` @707..711
+          base Name `a` @707..708
+        value Binary - @714..738
+          op Op @719..720
+          lhs Attribute `vy` @714..718
+            base Name `a` @714..715
+          rhs Binary * @721..738
+            op Op @733..734
+            lhs Binary * @721..732
+              op Op @724..725
+              lhs Name `dy` @721..723
+              rhs Attribute `mass` @726..732
+                base Name `b` @726..727
+            rhs Name `mag` @735..738
+      Assign @743..774
+        target Attribute `vx` @743..747
+          base Name `b` @743..744
+        value Binary + @750..774
+          op Op @755..756
+          lhs Attribute `vx` @750..754
+            base Name `b` @750..751
+          rhs Binary * @757..774
+            op Op @769..770
+            lhs Binary * @757..768
+              op Op @760..761
+              lhs Name `dx` @757..759
+              rhs Attribute `mass` @762..768
+                base Name `a` @762..763
+            rhs Name `mag` @771..774
+      Assign @779..810
+        target Attribute `vy` @779..783
+          base Name `b` @779..780
+        value Binary + @786..810
+          op Op @791..792
+          lhs Attribute `vy` @786..790
+            base Name `b` @786..787
+          rhs Binary * @793..810
+            op Op @805..806
+            lhs Binary * @793..804
+              op Op @796..797
+              lhs Name `dy` @793..795
+              rhs Attribute `mass` @798..804
+                base Name `a` @798..799
+            rhs Name `mag` @807..810
+      Assign @815..836
+        target Attribute `x` @815..818
+          base Name `a` @815..816
+        value Binary + @821..836
+          op Op @825..826
+          lhs Attribute `x` @821..824
+            base Name `a` @821..822
+          rhs Binary * @827..836
+            op Op @830..831
+            lhs Name `dt` @827..829
+            rhs Attribute `vx` @832..836
+              base Name `a` @832..833
+      Assign @841..862
+        target Attribute `y` @841..844
+          base Name `a` @841..842
+        value Binary + @847..862
+          op Op @851..852
+          lhs Attribute `y` @847..850
+            base Name `a` @847..848
+          rhs Binary * @853..862
+            op Op @856..857
+            lhs Name `dt` @853..855
+            rhs Attribute `vy` @858..862
+              base Name `a` @858..859
+      Assign @867..888
+        target Attribute `x` @867..870
+          base Name `b` @867..868
+        value Binary + @873..888
+          op Op @877..878
+          lhs Attribute `x` @873..876
+            base Name `b` @873..874
+          rhs Binary * @879..888
+            op Op @882..883
+            lhs Name `dt` @879..881
+            rhs Attribute `vx` @884..888
+              base Name `b` @884..885
+      Assign @893..914
+        target Attribute `y` @893..896
+          base Name `b` @893..894
+        value Binary + @899..914
+          op Op @903..904
+          lhs Attribute `y` @899..902
+            base Name `b` @899..900
+          rhs Binary * @905..914
+            op Op @908..909
+            lhs Name `dt` @905..907
+            rhs Attribute `vy` @910..914
+              base Name `b` @910..911
+  FnDecl `main` @916..1230
+    body Block @931..1230
+      Assign @931..981
+        target Name `sun` @931..934
+        value Call @937..981
+          callee Name `Body` @937..941
+          arg `x`= @942..947
+            Float 0.0 @944..947
+          arg `y`= @949..954
+            Float 0.0 @951..954
+          arg `vx`= @956..962
+            Float 0.0 @959..962
+          arg `vy`= @964..970
+            Float 0.0 @967..970
+          arg `mass`= @972..980
+            Float 1.0 @977..980
+      Assign @986..1041
+        target Name `planet` @986..992
+        value Call @995..1041
+          callee Name `Body` @995..999
+          arg `x`= @1000..1005
+            Float 1.0 @1002..1005
+          arg `y`= @1007..1012
+            Float 0.0 @1009..1012
+          arg `vx`= @1014..1020
+            Float 0.0 @1017..1020
+          arg `vy`= @1022..1028
+            Float 1.0 @1025..1028
+          arg `mass`= @1030..1040
+            Float 0.001 @1035..1040
+      ExprStmt @1046..1081
+        Call @1046..1081
+          callee Name `print` @1046..1051
+          arg positional @1052..1080
+            FString @1052..1080
+              hole Hole @1054..1079
+                Call @1055..1074
+                  callee Name `energy` @1055..1061
+                  arg positional @1062..1065
+                    Name `sun` @1062..1065
+                  arg positional @1067..1073
+                    Name `planet` @1067..1073
+                spec ".6f" @1075..1078
+      For `step` @1086..1146
+        iter Call @1098..1109
+          callee Name `range` @1098..1103
+          arg positional @1104..1108
+            Int 1000 @1104..1108
+        body Block @1119..1146
+          ExprStmt @1119..1146
+            Call @1119..1146
+              callee Name `advance` @1119..1126
+              arg positional @1127..1130
+                Name `sun` @1127..1130
+              arg positional @1132..1138
+                Name `planet` @1132..1138
+              arg positional @1140..1145
+                Float 0.001 @1140..1145
+      ExprStmt @1151..1186
+        Call @1151..1186
+          callee Name `print` @1151..1156
+          arg positional @1157..1185
+            FString @1157..1185
+              hole Hole @1159..1184
+                Call @1160..1179
+                  callee Name `energy` @1160..1166
+                  arg positional @1167..1170
+                    Name `sun` @1167..1170
+                  arg positional @1172..1178
+                    Name `planet` @1172..1178
+                spec ".6f" @1180..1183
+      ExprStmt @1191..1230
+        Call @1191..1230
+          callee Name `print` @1191..1196
+          arg positional @1197..1229
+            FString @1197..1229
+              hole Hole @1199..1213
+                Attribute `x` @1200..1208
+                  base Name `planet` @1200..1206
+                spec ".6f" @1209..1212
+              literal " " @1213..1214
+              hole Hole @1214..1228
+                Attribute `y` @1215..1223
+                  base Name `planet` @1215..1221
+                spec ".6f" @1224..1227

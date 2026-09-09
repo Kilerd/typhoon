@@ -1,0 +1,424 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Class @207..212
+Ident `Body` @213..217
+Colon @217..218
+Newline @218..219
+Indent @223..223
+Ident `x` @223..224
+Colon @224..225
+Ident `float` @226..231
+Newline @231..232
+Ident `y` @236..237
+Colon @237..238
+Ident `float` @239..244
+Newline @244..245
+Ident `vx` @249..251
+Colon @251..252
+Ident `float` @253..258
+Newline @258..259
+Ident `vy` @263..265
+Colon @265..266
+Ident `float` @267..272
+Newline @272..273
+Ident `mass` @277..281
+Colon @281..282
+Ident `float` @283..288
+Newline @288..289
+Dedent @290..290
+Fn @290..292
+Ident `energy` @293..299
+LParen @299..300
+Ident `a` @300..301
+Colon @301..302
+Ident `Body` @303..307
+Comma @307..308
+Ident `b` @309..310
+Colon @310..311
+Ident `Body` @312..316
+RParen @316..317
+Arrow @318..320
+Ident `float` @321..326
+Colon @326..327
+Newline @327..328
+Indent @332..332
+Ident `dx` @332..334
+Eq @335..336
+Ident `a` @337..338
+Dot @338..339
+Ident `x` @339..340
+Minus @341..342
+Ident `b` @343..344
+Dot @344..345
+Ident `x` @345..346
+Newline @346..347
+Ident `dy` @351..353
+Eq @354..355
+Ident `a` @356..357
+Dot @357..358
+Ident `y` @358..359
+Minus @360..361
+Ident `b` @362..363
+Dot @363..364
+Ident `y` @364..365
+Newline @365..366
+Ident `ke` @370..372
+Eq @373..374
+Float 0.5 @375..378
+Star @379..380
+Ident `a` @381..382
+Dot @382..383
+Ident `mass` @383..387
+Star @388..389
+LParen @390..391
+Ident `a` @391..392
+Dot @392..393
+Ident `vx` @393..395
+Star @396..397
+Ident `a` @398..399
+Dot @399..400
+Ident `vx` @400..402
+Plus @403..404
+Ident `a` @405..406
+Dot @406..407
+Ident `vy` @407..409
+Star @410..411
+Ident `a` @412..413
+Dot @413..414
+Ident `vy` @414..416
+RParen @416..417
+Plus @418..419
+Float 0.5 @420..423
+Star @424..425
+Ident `b` @426..427
+Dot @427..428
+Ident `mass` @428..432
+Star @433..434
+LParen @435..436
+Ident `b` @436..437
+Dot @437..438
+Ident `vx` @438..440
+Star @441..442
+Ident `b` @443..444
+Dot @444..445
+Ident `vx` @445..447
+Plus @448..449
+Ident `b` @450..451
+Dot @451..452
+Ident `vy` @452..454
+Star @455..456
+Ident `b` @457..458
+Dot @458..459
+Ident `vy` @459..461
+RParen @461..462
+Newline @462..463
+Return @467..473
+Ident `ke` @474..476
+Minus @477..478
+Ident `a` @479..480
+Dot @480..481
+Ident `mass` @481..485
+Star @486..487
+Ident `b` @488..489
+Dot @489..490
+Ident `mass` @490..494
+Slash @495..496
+LParen @497..498
+LParen @498..499
+Ident `dx` @499..501
+Star @502..503
+Ident `dx` @504..506
+Plus @507..508
+Ident `dy` @509..511
+Star @512..513
+Ident `dy` @514..516
+RParen @516..517
+StarStar @518..520
+Float 0.5 @521..524
+RParen @524..525
+Newline @525..526
+Dedent @527..527
+Fn @527..529
+Ident `advance` @530..537
+LParen @537..538
+Ident `a` @538..539
+Colon @539..540
+Ident `Body` @541..545
+Comma @545..546
+Ident `b` @547..548
+Colon @548..549
+Ident `Body` @550..554
+Comma @554..555
+Ident `dt` @556..558
+Colon @558..559
+Ident `float` @560..565
+RParen @565..566
+Colon @566..567
+Newline @567..568
+Indent @572..572
+Ident `dx` @572..574
+Eq @575..576
+Ident `a` @577..578
+Dot @578..579
+Ident `x` @579..580
+Minus @581..582
+Ident `b` @583..584
+Dot @584..585
+Ident `x` @585..586
+Newline @586..587
+Ident `dy` @591..593
+Eq @594..595
+Ident `a` @596..597
+Dot @597..598
+Ident `y` @598..599
+Minus @600..601
+Ident `b` @602..603
+Dot @603..604
+Ident `y` @604..605
+Newline @605..606
+Ident `d2` @610..612
+Eq @613..614
+Ident `dx` @615..617
+Star @618..619
+Ident `dx` @620..622
+Plus @623..624
+Ident `dy` @625..627
+Star @628..629
+Ident `dy` @630..632
+Newline @632..633
+Ident `mag` @637..640
+Eq @641..642
+Ident `dt` @643..645
+Slash @646..647
+LParen @648..649
+Ident `d2` @649..651
+Star @652..653
+LParen @654..655
+Ident `d2` @655..657
+StarStar @658..660
+Float 0.5 @661..664
+RParen @664..665
+RParen @665..666
+Newline @666..667
+Ident `a` @671..672
+Dot @672..673
+Ident `vx` @673..675
+Eq @676..677
+Ident `a` @678..679
+Dot @679..680
+Ident `vx` @680..682
+Minus @683..684
+Ident `dx` @685..687
+Star @688..689
+Ident `b` @690..691
+Dot @691..692
+Ident `mass` @692..696
+Star @697..698
+Ident `mag` @699..702
+Newline @702..703
+Ident `a` @707..708
+Dot @708..709
+Ident `vy` @709..711
+Eq @712..713
+Ident `a` @714..715
+Dot @715..716
+Ident `vy` @716..718
+Minus @719..720
+Ident `dy` @721..723
+Star @724..725
+Ident `b` @726..727
+Dot @727..728
+Ident `mass` @728..732
+Star @733..734
+Ident `mag` @735..738
+Newline @738..739
+Ident `b` @743..744
+Dot @744..745
+Ident `vx` @745..747
+Eq @748..749
+Ident `b` @750..751
+Dot @751..752
+Ident `vx` @752..754
+Plus @755..756
+Ident `dx` @757..759
+Star @760..761
+Ident `a` @762..763
+Dot @763..764
+Ident `mass` @764..768
+Star @769..770
+Ident `mag` @771..774
+Newline @774..775
+Ident `b` @779..780
+Dot @780..781
+Ident `vy` @781..783
+Eq @784..785
+Ident `b` @786..787
+Dot @787..788
+Ident `vy` @788..790
+Plus @791..792
+Ident `dy` @793..795
+Star @796..797
+Ident `a` @798..799
+Dot @799..800
+Ident `mass` @800..804
+Star @805..806
+Ident `mag` @807..810
+Newline @810..811
+Ident `a` @815..816
+Dot @816..817
+Ident `x` @817..818
+Eq @819..820
+Ident `a` @821..822
+Dot @822..823
+Ident `x` @823..824
+Plus @825..826
+Ident `dt` @827..829
+Star @830..831
+Ident `a` @832..833
+Dot @833..834
+Ident `vx` @834..836
+Newline @836..837
+Ident `a` @841..842
+Dot @842..843
+Ident `y` @843..844
+Eq @845..846
+Ident `a` @847..848
+Dot @848..849
+Ident `y` @849..850
+Plus @851..852
+Ident `dt` @853..855
+Star @856..857
+Ident `a` @858..859
+Dot @859..860
+Ident `vy` @860..862
+Newline @862..863
+Ident `b` @867..868
+Dot @868..869
+Ident `x` @869..870
+Eq @871..872
+Ident `b` @873..874
+Dot @874..875
+Ident `x` @875..876
+Plus @877..878
+Ident `dt` @879..881
+Star @882..883
+Ident `b` @884..885
+Dot @885..886
+Ident `vx` @886..888
+Newline @888..889
+Ident `b` @893..894
+Dot @894..895
+Ident `y` @895..896
+Eq @897..898
+Ident `b` @899..900
+Dot @900..901
+Ident `y` @901..902
+Plus @903..904
+Ident `dt` @905..907
+Star @908..909
+Ident `b` @910..911
+Dot @911..912
+Ident `vy` @912..914
+Newline @914..915
+Dedent @916..916
+Fn @916..918
+Ident `main` @919..923
+LParen @923..924
+RParen @924..925
+Colon @925..926
+Newline @926..927
+Indent @931..931
+Ident `sun` @931..934
+Eq @935..936
+Ident `Body` @937..941
+LParen @941..942
+Ident `x` @942..943
+Eq @943..944
+Float 0.0 @944..947
+Comma @947..948
+Ident `y` @949..950
+Eq @950..951
+Float 0.0 @951..954
+Comma @954..955
+Ident `vx` @956..958
+Eq @958..959
+Float 0.0 @959..962
+Comma @962..963
+Ident `vy` @964..966
+Eq @966..967
+Float 0.0 @967..970
+Comma @970..971
+Ident `mass` @972..976
+Eq @976..977
+Float 1.0 @977..980
+RParen @980..981
+Newline @981..982
+Ident `planet` @986..992
+Eq @993..994
+Ident `Body` @995..999
+LParen @999..1000
+Ident `x` @1000..1001
+Eq @1001..1002
+Float 1.0 @1002..1005
+Comma @1005..1006
+Ident `y` @1007..1008
+Eq @1008..1009
+Float 0.0 @1009..1012
+Comma @1012..1013
+Ident `vx` @1014..1016
+Eq @1016..1017
+Float 0.0 @1017..1020
+Comma @1020..1021
+Ident `vy` @1022..1024
+Eq @1024..1025
+Float 1.0 @1025..1028
+Comma @1028..1029
+Ident `mass` @1030..1034
+Eq @1034..1035
+Float 0.001 @1035..1040
+RParen @1040..1041
+Newline @1041..1042
+Ident `print` @1046..1051
+LParen @1051..1052
+FString @1052..1080
+    Expr "energy(sun, planet)" @1055..1074 spec ".6f" @1075..1078 full @1054..1079
+RParen @1080..1081
+Newline @1081..1082
+For @1086..1089
+Ident `step` @1090..1094
+In @1095..1097
+Ident `range` @1098..1103
+LParen @1103..1104
+Int 1000 @1104..1108
+RParen @1108..1109
+Colon @1109..1110
+Newline @1110..1111
+Indent @1119..1119
+Ident `advance` @1119..1126
+LParen @1126..1127
+Ident `sun` @1127..1130
+Comma @1130..1131
+Ident `planet` @1132..1138
+Comma @1138..1139
+Float 0.001 @1140..1145
+RParen @1145..1146
+Newline @1146..1147
+Dedent @1151..1151
+Ident `print` @1151..1156
+LParen @1156..1157
+FString @1157..1185
+    Expr "energy(sun, planet)" @1160..1179 spec ".6f" @1180..1183 full @1159..1184
+RParen @1185..1186
+Newline @1186..1187
+Ident `print` @1191..1196
+LParen @1196..1197
+FString @1197..1229
+    Expr "planet.x" @1200..1208 spec ".6f" @1209..1212 full @1199..1213
+    Literal " " @1213..1214
+    Expr "planet.y" @1215..1223 spec ".6f" @1224..1227 full @1214..1228
+RParen @1229..1230
+Newline @1230..1231
+Dedent @1231..1231
+Eof @1231..1231

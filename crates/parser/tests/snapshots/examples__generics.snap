@@ -1,0 +1,149 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..802
+  FnDecl `max` @162..233
+    generic `T` @169..170
+    param `a` @172..176
+      type Named `T` @175..176
+    param `b` @178..182
+      type Named `T` @181..182
+    ret Named `T` @187..188
+    body Block @194..233
+      If @194..220
+        cond Compare @197..202
+          left Name `a` @197..198
+          cmp `>` @199..200
+            Name `b` @201..202
+        then Block @212..220
+          Return @212..220
+            Name `a` @219..220
+      Return @225..233
+        Name `b` @232..233
+  ClassDecl `Stack` @235..446
+    generic `T` @247..248
+    field `items` @255..269
+      type Named `list` @262..269
+        arg Named `T` @267..268
+    method FnDecl `push` @275..332
+      param `self` (self) @283..287
+      param `value` @289..297
+        type Named `T` @296..297
+      body Block @308..332
+        ExprStmt @308..332
+          Call @308..332
+            callee Attribute `append` @308..325
+              base Attribute `items` @308..318
+                base Name `self` @308..312
+            arg positional @326..331
+              Name `value` @326..331
+    method FnDecl `pop` @338..388
+      param `self` (self) @345..349
+      ret Named `T` @354..355
+      body Block @365..388
+        Return @365..388
+          Call @372..388
+            callee Attribute `pop` @372..386
+              base Attribute `items` @372..382
+                base Name `self` @372..376
+    method FnDecl `size` @394..446
+      param `self` (self) @402..406
+      ret Named `int` @411..414
+      body Block @424..446
+        Return @424..446
+          Call @431..446
+            callee Name `len` @431..434
+            arg positional @435..445
+              Attribute `items` @435..445
+                base Name `self` @435..439
+  FnDecl `main` @448..801
+    body Block @463..801
+      ExprStmt @463..479
+        Call @463..479
+          callee Name `print` @463..468
+          arg positional @469..478
+            Call @469..478
+              callee Name `max` @469..472
+              arg positional @473..474
+                Int 1 @473..474
+              arg positional @476..477
+                Int 3 @476..477
+      ExprStmt @519..546
+        Call @519..546
+          callee Name `print` @519..524
+          arg positional @525..545
+            Call @525..545
+              callee Name `max` @525..528
+              typearg Named `float` @529..534
+              arg positional @536..539
+                Float 2.5 @536..539
+              arg positional @541..544
+                Float 1.5 @541..544
+      AnnAssign `s` @580..611
+        type Named `Stack` @583..593
+          arg Named `int` @589..592
+        value Call @596..611
+          callee Name `Stack` @596..601
+          arg `items`= @602..610
+            List @608..610
+      ExprStmt @616..625
+        Call @616..625
+          callee Attribute `push` @616..622
+            base Name `s` @616..617
+          arg positional @623..624
+            Int 1 @623..624
+      ExprStmt @630..639
+        Call @630..639
+          callee Attribute `push` @630..636
+            base Name `s` @630..631
+          arg positional @637..638
+            Int 2 @637..638
+      ExprStmt @644..659
+        Call @644..659
+          callee Name `print` @644..649
+          arg positional @650..658
+            Call @650..658
+              callee Attribute `size` @650..656
+                base Name `s` @650..651
+      ExprStmt @664..678
+        Call @664..678
+          callee Name `print` @664..669
+          arg positional @670..677
+            Call @670..677
+              callee Attribute `pop` @670..675
+                base Name `s` @670..671
+      ExprStmt @683..697
+        Call @683..697
+          callee Name `print` @683..688
+          arg positional @689..696
+            Call @689..696
+              callee Attribute `pop` @689..694
+                base Name `s` @689..690
+      ExprStmt @702..717
+        Call @702..717
+          callee Name `print` @702..707
+          arg positional @708..716
+            Call @708..716
+              callee Attribute `size` @708..714
+                base Name `s` @708..709
+      AnnAssign `names` @723..758
+        type Named `Stack` @730..740
+          arg Named `str` @736..739
+        value Call @743..758
+          callee Name `Stack` @743..748
+          arg `items`= @749..757
+            List @755..757
+      ExprStmt @763..778
+        Call @763..778
+          callee Attribute `push` @763..773
+            base Name `names` @763..768
+          arg positional @774..777
+            Str "b" @774..777
+      ExprStmt @783..801
+        Call @783..801
+          callee Name `print` @783..788
+          arg positional @789..800
+            Call @789..800
+              callee Attribute `pop` @789..798
+                base Name `names` @789..794

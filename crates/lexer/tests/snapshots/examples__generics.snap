@@ -1,0 +1,243 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Fn @162..164
+Ident `max` @165..168
+Lt @168..169
+Ident `T` @169..170
+Gt @170..171
+LParen @171..172
+Ident `a` @172..173
+Colon @173..174
+Ident `T` @175..176
+Comma @176..177
+Ident `b` @178..179
+Colon @179..180
+Ident `T` @181..182
+RParen @182..183
+Arrow @184..186
+Ident `T` @187..188
+Colon @188..189
+Newline @189..190
+Indent @194..194
+If @194..196
+Ident `a` @197..198
+Gt @199..200
+Ident `b` @201..202
+Colon @202..203
+Newline @203..204
+Indent @212..212
+Return @212..218
+Ident `a` @219..220
+Newline @220..221
+Dedent @225..225
+Return @225..231
+Ident `b` @232..233
+Newline @233..234
+Dedent @235..235
+Class @235..240
+Ident `Stack` @241..246
+Lt @246..247
+Ident `T` @247..248
+Gt @248..249
+Colon @249..250
+Newline @250..251
+Indent @255..255
+Ident `items` @255..260
+Colon @260..261
+Ident `list` @262..266
+Lt @266..267
+Ident `T` @267..268
+Gt @268..269
+Newline @269..270
+Fn @275..277
+Ident `push` @278..282
+LParen @282..283
+Ident `self` @283..287
+Comma @287..288
+Ident `value` @289..294
+Colon @294..295
+Ident `T` @296..297
+RParen @297..298
+Colon @298..299
+Newline @299..300
+Indent @308..308
+Ident `self` @308..312
+Dot @312..313
+Ident `items` @313..318
+Dot @318..319
+Ident `append` @319..325
+LParen @325..326
+Ident `value` @326..331
+RParen @331..332
+Newline @332..333
+Dedent @338..338
+Fn @338..340
+Ident `pop` @341..344
+LParen @344..345
+Ident `self` @345..349
+RParen @349..350
+Arrow @351..353
+Ident `T` @354..355
+Colon @355..356
+Newline @356..357
+Indent @365..365
+Return @365..371
+Ident `self` @372..376
+Dot @376..377
+Ident `items` @377..382
+Dot @382..383
+Ident `pop` @383..386
+LParen @386..387
+RParen @387..388
+Newline @388..389
+Dedent @394..394
+Fn @394..396
+Ident `size` @397..401
+LParen @401..402
+Ident `self` @402..406
+RParen @406..407
+Arrow @408..410
+Ident `int` @411..414
+Colon @414..415
+Newline @415..416
+Indent @424..424
+Return @424..430
+Ident `len` @431..434
+LParen @434..435
+Ident `self` @435..439
+Dot @439..440
+Ident `items` @440..445
+RParen @445..446
+Newline @446..447
+Dedent @448..448
+Dedent @448..448
+Fn @448..450
+Ident `main` @451..455
+LParen @455..456
+RParen @456..457
+Colon @457..458
+Newline @458..459
+Indent @463..463
+Ident `print` @463..468
+LParen @468..469
+Ident `max` @469..472
+LParen @472..473
+Int 1 @473..474
+Comma @474..475
+Int 3 @476..477
+RParen @477..478
+RParen @478..479
+Newline @514..515
+Ident `print` @519..524
+LParen @524..525
+Ident `max` @525..528
+Lt @528..529
+Ident `float` @529..534
+Gt @534..535
+LParen @535..536
+Float 2.5 @536..539
+Comma @539..540
+Float 1.5 @541..544
+RParen @544..545
+RParen @545..546
+Newline @575..576
+Ident `s` @580..581
+Colon @581..582
+Ident `Stack` @583..588
+Lt @588..589
+Ident `int` @589..592
+Gt @592..593
+Eq @594..595
+Ident `Stack` @596..601
+LParen @601..602
+Ident `items` @602..607
+Eq @607..608
+LBracket @608..609
+RBracket @609..610
+RParen @610..611
+Newline @611..612
+Ident `s` @616..617
+Dot @617..618
+Ident `push` @618..622
+LParen @622..623
+Int 1 @623..624
+RParen @624..625
+Newline @625..626
+Ident `s` @630..631
+Dot @631..632
+Ident `push` @632..636
+LParen @636..637
+Int 2 @637..638
+RParen @638..639
+Newline @639..640
+Ident `print` @644..649
+LParen @649..650
+Ident `s` @650..651
+Dot @651..652
+Ident `size` @652..656
+LParen @656..657
+RParen @657..658
+RParen @658..659
+Newline @659..660
+Ident `print` @664..669
+LParen @669..670
+Ident `s` @670..671
+Dot @671..672
+Ident `pop` @672..675
+LParen @675..676
+RParen @676..677
+RParen @677..678
+Newline @678..679
+Ident `print` @683..688
+LParen @688..689
+Ident `s` @689..690
+Dot @690..691
+Ident `pop` @691..694
+LParen @694..695
+RParen @695..696
+RParen @696..697
+Newline @697..698
+Ident `print` @702..707
+LParen @707..708
+Ident `s` @708..709
+Dot @709..710
+Ident `size` @710..714
+LParen @714..715
+RParen @715..716
+RParen @716..717
+Newline @717..718
+Ident `names` @723..728
+Colon @728..729
+Ident `Stack` @730..735
+Lt @735..736
+Ident `str` @736..739
+Gt @739..740
+Eq @741..742
+Ident `Stack` @743..748
+LParen @748..749
+Ident `items` @749..754
+Eq @754..755
+LBracket @755..756
+RBracket @756..757
+RParen @757..758
+Newline @758..759
+Ident `names` @763..768
+Dot @768..769
+Ident `push` @769..773
+LParen @773..774
+Str "b" @774..777
+RParen @777..778
+Newline @778..779
+Ident `print` @783..788
+LParen @788..789
+Ident `names` @789..794
+Dot @794..795
+Ident `pop` @795..798
+LParen @798..799
+RParen @799..800
+RParen @800..801
+Newline @801..802
+Dedent @802..802
+Eof @802..802
