@@ -1,0 +1,18 @@
+# loops: nested integer loops with a constant modulus and a wrapping
+# i64 accumulator.
+#
+# Measures integer loop codegen: induction variables, `%` by a constant,
+# and keeping the accumulator in a register. No allocation, no floats.
+# Must stay structurally identical to main.go (DESIGN 7.2).
+#
+# expect: 9256937139
+
+N: int = 60000
+M: int = 60000
+
+fn main():
+    acc = 0
+    for i in range(N):
+        for j in range(M):
+            acc = acc + (i * j) % 7
+    print(acc)

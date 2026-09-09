@@ -1,0 +1,42 @@
+# mandelbrot: escape-time iteration over a W x H grid, counting the points
+# that never escape within MAX_ITER iterations.
+#
+# Measures scalar float loop codegen: no allocation, no calls, a short
+# data-dependent inner loop with an early exit.
+# Must stay structurally identical to main.go (DESIGN 7.2).
+#
+# Every multiply that feeds an add is broken out into its own local so that
+# neither Go (which fuses into FMA on arm64) nor LLVM can contract a
+# mul+add pair. Without this the two implementations would round
+# differently and, this close to the boundary of the set, would disagree on
+# the final count.
+#
+# expect: 21467454
+
+W: int = 9000
+H: int = 9000
+MAX_ITER: int = 50
+
+fn main():
+    count = 0
+    for py in range(H):
+        v = float(py) / float(H) * 2.0
+        cy = v - 1.0
+        for px in range(W):
+            u = float(px) / float(W) * 3.0
+            cx = u - 2.0
+            x = 0.0
+            y = 0.0
+            escaped = False
+            for k in range(MAX_ITER):
+                x2 = x * x
+                y2 = y * y
+                if x2 + y2 > 4.0:
+                    escaped = True
+                    break
+                t = 2.0 * x * y
+                y = t + cy
+                x = x2 - y2 + cx
+            if not escaped:
+                count = count + 1
+    print(count)

@@ -1,0 +1,16 @@
+# fib: naive recursive Fibonacci.
+#
+# Measures pure function-call / recursion overhead: no allocation, no floats,
+# no loops. Must stay structurally identical to main.go (DESIGN 7.2).
+#
+# expect: 701408733
+
+N: int = 44
+
+fn fib(n: int) -> int:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn main():
+    print(fib(N))
