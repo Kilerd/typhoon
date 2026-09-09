@@ -26,10 +26,20 @@ fn main():
 
 ## Playground
 
-Try the compiler frontend in your browser: <https://kilerd.github.io/typhoon/>.
-It runs the real lexer, parser, type checker and LLVM IR emitter as
-WebAssembly and shows diagnostics, tokens, AST, HIR and IR as you type.
-In-browser execution through the WebAssembly backend is in progress.
+Write and run Typhoon in your browser: <https://kilerd.github.io/typhoon/>.
+The real compiler runs as WebAssembly in the page: it shows diagnostics,
+tokens, AST, HIR and LLVM IR as you type, and the Run button compiles your
+program with the WebAssembly backend and executes it in a Web Worker.
+
+## WebAssembly target
+
+Besides native binaries, `typhoon build --target wasm main.ty` emits
+`main.wasm`, the runtime module `typhoon_rt.wasm` and a small ES-module
+loader `main.js` that works in Node and browsers (`node main.js`). The wasm
+backend shares the runtime and the type checker with the native backend, and
+every golden test also runs under wasmtime and is compared with the native
+output byte for byte. Requires `rustup target add wasm32-unknown-unknown`
+when building the compiler. v1 has no garbage collector on wasm.
 
 ## Status
 
