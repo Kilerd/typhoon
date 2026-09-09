@@ -24,6 +24,13 @@ fn main():
         print(fib(i))
 ```
 
+## Playground
+
+Try the compiler frontend in your browser: <https://kilerd.github.io/typhoon/>.
+It runs the real lexer, parser, type checker and LLVM IR emitter as
+WebAssembly and shows diagnostics, tokens, AST, HIR and IR as you type.
+In-browser execution through the WebAssembly backend is in progress.
+
 ## Status
 
 Typhoon is under active development and is **not usable yet**. Progress is
