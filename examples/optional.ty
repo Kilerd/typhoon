@@ -1,4 +1,5 @@
 # `T | None` and flow-sensitive narrowing with `is None` / `is not None`.
+# milestone: M3
 # expect: found at 2
 # expect: not found
 # expect: 20

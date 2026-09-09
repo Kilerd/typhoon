@@ -1,0 +1,10 @@
+# Typhoon spells function definitions `fn`, not `def`: Python-flavoured syntax,
+# not Python compatibility (DESIGN 1.3). Using `def` must be a parse error that
+# names the offending token and points at `fn`.
+# The `# error:` lines are substrings, not full wording.
+# milestone: M1
+# error: def
+# error: fn
+
+def main():
+    print(1)

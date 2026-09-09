@@ -1,0 +1,15 @@
+# Integer printing: decimal, negatives, the i64 maximum, and multi-argument
+# print (single space separator, trailing newline -- DESIGN 4.6).
+# milestone: M1
+# expect: 42
+# expect: -7
+# expect: 0
+# expect: 9223372036854775807
+# expect: 1 2 3
+
+fn main():
+    print(42)
+    print(-7)
+    print(0)
+    print(9223372036854775807)
+    print(1, 2, 3)

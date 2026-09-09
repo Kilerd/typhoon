@@ -1,4 +1,5 @@
 # The smallest complete Typhoon program.
+# milestone: M0
 # expect: Hello, Typhoon!
 
 fn main():

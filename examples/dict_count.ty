@@ -1,4 +1,5 @@
 # dict<str, int>: word frequency over a fixed list, printed in sorted key order.
+# milestone: M3
 # expect: fast: 2
 # expect: is: 1
 # expect: typhoon: 3

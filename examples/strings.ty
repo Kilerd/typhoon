@@ -1,4 +1,5 @@
 # Strings: f-string, concatenation, len, upper, split and join.
+# milestone: M2
 # expect: Hello, Typhoon!
 # expect: 15
 # expect: HELLO!

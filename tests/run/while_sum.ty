@@ -1,0 +1,27 @@
+# while loops, accumulation and comparison operators.
+# milestone: M1
+# expect: 45
+# expect: 30
+# expect: 10
+
+fn main():
+    i = 0
+    total = 0
+    while i < 10:
+        total = total + i
+        i = i + 1
+    print(total)
+
+    n = 1
+    squares = 0
+    while n <= 4:
+        squares = squares + n * n
+        n = n + 1
+    print(squares)
+
+    countdown = 10
+    steps = 0
+    while countdown > 0:
+        countdown = countdown - 1
+        steps = steps + 1
+    print(steps)

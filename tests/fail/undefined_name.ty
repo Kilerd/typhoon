@@ -1,0 +1,8 @@
+# Using a name that was never bound must be a name-resolution error.
+# The `# error:` lines are substrings, not full wording.
+# milestone: M1
+# error: cannot find
+# error: total
+
+fn main():
+    print(total)

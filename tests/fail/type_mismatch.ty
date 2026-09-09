@@ -1,0 +1,13 @@
+# A str literal cannot initialise an `int` variable: types are checked, and
+# there is no implicit conversion (DESIGN 1.2, 4.x).
+# The `# error:` lines are substrings, not full wording -- adjust them if the
+# diagnostics are phrased differently, but keep them specific enough to be
+# meaningful.
+# milestone: M1
+# error: mismatched types
+# error: int
+# error: str
+
+fn main():
+    x: int = "not an int"
+    print(x)

@@ -1,4 +1,5 @@
 # Recursive fibonacci: the shape of the M1 pure-CPU benchmark.
+# milestone: M1
 # expect: 832040
 # expect: 0
 # expect: 1

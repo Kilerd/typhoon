@@ -1,4 +1,5 @@
 # Two-body gravitational integrator, the shape of the M1 float benchmark (values from an f64 reference, re-verify at M1).
+# milestone: M2
 # expect: -0.000500
 # expect: -0.000500
 # expect: 0.539632 0.841308

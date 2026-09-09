@@ -1,4 +1,5 @@
 # list<int>: literal, append, len, indexing, iteration, sum loop.
+# milestone: M2
 # expect: 3
 # expect: 10
 # expect: 30

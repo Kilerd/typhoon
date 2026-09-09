@@ -1,4 +1,5 @@
 # Arithmetic: int vs float, `/` vs `//`, `%`, `**`, and explicit float().
+# milestone: M1
 # expect: 9
 # expect: 5
 # expect: 14

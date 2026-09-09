@@ -4,3 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+typhoon-codegen = { path = "../codegen" }
+
+[dev-dependencies]
+libtest-mimic = "0.8"
+
+[[test]]
+name = "golden"
+path = "tests/golden.rs"
+harness = false

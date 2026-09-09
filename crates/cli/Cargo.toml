@@ -2,9 +2,12 @@
 name = "typhoon"
 version.workspace = true
 edition.workspace = true
+description = "The Typhoon compiler: Python-flavoured syntax, static types, native binaries"
 
 [[bin]]
 name = "typhoon"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
+typhoon-driver = { path = "../driver" }
