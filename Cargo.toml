@@ -10,3 +10,15 @@ edition = "2024"
 
 [profile.release]
 debug = 1
+
+# The WebAssembly playground (crates/playground, built by web/build.sh). It has
+# its own profile so that the native compiler keeps the debug info of
+# [profile.release] while the .wasm shipped to browsers is optimised for size.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false

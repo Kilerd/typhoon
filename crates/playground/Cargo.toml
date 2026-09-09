@@ -1,0 +1,30 @@
+[package]
+name = "typhoon-playground"
+version.workspace = true
+edition.workspace = true
+description = "The typhoon compiler frontend compiled to WebAssembly, for the web playground"
+
+[lib]
+name = "typhoon_playground"
+# `cdylib` is what wasm-bindgen consumes; `rlib` keeps the native unit tests
+# (and any other crate) able to link against the same code.
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+typhoon-ast = { path = "../ast" }
+typhoon-codegen = { path = "../codegen" }
+typhoon-diag = { path = "../diag" }
+typhoon-lexer = { path = "../lexer" }
+typhoon-parser = { path = "../parser" }
+typhoon-sema = { path = "../sema" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# `std::time::Instant` panics on wasm32-unknown-unknown; `web-time` is the same
+# API backed by `performance.now()` there and a plain re-export elsewhere.
+web-time = "1.1"
+wasm-bindgen = "0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"

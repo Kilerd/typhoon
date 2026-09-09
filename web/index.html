@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typhoon Playground</title>
+    <meta
+      name="description"
+      content="Compile Typhoon in your browser: diagnostics, tokens, AST and LLVM IR from the real compiler frontend, running as WebAssembly."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="titles">
+        <h1>Typhoon <span class="sub">playground</span></h1>
+        <p class="tagline">
+          Python's syntax, Go/Nim's semantics, a Rust toolchain, one static binary out.
+        </p>
+      </div>
+      <nav class="links">
+        <a href="https://github.com/Kilerd/typhoon">GitHub</a>
+        <a href="https://github.com/Kilerd/typhoon/blob/master/docs/DESIGN.md">Design</a>
+        <a href="https://github.com/Kilerd/typhoon/blob/master/README.md">README</a>
+      </nav>
+    </header>
+
+    <p class="note">
+      Runs the real typhoon frontend in your browser via WebAssembly. Native execution:
+      <code>typhoon run file.ty</code> (see README). In-browser execution is planned.
+    </p>
+
+    <main class="panes">
+      <section class="pane pane-editor">
+        <div class="pane-head">
+          <label for="example-select">Example</label>
+          <select id="example-select" aria-label="Load an example program">
+            <option value="">loading…</option>
+          </select>
+          <span class="hint">Ctrl/&#8984;+Enter to compile</span>
+        </div>
+        <div id="editor" class="editor"></div>
+        <p id="example-description" class="example-description"></p>
+      </section>
+
+      <section class="pane pane-output">
+        <div class="tabs" role="tablist" aria-label="Compiler output">
+          <button class="tab" role="tab" data-tab="diagnostics" aria-selected="false">
+            Diagnostics<span id="diag-count" class="badge"></span>
+          </button>
+          <button class="tab" role="tab" data-tab="llvm_ir" aria-selected="true">LLVM IR</button>
+          <button class="tab" role="tab" data-tab="ast" aria-selected="false">AST</button>
+          <button class="tab" role="tab" data-tab="tokens" aria-selected="false">Tokens</button>
+          <button class="tab" role="tab" data-tab="hir" aria-selected="false">HIR</button>
+        </div>
+        <div class="panels">
+          <pre class="panel" id="panel-diagnostics" role="tabpanel" hidden></pre>
+          <pre class="panel" id="panel-llvm_ir" role="tabpanel"></pre>
+          <pre class="panel" id="panel-ast" role="tabpanel" hidden></pre>
+          <pre class="panel" id="panel-tokens" role="tabpanel" hidden></pre>
+          <pre class="panel" id="panel-hir" role="tabpanel" hidden></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="status" id="status" title="Show the Diagnostics tab">
+      <span id="status-state" class="state">loading the compiler…</span>
+      <span id="status-timings" class="timings"></span>
+    </footer>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
