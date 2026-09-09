@@ -1,0 +1,54 @@
+---
+source: crates/codegen-wasm/tests/wat.rs
+expression: "wat(\"fn main():\\n    print(\\\"Hello, Typhoon!\\\")\\n\")"
+---
+(module $typhoon
+  (type (;0;) (func))
+  (type (;1;) (func (param i32 i32)))
+  (type (;2;) (func (param i32) (result i32)))
+  (type (;3;) (func (param i32)))
+  (import "env" "memory" (memory (;0;) 0))
+  (import "env" "ty_rt_init" (func $ty_rt_init (;0;) (type 0)))
+  (import "env" "ty_rt_exit" (func $ty_rt_exit (;1;) (type 3)))
+  (import "env" "ty_alloc_atomic" (func $ty_alloc_atomic (;2;) (type 2)))
+  (import "env" "ty_print_str" (func $ty_print_str (;3;) (type 1)))
+  (import "env" "ty_print_end" (func $ty_print_end (;4;) (type 0)))
+  (global (;0;) (mut i32) i32.const 0)
+  (export "_start" (func $_start))
+  (func $ty_user_main (;5;) (type 0)
+    (local i32)
+    global.get 0
+    local.set 0
+    local.get 0
+    i32.const 16
+    i32.add
+    local.get 0
+    i64.load
+    i32.wrap_i64
+    call $ty_print_str
+    call $ty_print_end
+  )
+  (func $_start (;6;) (type 0)
+    call $ty_rt_init
+    i32.const 31
+    call $ty_alloc_atomic
+    global.set 0
+    global.get 0
+    i64.const 15
+    i64.store
+    global.get 0
+    i64.const 15
+    i64.store offset=8
+    global.get 0
+    i32.const 16
+    i32.add
+    i32.const 0
+    i32.const 15
+    memory.init 0
+    call $ty_user_main
+    i32.const 0
+    call $ty_rt_exit
+    unreachable
+  )
+  (data (;0;) "Hello, Typhoon!")
+)

@@ -468,6 +468,7 @@ MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换
 | `sema` | 名字解析、类型推断与检查、定值分析、单态化；类型经 interning 表示为 `TypeId` |
 | `ir` | 带类型的中间表示（CFG + 简单 SSA），后端无关；逃逸分析等优化在此层。**推迟到 M3**（排在逃逸分析之前）：M0–M2 没有独立的 IR crate，`codegen` 直接下降 `sema` 输出的 typed HIR |
 | `codegen` | IR → LLVM IR（M0–M2 是 typed HIR → LLVM IR） |
+| `codegen-wasm` | typed HIR → WebAssembly 二进制（`wasm-encoder` 直出），与 `codegen` 语义对齐；用于浏览器执行与 `typhoon build --target wasm` |
 | `runtime` | Rust `staticlib`，`extern "C"` 导出 `ty_alloc`、str/list/dict 操作、`ty_print_*`、`ty_panic` |
 | `cli` | `typhoon build <file>`、`typhoon run <file>`、`typhoon emit-ir <file>` |
 
@@ -500,6 +501,18 @@ clang -O2 out.ll libtyphoon_runtime.a -lgc -o out
 
 **备选方案**：如果 LLVM 依赖在 CI 上长期麻烦，退回 **C 后端**（Nim 路线），生成 C 再调 cc。保留这个选项，但不作为主路线。
 
+#### 6.2.1 wasm 后端
+
+浏览器执行与 `typhoon build --target wasm` 走一条独立于 LLVM 的下降路径，由 `codegen-wasm` 承担。以下五条已定稿：
+
+1. **runtime 单一实现**：`crates/runtime` 只有一份源码，既编译为原生 `staticlib`，也用 `cargo rustc --crate-type cdylib --target wasm32-unknown-unknown` 编译成一个 wasm 模块，导出同一套 `ty_*` C ABI 与线性内存 `memory`。wasm 下只有三处不同：分配走 Rust 全局分配器且永不回收（v1 无 GC）；stdout / stderr 经宿主导入函数 `host_write(fd, ptr, len)` 输出；`ty_rt_exit` / `ty_panic` 调用宿主导入的 `host_exit(code)` 后以 `unreachable` 陷入。原生行为不变。
+2. **双模块共享内存**：用户程序是独立的第二个 wasm 模块，`import` runtime 实例的 `env.memory` 与用到的每个 `env.ty_*`。加载器先实例化 runtime（提供 `host_write` / `host_exit`），再用它的导出实例化用户模块，然后调用用户模块导出的 `_start`。加载器 JS 只有一份（`crates/driver/assets/loader.js`），CLI 内嵌它，playground 也用它。
+3. **`wasm-encoder` 直出**：不经过 LLVM、也不经过文本 WAT，`codegen-wasm` 把 typed HIR 直接下降成二进制模块——HIR 的结构化控制流与 wasm 的 `block` / `loop` / `if` / `br` 一一对应。指针是 i32，因此布局是 target-aware 的：指针 4 字节，`str` / `list` 的头部字段顺序与原生一致，只有指针宽度不同；`int` = i64、`float` = f64、`bool` 在局部变量里是 i32、在内存里是 i8。
+4. **字符串字面量用被动数据段**：用户字符串字面量放进 passive data segment，`_start` 里先 `ty_alloc_atomic` 分配、写入 `{byte_len, char_len}` 头部，再用 `memory.init` 拷贝字节，指针存进 wasm global。这样字面量与运行时分配共用同一个堆，不需要为静态数据预留地址空间。
+5. **差分测试**：`tests/run/*.ty` 与 `examples/*.ty` 的每个用例都在 wasmtime 下再跑一遍 wasm 后端，stdout 与 `# expect:` 逐字节比对，`# exit:` / `# stderr:` 同样生效，测试名为 `wasm/run/<name>`。需要 GC 才能跑的用例用 `# wasm: skip <reason>` 显式跳过（v1 wasm 后端不回收内存）。此外每个产出的模块都用 `wasmparser` 校验，并对约 10 个小程序做 `wasmprinter` 的 WAT 快照。
+
+wasm 输出的性能不是 v1 的目标——第 2 节的基准比值一律只针对原生后端——正确性对齐才是：同一个程序在 wasmtime 与原生下必须给出逐字节相同的输出。
+
 ### 6.3 编译管线
 
 ```
@@ -511,6 +524,15 @@ source (.ty)
   → codegen    (text LLVM IR)
   → clang -O2  (optimize + link with runtime & GC)
   → native binary
+```
+
+wasm 后端（6.2.1）从 typed AST 处分叉，共用整个前端：
+
+```
+typed AST
+  → codegen-wasm (binary wasm module，wasm-encoder 直出)
+  → <name>.wasm + typhoon_rt.wasm + loader.js
+  → node / 浏览器 / wasmtime
 ```
 
 `typhoon emit-ir` 在 `.ll` 这一步停下，用于调试与 golden test。
@@ -548,6 +570,7 @@ fn main():
 | M0 重置 | 删除旧 crate 与注释掉的代码；新 workspace 骨架；安装工具链：`brew install llvm bdw-gc go`（Go 用于 bench 对照，当前开发机未安装 Go 与 bdw-gc）/ CI；runtime 骨架 + Boehm 链接；golden test 驱动 | `hello.ty` 编译运行通过 CI |
 | M1 数值核心 | lexer/parser、`fn`、`int`/`float`/`bool`、运算符、`if`/`while`/`for range`、递归、`print`、类型检查 | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go |
 | M2 数据 | `class`、`str`、`list<T>`、`tuple`、`for-in`、Boehm 接入 | binary-trees ≤ 2.0x、fannkuch ≤ 1.0x |
+| W1 wasm 后端 | HIR → wasm、共享 runtime、CLI `--target wasm`、playground 在线执行 | 全部 golden 用例在 wasmtime 下与原生输出一致 |
 | M3 泛型与推断 | 泛型单态化、`dict`/`set`、推导式、`T \| None`、比较链 | k-nucleotide ≤ 1.5x |
 | M4 错误与模块 | `try`/`except`/`raise`、`import`、C FFI、字符串运行时优化 | fasta / k-nucleotide ≤ 1.0x |
 | M5 性能与体验 | 逃逸分析、GC 替换评估、JIT `run`、诊断（ariadne / miette 风格）、formatter | binary-trees ≤ 1.0x |

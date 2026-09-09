@@ -1,0 +1,70 @@
+---
+source: crates/codegen-wasm/tests/wat.rs
+expression: "wat(\"fn main():\\n    a = 1.5\\n    b = 2.5\\n    print(a * b + a)\\n    print(a % b)\\n    print(float(a) * b)\\n\")"
+---
+(module $typhoon
+  (type (;0;) (func))
+  (type (;1;) (func (param f64)))
+  (type (;2;) (func (param i32)))
+  (import "env" "memory" (memory (;0;) 0))
+  (import "env" "ty_rt_init" (func $ty_rt_init (;0;) (type 0)))
+  (import "env" "ty_rt_exit" (func $ty_rt_exit (;1;) (type 2)))
+  (import "env" "ty_print_float" (func $ty_print_float (;2;) (type 1)))
+  (import "env" "ty_print_end" (func $ty_print_end (;3;) (type 0)))
+  (export "_start" (func $_start))
+  (func $ty_user_main (;4;) (type 0)
+    (local f64 f64 f64 f64 f64 f64 f64 f64)
+    f64.const 0x1.8p+0 (;=1.5;)
+    local.set 0
+    f64.const 0x1.4p+1 (;=2.5;)
+    local.set 1
+    local.get 0
+    local.get 1
+    f64.mul
+    local.get 0
+    f64.add
+    local.set 2
+    local.get 2
+    call $ty_print_float
+    call $ty_print_end
+    local.get 0
+    local.get 1
+    local.set 3
+    local.set 4
+    local.get 4
+    local.get 3
+    local.get 4
+    local.get 3
+    f64.div
+    f64.floor
+    f64.mul
+    f64.sub
+    local.set 5
+    f64.const 0x0p+0 (;=0;)
+    local.get 3
+    f64.copysign
+    local.get 5
+    local.get 5
+    f64.const 0x0p+0 (;=0;)
+    f64.eq
+    select
+    local.set 6
+    local.get 6
+    call $ty_print_float
+    call $ty_print_end
+    local.get 0
+    local.get 1
+    f64.mul
+    local.set 7
+    local.get 7
+    call $ty_print_float
+    call $ty_print_end
+  )
+  (func $_start (;5;) (type 0)
+    call $ty_rt_init
+    call $ty_user_main
+    i32.const 0
+    call $ty_rt_exit
+    unreachable
+  )
+)

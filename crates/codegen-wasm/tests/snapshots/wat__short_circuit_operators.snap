@@ -1,0 +1,52 @@
+---
+source: crates/codegen-wasm/tests/wat.rs
+expression: "wat(\"fn side(n: int) -> bool:\\n    print(n)\\n    return n > 0\\n\\nfn main():\\n    print(side(1) and side(2))\\n\")"
+---
+(module $typhoon
+  (type (;0;) (func (param i64) (result i32)))
+  (type (;1;) (func (param i64)))
+  (type (;2;) (func))
+  (type (;3;) (func (param i32)))
+  (import "env" "memory" (memory (;0;) 0))
+  (import "env" "ty_rt_init" (func $ty_rt_init (;0;) (type 2)))
+  (import "env" "ty_rt_exit" (func $ty_rt_exit (;1;) (type 3)))
+  (import "env" "ty_print_int" (func $ty_print_int (;2;) (type 1)))
+  (import "env" "ty_print_bool" (func $ty_print_bool (;3;) (type 3)))
+  (import "env" "ty_print_end" (func $ty_print_end (;4;) (type 2)))
+  (export "_start" (func $_start))
+  (func $ty_user_side (;5;) (type 0) (param i64) (result i32)
+    (local i64)
+    local.get 0
+    local.set 1
+    local.get 1
+    call $ty_print_int
+    call $ty_print_end
+    local.get 0
+    i64.const 0
+    i64.gt_s
+    return
+    unreachable
+  )
+  (func $ty_user_main (;6;) (type 2)
+    (local i32)
+    i64.const 1
+    call $ty_user_side
+    if (result i32) ;; label = @1
+      i64.const 2
+      call $ty_user_side
+    else
+      i32.const 0
+    end
+    local.set 0
+    local.get 0
+    call $ty_print_bool
+    call $ty_print_end
+  )
+  (func $_start (;7;) (type 2)
+    call $ty_rt_init
+    call $ty_user_main
+    i32.const 0
+    call $ty_rt_exit
+    unreachable
+  )
+)

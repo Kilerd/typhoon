@@ -15,6 +15,7 @@
 //! | `# milestone: M0` | the milestone this file starts being enforced at |
 //! | `# exit: <code>` | the expected exit status, `0` when absent |
 //! | `# stderr: <substring>` | a substring the program's stderr must contain |
+//! | `# wasm: skip <reason>` | do not run this file on the wasm backend |
 //!
 //! `tests/run/` and `examples/` files must compile, run with the expected exit
 //! code (`0` unless `# exit:` says otherwise) and produce exactly the
@@ -22,6 +23,21 @@
 //! testable: a panicking program exits 101 and prints `panic: ...` on stderr.
 //! `tests/fail/` files must fail to compile with diagnostics containing every
 //! `# error:` substring.
+//!
+//! # Two backends
+//!
+//! Every `tests/run/` and `examples/` case runs **twice**: once as a native
+//! binary (`run/<name>`) and once as a wasm module under `wasmtime`
+//! (`wasm/run/<name>`), against the same `# expect:` lines, the same `# exit:`
+//! and the same `# stderr:` substrings. That is the point of having a second
+//! backend in the same repository: any place where the two disagree is a bug in
+//! one of them, and the suite says which file it is (DESIGN §6.2.1).
+//!
+//! `# wasm: skip <reason>` opts a file out of the wasm pass. The only honest
+//! reason today is that v1 of the wasm backend has no collector, so a program
+//! written to stress the GC runs out of memory instead. `tests/fail/` needs no
+//! wasm pass at all: both backends share the whole frontend, so a program that
+//! fails to compile fails identically.
 //!
 //! # Milestones
 //!
@@ -37,6 +53,7 @@ use std::path::{Path, PathBuf};
 use libtest_mimic::{Arguments, Failed, Trial};
 use typhoon_driver::{BuildOptions, DriverError, compile_source, compile_to_ir, run_binary};
 
+use common::wasm::{compile_and_run, is_available as wasm_is_available};
 use common::{Scratch, repo_root, unified_diff};
 
 /// The milestone whose test cases are currently enforced (DESIGN section 8).
@@ -54,7 +71,7 @@ enum Kind {
 }
 
 /// One collected `.ty` file.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Case {
     name: String,
     path: PathBuf,
@@ -63,7 +80,7 @@ struct Case {
 }
 
 /// Everything a `.ty` file declares about itself.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Directives {
     /// The milestone this case starts being enforced at, `None` when the file
     /// forgot to declare one.
@@ -76,6 +93,10 @@ struct Directives {
     exit: Option<i32>,
     /// Substrings the program's stderr must contain.
     stderr: Vec<String>,
+    /// Why this file cannot run on the wasm backend, when it cannot.
+    wasm_skip: Option<String>,
+    /// A malformed `# wasm:` line, reported by the manifest meta-test.
+    wasm_bad: Option<String>,
 }
 
 impl Directives {
@@ -133,6 +154,15 @@ fn parse_directives(source: &str) -> Directives {
             }));
         } else if let Some(v) = directive(line, "stderr") {
             directives.stderr.push(v.to_string());
+        } else if let Some(v) = directive(line, "wasm") {
+            // The only form is `skip <reason>`; anything else is a typo that
+            // would silently stop enforcing the wasm pass.
+            match v.trim().strip_prefix("skip") {
+                Some(reason) if !reason.trim().is_empty() => {
+                    directives.wasm_skip = Some(reason.trim().to_string());
+                }
+                _ => directives.wasm_bad = Some(v.trim().to_string()),
+            }
         }
     }
     directives
@@ -233,6 +263,58 @@ fn run_case(case: &Case) -> Result<(), Failed> {
     Ok(())
 }
 
+/// Runs one success case on the wasm backend: compile to a module, run it
+/// under `wasmtime` with the host imports the browser loader provides, and hold
+/// it to exactly the same expectations as the native binary.
+fn run_wasm_case(case: &Case) -> Result<(), Failed> {
+    let source = std::fs::read_to_string(&case.path)?;
+    let file_name = case
+        .path
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+
+    let output = compile_and_run(&file_name, &source)
+        .map_err(|err| Failed::from(format!("wasm/{}: {err}", case.name)))?;
+
+    let expected_exit = case.directives.exit();
+    if output.status != expected_exit {
+        return Err(Failed::from(format!(
+            "wasm/{} exited with {} (expected {expected_exit})\nstdout:\n{}\nstderr:\n{}",
+            case.name, output.status, output.stdout, output.stderr
+        )));
+    }
+
+    let expected: String = case
+        .directives
+        .expect
+        .iter()
+        .map(|line| format!("{line}\n"))
+        .collect();
+    if output.stdout != expected {
+        return Err(Failed::from(format!(
+            "wasm/{}: stdout does not match the `# expect:` lines\n{}",
+            case.name,
+            unified_diff(&expected, &output.stdout)
+        )));
+    }
+
+    let missing: Vec<&String> = case
+        .directives
+        .stderr
+        .iter()
+        .filter(|want| !output.stderr.contains(want.as_str()))
+        .collect();
+    if !missing.is_empty() {
+        return Err(Failed::from(format!(
+            "wasm/{}: stderr is missing {missing:?}\nstderr:\n{}",
+            case.name, output.stderr
+        )));
+    }
+    Ok(())
+}
+
 /// Runs one failure case: compilation must fail with matching diagnostics.
 fn fail_case(case: &Case) -> Result<(), Failed> {
     let source = std::fs::read_to_string(&case.path)?;
@@ -318,6 +400,19 @@ fn manifest_check() -> Result<(), Failed> {
                 }
                 _ => {}
             }
+            if let Some(bad) = &case.directives.wasm_bad {
+                problems.push(format!(
+                    "{}: `# wasm: {bad}` is not a directive; the only form is \
+                     `# wasm: skip <reason>`",
+                    case.name
+                ));
+            }
+            if case.kind == Kind::Fail && case.directives.wasm_skip.is_some() {
+                problems.push(format!(
+                    "{} declares `# wasm: skip`, but a failing case never reaches a backend",
+                    case.name
+                ));
+            }
         }
     }
 
@@ -338,6 +433,7 @@ fn directive_parser_check() -> Result<(), Failed> {
 # error: mismatched types
 # exit: 101
 # stderr: panic: integer division by zero
+# wasm: skip needs a collector
 
 fn main():
     print(1)        # expect: not a directive, this is a trailing comment
@@ -374,6 +470,23 @@ fn main():
     if milestone_rank("M10") != 10 || milestone_rank("M0") != 0 {
         problems.push("milestone_rank is wrong".into());
     }
+    if parsed.wasm_skip.as_deref() != Some("needs a collector") {
+        problems.push(format!("wasm skip parsed as {:?}", parsed.wasm_skip));
+    }
+    if parsed.wasm_bad.is_some() {
+        problems.push(format!(
+            "a valid `# wasm:` line was rejected: {:?}",
+            parsed.wasm_bad
+        ));
+    }
+    // A `# wasm:` line that is not `skip <reason>` must be reported, not
+    // silently ignored: a typo would quietly stop enforcing the wasm pass.
+    for bad in ["# wasm: skip\n", "# wasm: yes\n", "# wasm:\n"] {
+        let parsed = parse_directives(bad);
+        if parsed.wasm_bad.is_none() || parsed.wasm_skip.is_some() {
+            problems.push(format!("`{}` should be reported as malformed", bad.trim()));
+        }
+    }
     if problems.is_empty() {
         Ok(())
     } else {
@@ -393,10 +506,31 @@ fn main() {
         Trial::test("harness/directives", directive_parser_check).with_kind("golden"),
     ];
 
+    // The wasm backend needs the runtime compiled for wasm32; a checkout
+    // without that target still runs the native half of the suite.
+    let wasm_ready = wasm_is_available();
+
     for case in collect_cases() {
         let ignored = case.directives.milestone() > current;
         let kind = case.kind;
         let name = case.name.clone();
+
+        // Every running case is also a wasm case, unless it says why not.
+        if kind == Kind::Run {
+            let skipped = case.directives.wasm_skip.is_some();
+            let wasm_case = Case {
+                name: case.name.clone(),
+                path: case.path.clone(),
+                kind,
+                directives: case.directives.clone(),
+            };
+            trials.push(
+                Trial::test(format!("wasm/{name}"), move || run_wasm_case(&wasm_case))
+                    .with_kind("wasm")
+                    .with_ignored_flag(ignored || skipped || !wasm_ready),
+            );
+        }
+
         trials.push(
             Trial::test(name, move || match kind {
                 Kind::Run => run_case(&case),

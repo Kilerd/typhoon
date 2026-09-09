@@ -1,0 +1,58 @@
+---
+source: crates/codegen-wasm/tests/wat.rs
+expression: "wat(\"fn main():\\n    i = 0\\n    while i < 10:\\n        i = i + 1\\n        if i == 3:\\n            continue\\n        if i > 5:\\n            break\\n        print(i)\\n\")"
+---
+(module $typhoon
+  (type (;0;) (func))
+  (type (;1;) (func (param i64)))
+  (type (;2;) (func (param i32)))
+  (import "env" "memory" (memory (;0;) 0))
+  (import "env" "ty_rt_init" (func $ty_rt_init (;0;) (type 0)))
+  (import "env" "ty_rt_exit" (func $ty_rt_exit (;1;) (type 2)))
+  (import "env" "ty_print_int" (func $ty_print_int (;2;) (type 1)))
+  (import "env" "ty_print_end" (func $ty_print_end (;3;) (type 0)))
+  (export "_start" (func $_start))
+  (func $ty_user_main (;4;) (type 0)
+    (local i64 i64)
+    i64.const 0
+    local.set 0
+    block ;; label = @1
+      loop ;; label = @2
+        local.get 0
+        i64.const 10
+        i64.lt_s
+        i32.eqz
+        br_if 1 (;@1;)
+        local.get 0
+        i64.const 1
+        i64.add
+        local.set 0
+        local.get 0
+        i64.const 3
+        i64.eq
+        if ;; label = @3
+          br 1 (;@2;)
+        end
+        local.get 0
+        i64.const 5
+        i64.gt_s
+        if ;; label = @3
+          br 2 (;@1;)
+        end
+        local.get 0
+        local.set 1
+        local.get 1
+        call $ty_print_int
+        call $ty_print_end
+        br 0 (;@2;)
+      end
+    end
+  )
+  (func $_start (;5;) (type 0)
+    call $ty_rt_init
+    call $ty_user_main
+    i32.const 0
+    call $ty_rt_exit
+    unreachable
+  )
+)

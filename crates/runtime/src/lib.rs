@@ -23,12 +23,20 @@
 //!   [`ty_panic`] and by an `atexit` hook installed by [`ty_rt_init`], so a
 //!   plain `return 0` from `main` still produces complete output.
 
+use std::io::{self, Write};
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::ffi::{c_int, c_void};
-use std::io::{self, BufWriter, Stdout, Write};
-use std::sync::{Mutex, MutexGuard, Once, OnceLock};
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::{BufWriter, Stdout};
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::Once;
 
 // Boehm-Demers-Weiser GC. Declared only: the archive does not link it, the
-// final `clang` invocation does (`-lgc`).
+// final `clang` invocation does (`-lgc`). The wasm build has no GC at all
+// (DESIGN §6.2.1), so it does not declare these symbols either.
+#[cfg(not(target_arch = "wasm32"))]
 unsafe extern "C" {
     fn GC_init();
     // Unused in `cfg(test)`, where allocation goes through Rust's allocator;
@@ -40,6 +48,28 @@ unsafe extern "C" {
     fn atexit(cb: extern "C" fn()) -> c_int;
 }
 
+// The two functions the wasm build imports from its host (DESIGN §6.2.1).
+//
+// `wasm32-unknown-unknown` has no operating system: there is no `stdout` to
+// write to and no process to exit, so the embedder (the JS loader in
+// `crates/driver/assets/loader.js`, or the `wasmtime` harness in the golden
+// tests) supplies both:
+//
+// * `host_write(fd, ptr, len)` writes `len` bytes of the module's memory to
+//   file descriptor `fd` (1 = stdout, 2 = stderr);
+// * `host_exit(code)` reports the program's exit code; the host is expected to
+//   unwind or terminate, and the runtime traps right afterwards in case it
+//   returns.
+//
+// They are imported from the `env` module, which is where an undecorated
+// `extern "C"` block lands.
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn host_write(fd: i32, ptr: *const u8, len: usize);
+    fn host_exit(code: i32);
+}
+
 /// Exit code used for every runtime panic (matches Rust's own convention).
 pub const PANIC_EXIT_CODE: i32 = 101;
 
@@ -47,11 +77,73 @@ pub const PANIC_EXIT_CODE: i32 = 101;
 // Buffered stdout
 // ---------------------------------------------------------------------------
 
-static OUT: OnceLock<Mutex<BufWriter<Stdout>>> = OnceLock::new();
+/// The buffered sink `print` writes to: the process's stdout natively, and a
+/// buffer drained through [`host_write`] on wasm.
+#[cfg(not(target_arch = "wasm32"))]
+type OutSink = BufWriter<Stdout>;
+#[cfg(target_arch = "wasm32")]
+type OutSink = HostOut;
+
+/// A buffered writer over the host's `host_write` (wasm only).
+///
+/// The buffer is drained when it grows past [`HostOut::CAPACITY`], at the end
+/// of every `print` (see [`ty_print_end`]) and on exit, so a browser or a test
+/// harness sees output line by line rather than only when the program stops.
+#[cfg(target_arch = "wasm32")]
+pub struct HostOut {
+    fd: i32,
+    buf: Vec<u8>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl HostOut {
+    /// How many bytes accumulate before the buffer is handed to the host.
+    const CAPACITY: usize = 8 * 1024;
+
+    /// A writer for file descriptor `fd` (1 = stdout, 2 = stderr).
+    const fn new(fd: i32) -> HostOut {
+        HostOut {
+            fd,
+            buf: Vec::new(),
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Write for HostOut {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        self.buf.extend_from_slice(data);
+        if self.buf.len() >= HostOut::CAPACITY {
+            self.flush()?;
+        }
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if !self.buf.is_empty() {
+            unsafe { host_write(self.fd, self.buf.as_ptr(), self.buf.len()) };
+            self.buf.clear();
+        }
+        Ok(())
+    }
+}
+
+static OUT: OnceLock<Mutex<OutSink>> = OnceLock::new();
+
+/// A fresh buffered stdout.
+#[cfg(not(target_arch = "wasm32"))]
+fn new_out() -> Mutex<OutSink> {
+    Mutex::new(BufWriter::with_capacity(64 * 1024, io::stdout()))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn new_out() -> Mutex<OutSink> {
+    Mutex::new(HostOut::new(1))
+}
 
 /// Locks the process-global buffered stdout, recovering from poisoning.
-fn out() -> MutexGuard<'static, BufWriter<Stdout>> {
-    OUT.get_or_init(|| Mutex::new(BufWriter::with_capacity(64 * 1024, io::stdout())))
+fn out() -> MutexGuard<'static, OutSink> {
+    OUT.get_or_init(new_out)
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
@@ -61,6 +153,7 @@ fn flush_out() {
     let _ = out().flush();
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 extern "C" fn flush_at_exit() {
     flush_out();
 }
@@ -74,6 +167,7 @@ extern "C" fn flush_at_exit() {
 /// Must be the first runtime call made by a Typhoon program. Calling it more
 /// than once, or from several threads at once, is harmless: the work happens
 /// exactly once (Boehm's `GC_init` is not itself reentrant).
+#[cfg(not(target_arch = "wasm32"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_rt_init() {
     static INIT: Once = Once::new();
@@ -83,11 +177,33 @@ pub extern "C" fn ty_rt_init() {
     });
 }
 
+/// Initialises the runtime. On wasm there is nothing to do: memory comes from
+/// the module's own allocator and the host owns the exit path, so the entry
+/// point still calls this only to keep both backends' `_start` identical.
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_rt_init() {}
+
 /// Flushes stdout and terminates the process with `code`.
+#[cfg(not(target_arch = "wasm32"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_rt_exit(code: i32) -> ! {
     flush_out();
     std::process::exit(code)
+}
+
+/// Flushes stdout, reports `code` to the host and traps.
+///
+/// wasm has no process to exit: the host is told the exit code through
+/// `host_exit` (the JS loader throws a sentinel there, the test harness
+/// records it) and the module then traps, so nothing after the call can run
+/// even if the host returns.
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_rt_exit(code: i32) -> ! {
+    flush_out();
+    unsafe { host_exit(code) };
+    core::arch::wasm32::unreachable()
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +220,7 @@ pub extern "C" fn ty_rt_exit(code: i32) -> ! {
 /// abort in `thread_suspend`. The GC path itself is covered end to end by the
 /// golden suite (`tests/run/gc_stress.ty` in particular), which runs real
 /// compiled programs.
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_arch = "wasm32")))]
 fn raw_alloc(size: usize, atomic: bool) -> *mut u8 {
     unsafe {
         if atomic {
@@ -115,7 +231,13 @@ fn raw_alloc(size: usize, atomic: bool) -> *mut u8 {
     }
 }
 
-#[cfg(test)]
+/// The allocator used by `cargo test` and by the wasm build.
+///
+/// On wasm it is the whole story: v1 of the wasm backend has no collector
+/// (DESIGN §6.2.1), so memory is allocated from Rust's global allocator and
+/// never given back. A program that allocates without bound therefore runs out
+/// of memory instead of collecting; those golden cases carry `# wasm: skip`.
+#[cfg(any(test, target_arch = "wasm32"))]
 fn raw_alloc(size: usize, _atomic: bool) -> *mut u8 {
     // Leaked on purpose: a test process is short lived, and a Typhoon value
     // is never freed explicitly.
@@ -165,6 +287,7 @@ fn out_of_memory() -> ! {
 ///
 /// `msg_ptr` must point to `msg_len` readable bytes (UTF-8 is expected but not
 /// required; the bytes are written verbatim).
+#[cfg(not(target_arch = "wasm32"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ty_panic(msg_ptr: *const u8, msg_len: usize) -> ! {
     flush_out();
@@ -173,6 +296,33 @@ pub unsafe extern "C" fn ty_panic(msg_ptr: *const u8, msg_len: usize) -> ! {
     let _ = write_panic(&mut err, msg);
     let _ = err.flush();
     std::process::exit(PANIC_EXIT_CODE)
+}
+
+/// Aborts the program with `panic: <msg>` on the host's stderr and exit code
+/// 101, then traps.
+///
+/// # Safety
+///
+/// `msg_ptr` must point to `msg_len` readable bytes.
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_panic(msg_ptr: *const u8, msg_len: usize) -> ! {
+    flush_out();
+    // Deliberately *not* [`write_panic`]: the most likely reason a wasm program
+    // panics is that it ran out of memory (v1 has no collector), and at that
+    // point even the seven bytes of `panic: ` cannot be buffered — the
+    // allocation would fail, Rust would call the allocation error handler, and
+    // the program would abort with an opaque `unreachable` trap instead of
+    // reporting the panic. Three writes straight to the host allocate nothing.
+    unsafe {
+        host_write(2, b"panic: ".as_ptr(), 7);
+        if msg_len > 0 {
+            host_write(2, msg_ptr, msg_len);
+        }
+        host_write(2, b"\n".as_ptr(), 1);
+        host_exit(PANIC_EXIT_CODE);
+    }
+    core::arch::wasm32::unreachable()
 }
 
 /// Renders a panic message: `panic: <msg>\n`.
@@ -268,9 +418,16 @@ pub extern "C" fn ty_print_sep() {
 }
 
 /// Prints the trailing newline of a `print` call.
+///
+/// On wasm the buffer is handed to the host here, so that output streams line
+/// by line (a browser playground shows a long-running program's progress, and
+/// a program killed by a timeout still shows what it printed).
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_print_end() {
-    let _ = write_end(&mut *out());
+    let mut sink = out();
+    let _ = write_end(&mut *sink);
+    #[cfg(target_arch = "wasm32")]
+    let _ = sink.flush();
 }
 
 /// Reads `len` bytes at `ptr` as a slice, tolerating a null pointer when
@@ -1024,6 +1181,37 @@ pub struct TyList {
     pub data: *mut u8,
 }
 
+/// Byte offset of a list's `len` field.
+pub const LIST_LEN_OFFSET: usize = std::mem::offset_of!(TyList, len);
+/// Byte offset of a list's `cap` field.
+pub const LIST_CAP_OFFSET: usize = std::mem::offset_of!(TyList, cap);
+/// Byte offset of a list's `data` field.
+pub const LIST_DATA_OFFSET: usize = std::mem::offset_of!(TyList, data);
+
+// Both backends hard-code these offsets, so they are pinned here rather than
+// merely documented; the wasm build in CI checks the wasm32 column of the
+// table below the same way this checks the native one.
+//
+// | field      | native (ptr 8) | wasm32 (ptr 4) |
+// |------------|----------------|----------------|
+// | `len`      | 0              | 0              |
+// | `cap`      | 8              | 8              |
+// | `data`     | 16             | 16             |
+// | `size_of`  | 24             | 24 (20 rounded up to align 8) |
+//
+// The two layouts agree because `i64` is 8-byte aligned on both targets, so
+// the narrower pointer only shows up as trailing padding. Keeping them equal
+// is what lets one runtime serve both backends unchanged.
+const _: () = {
+    assert!(LIST_LEN_OFFSET == 0);
+    assert!(LIST_CAP_OFFSET == 8);
+    assert!(LIST_DATA_OFFSET == 16);
+    assert!(size_of::<TyList>() == 24);
+    assert!(align_of::<TyList>() == 8);
+    assert!(STR_HEADER == 16);
+    assert!(STR_CHAR_LEN_OFFSET == 8);
+};
+
 /// Allocates a `cap * elem_size` byte element buffer, scanned unless `atomic`.
 fn list_alloc_data(cap: i64, elem_size: i64, atomic: u8) -> *mut u8 {
     let size = (cap.max(0) as usize).saturating_mul(elem_size.max(0) as usize);
@@ -1240,9 +1428,83 @@ pub extern "C" fn ty_int_pow(base: i64, exp: i64) -> i64 {
     }
 }
 
+/// `base ** exp` on two `float`s, i.e. C's `pow`.
+///
+/// The native backend lowers `**` to `llvm.pow.f64` and never calls this; the
+/// wasm backend has no such instruction (wasm's floating point is add, sub,
+/// mul, div, sqrt, floor, ceil, trunc, nearest, abs, neg, min, max, copysign
+/// and nothing else), so it calls the runtime instead. Rust's `f64::powf` is
+/// the same `pow` LLVM lowers its intrinsic to, so both backends agree.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_float_pow(base: f64, exp: f64) -> f64 {
+    base.powf(exp)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The data layouts both backends hard-code (DESIGN §4.1, §6.2.1).
+    ///
+    /// The `const` block next to [`TyList`] checks the same offsets at compile
+    /// time — including when the crate is compiled for `wasm32-unknown-unknown`
+    /// in CI, where the pointer is four bytes wide. This test is the runtime
+    /// half: it also pins the values a code generator writes into a `str`
+    /// header, which no compile-time assertion can observe.
+    #[test]
+    fn abi_layouts_are_pinned() {
+        assert_eq!(LIST_LEN_OFFSET, 0);
+        assert_eq!(LIST_CAP_OFFSET, 8);
+        assert_eq!(LIST_DATA_OFFSET, 16);
+        assert_eq!(size_of::<TyList>(), 24);
+        assert_eq!(align_of::<TyList>(), 8);
+        assert_eq!(STR_HEADER, 16);
+        assert_eq!(STR_CHAR_LEN_OFFSET, 8);
+
+        // A string really is `{ byte_len, char_len, bytes }` at those offsets.
+        let s = str_new("héllo".as_bytes());
+        unsafe {
+            assert_eq!(std::ptr::read_unaligned(s as *const i64), 6);
+            assert_eq!(
+                std::ptr::read_unaligned(s.add(STR_CHAR_LEN_OFFSET) as *const i64),
+                5
+            );
+            assert_eq!(
+                std::slice::from_raw_parts(s.add(STR_HEADER), 6),
+                "héllo".as_bytes()
+            );
+        }
+
+        // And a list header really is `{ len, cap, data }`.
+        let list = ty_list_new(8, 1, 4);
+        unsafe {
+            let raw = list as *const u8;
+            assert_eq!(
+                std::ptr::read_unaligned(raw.add(LIST_LEN_OFFSET) as *const i64),
+                0
+            );
+            assert_eq!(
+                std::ptr::read_unaligned(raw.add(LIST_CAP_OFFSET) as *const i64),
+                4
+            );
+            assert_eq!(
+                std::ptr::read_unaligned(raw.add(LIST_DATA_OFFSET) as *const *mut u8),
+                (*list).data
+            );
+        }
+    }
+
+    /// `**` on floats goes through the runtime on wasm; it must agree with what
+    /// `llvm.pow.f64` computes for the native backend.
+    #[test]
+    fn float_pow_matches_powf() {
+        assert_eq!(ty_float_pow(2.0, 10.0), 1024.0);
+        assert_eq!(ty_float_pow(9.0, 0.5), 3.0);
+        assert_eq!(ty_float_pow(2.0, -1.0), 0.5);
+        assert_eq!(ty_float_pow(1.0, f64::NAN), 1.0);
+        assert!(ty_float_pow(f64::NAN, 2.0).is_nan());
+        assert_eq!(ty_float_pow(0.0, 0.0), 1.0);
+    }
 
     fn rendered(f: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -> String {
         let mut buf = Vec::new();

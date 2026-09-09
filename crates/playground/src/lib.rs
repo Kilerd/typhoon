@@ -8,9 +8,11 @@
 //! LLVM IR and per-phase timings — into one [`PlaygroundOutput`].
 //!
 //! Nothing here shells out or touches the filesystem, so the whole thing runs
-//! inside a browser tab. Linking and running the produced IR still needs the
-//! native driver (`typhoon run file.ty`); in-browser execution is not part of
-//! this stage.
+//! inside a browser tab. Turning the LLVM IR into a binary still needs the
+//! native driver (`typhoon run file.ty`), but the page does not have to wait
+//! for it to run a program: [`compile_wasm_playground`] goes down the second
+//! backend of DESIGN §6.2.1 instead and hands the page a wasm module it can
+//! instantiate itself.
 //!
 //! ```
 //! let out = typhoon_playground::compile_playground("fn main():\n    print(1)\n");
@@ -20,6 +22,8 @@
 
 #![warn(missing_docs)]
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::{Deserialize, Serialize};
 use typhoon_diag::{Diagnostics, SourceMap, render};
 use wasm_bindgen::prelude::*;
@@ -177,6 +181,83 @@ pub fn compile(source: &str) -> String {
             "{{\"ok\":false,\"diagnostics\":[\"internal error: {}\"],\
              \"tokens\":\"\",\"ast\":\"\",\"hir\":null,\"llvm_ir\":null,\
              \"timings_ms\":{{\"lex\":0,\"parse\":0,\"sema\":0,\"codegen\":0}}}}",
+            err.to_string().replace('"', "'")
+        )
+    })
+}
+
+/// The result of compiling one program for in-browser execution.
+///
+/// Serialised to JSON by [`compile_wasm`]; the field names are the keys the
+/// page's `worker.js` and `main.js` read.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WasmOutput {
+    /// Whether a module was produced.
+    pub ok: bool,
+    /// Every diagnostic, rendered as plain text (never ANSI-coloured); empty
+    /// when the program compiled.
+    pub diagnostics: Vec<String>,
+    /// The module as standard base64 (with padding), or `None` when the
+    /// program did not compile.
+    ///
+    /// Base64 rather than an array of numbers because the payload crosses into
+    /// JS as JSON, which has no byte string: a `Uint8Array` would become tens
+    /// of thousands of decimal literals, several times the size of the module
+    /// it describes.
+    pub wasm: Option<String>,
+    /// Wall-clock milliseconds spent in the backend.
+    pub compile_ms: f64,
+}
+
+/// Compiles `source` to a WebAssembly module the page can run itself.
+///
+/// This is the whole pipeline again, not a continuation of
+/// [`compile_playground`]: [`typhoon_codegen_wasm::compile_to_wasm`] only
+/// exposes a source-to-module entry point, so a page that shows both the LLVM
+/// IR and runs the program parses it twice. That is cheap next to the round
+/// trip through a worker, and it keeps the two backends independent — the wasm
+/// module the user runs is exactly what `typhoon build --target wasm` would
+/// produce for the same file.
+///
+/// Never fails and never panics; a program that does not compile comes back
+/// with `ok: false`, `wasm: None` and the diagnostics that explain it.
+pub fn compile_wasm_playground(source: &str) -> WasmOutput {
+    let started = Instant::now();
+    let compiled = typhoon_codegen_wasm::compile_to_wasm(FILE_NAME, source);
+    let compile_ms = millis(started);
+
+    match compiled {
+        Ok(module) => WasmOutput {
+            ok: true,
+            diagnostics: Vec::new(),
+            wasm: Some(BASE64.encode(module)),
+            compile_ms,
+        },
+        // `compile_to_wasm` renders its diagnostics itself, so there is no
+        // source map to consult here.
+        Err(rendered) => WasmOutput {
+            ok: false,
+            diagnostics: rendered,
+            wasm: None,
+            compile_ms,
+        },
+    }
+}
+
+/// Compiles `source` for execution and returns [`WasmOutput`] as a JSON
+/// string.
+///
+/// The counterpart of [`compile`]: a string rather than a structured value, so
+/// that the JS side needs no generated glue per field.
+#[wasm_bindgen]
+pub fn compile_wasm(source: &str) -> String {
+    let output = compile_wasm_playground(source);
+    serde_json::to_string(&output).unwrap_or_else(|err| {
+        // `WasmOutput` is plain strings and a float, so this cannot happen;
+        // report it as a diagnostic rather than panicking.
+        format!(
+            "{{\"ok\":false,\"diagnostics\":[\"internal error: {}\"],\
+             \"wasm\":null,\"compile_ms\":0}}",
             err.to_string().replace('"', "'")
         )
     })
@@ -370,5 +451,91 @@ mod tests {
         let out = compile_playground("");
         assert!(!out.ok);
         assert!(all_diagnostics(&out).contains("main"));
+    }
+
+    /// The bytes of a [`WasmOutput`], decoded from its base64 field.
+    fn wasm_bytes(output: &WasmOutput) -> Vec<u8> {
+        let encoded = output.wasm.as_ref().expect("a module was produced");
+        BASE64.decode(encoded).expect("valid standard base64")
+    }
+
+    #[test]
+    fn hello_world_compiles_to_a_wasm_module() {
+        let out = compile_wasm_playground("fn main():\n    print(\"Hello, Typhoon!\")\n");
+        assert!(out.ok, "diagnostics: {}", out.diagnostics.join("\n"));
+        assert!(out.diagnostics.is_empty());
+        // The magic number is all this crate checks: `compile_to_wasm`
+        // validates the module itself before returning it.
+        assert_eq!(&wasm_bytes(&out)[..4], b"\0asm");
+    }
+
+    #[test]
+    fn type_error_produces_no_wasm() {
+        let out = compile_wasm_playground("fn main():\n    x: str = 1\n");
+        assert!(!out.ok);
+        assert!(out.wasm.is_none());
+        assert!(
+            out.diagnostics.join("\n").contains("mismatched types"),
+            "got: {:?}",
+            out.diagnostics
+        );
+    }
+
+    #[test]
+    fn wasm_output_round_trips_through_json() {
+        let source = "fn main():\n    print(1 + 2)\n";
+        let json = compile_wasm(source);
+        let parsed: WasmOutput = serde_json::from_str(&json).expect("valid JSON");
+        assert!(parsed.ok);
+        assert_eq!(
+            wasm_bytes(&parsed),
+            wasm_bytes(&compile_wasm_playground(source))
+        );
+
+        // The page reads these four keys and nothing else.
+        let value: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        for key in ["ok", "diagnostics", "wasm", "compile_ms"] {
+            assert!(value.get(key).is_some(), "missing key `{key}`");
+        }
+        assert!(value["compile_ms"].is_number());
+        assert!(value["wasm"].is_string());
+
+        let broken = compile_wasm("fn main():\n    x: str = 1\n");
+        let value: serde_json::Value = serde_json::from_str(&broken).expect("valid JSON");
+        assert_eq!(value["ok"], serde_json::Value::Bool(false));
+        assert!(value["wasm"].is_null());
+        assert!(
+            !value["diagnostics"]
+                .as_array()
+                .expect("an array")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn hostile_input_never_panics_in_the_wasm_backend() {
+        // Same contract as `hostile_input_never_panics`: the Run button
+        // compiles whatever is in the editor, so every one of these must come
+        // back as an output rather than as a trap.
+        let sources = [
+            "",
+            "fn main(",
+            "fn main():\n\tprint(1)\n",
+            "fn main():\n    print(\"unclosed\n",
+            "class C:\n    x: int\n",
+            "🌀 = 1\n",
+        ];
+        for source in sources {
+            let out = compile_wasm_playground(source);
+            assert_eq!(
+                out.ok,
+                out.wasm.is_some(),
+                "`ok` and `wasm` disagree for {source:?}"
+            );
+            assert!(
+                out.ok || !out.diagnostics.is_empty(),
+                "{source:?} failed without a diagnostic"
+            );
+        }
     }
 }

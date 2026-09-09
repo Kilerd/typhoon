@@ -1,0 +1,24 @@
+[package]
+name = "typhoon-codegen-wasm"
+version.workspace = true
+edition.workspace = true
+description = "The Typhoon WebAssembly backend: typed HIR to a binary wasm module"
+
+[lib]
+name = "typhoon_codegen_wasm"
+path = "src/lib.rs"
+
+[dependencies]
+typhoon-diag = { path = "../diag" }
+typhoon-parser = { path = "../parser" }
+typhoon-sema = { path = "../sema" }
+
+wasm-encoder = "0.258"
+# Every module the backend produces is validated before it is handed out, so a
+# lowering bug is an error at compile time instead of a trap at run time.
+wasmparser = "0.258"
+
+[dev-dependencies]
+insta = "1.48.0"
+wasmprinter = "0.258"
+wasmtime = "48"

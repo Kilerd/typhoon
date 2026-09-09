@@ -149,6 +149,32 @@ select {
   max-width: 60%;
 }
 
+/* The Run button sits with the example picker, not with the tabs: it acts on
+   what is in the editor. */
+.run {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-input);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.run:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.run:disabled {
+  color: var(--fg-dim);
+  cursor: default;
+}
+
 .hint {
   margin-left: auto;
   color: var(--fg-dim);
@@ -266,6 +292,33 @@ select {
 .panel.empty {
   color: var(--fg-dim);
   white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------- program output */
+
+/* What the program wrote to fd 2, told apart from its stdout without
+   reordering the two: they share one pane, in the order they were written. */
+.stream-err {
+  color: var(--error);
+}
+
+/* The playground's own commentary in the Output pane — the exit line, the
+   10 s termination note — never the program's own output. */
+/* Inline, not a block: the note carries its own newlines so that it lands on
+   its own line inside the <pre> without a blank one around it. */
+.run-note {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.run-note.ok {
+  color: var(--ok);
+  font-style: normal;
+}
+
+.run-note.bad {
+  color: var(--error);
+  font-style: normal;
 }
 
 /* ------------------------------------------------------------ status bar */

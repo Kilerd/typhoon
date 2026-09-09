@@ -5,9 +5,13 @@ edition.workspace = true
 
 [dependencies]
 typhoon-codegen = { path = "../codegen" }
+typhoon-codegen-wasm = { path = "../codegen-wasm" }
 
 [dev-dependencies]
 libtest-mimic = "0.8"
+# The golden suite runs every program on the wasm backend as well, under a real
+# engine, and compares its output with the native one byte for byte.
+wasmtime = "48"
 
 [[test]]
 name = "golden"

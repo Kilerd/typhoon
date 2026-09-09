@@ -14,11 +14,16 @@ path = "src/lib.rs"
 [dependencies]
 typhoon-ast = { path = "../ast" }
 typhoon-codegen = { path = "../codegen" }
+typhoon-codegen-wasm = { path = "../codegen-wasm" }
 typhoon-diag = { path = "../diag" }
 typhoon-lexer = { path = "../lexer" }
 typhoon-parser = { path = "../parser" }
 typhoon-sema = { path = "../sema" }
 
+# The compiled wasm module crosses into JS as JSON, which has no byte string;
+# base64 is the smallest dependency that fixes that, and its `Engine` API keeps
+# the encoder table out of the binary when it is not used.
+base64 = "0.23"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # `std::time::Instant` panics on wasm32-unknown-unknown; `web-time` is the same

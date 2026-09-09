@@ -1,0 +1,81 @@
+# Every `ty_*` runtime entry point a backend can emit a call to, in one
+# program. The golden suite runs this natively and on the wasm backend, so the
+# whole C ABI is covered twice; the wasm pass additionally proves that every
+# imported signature matches the runtime module, because a mismatch makes
+# instantiation fail rather than misbehave quietly.
+# milestone: M2
+# expect: 1 2.5 True text
+# expect: 7 1.5 False 1.500
+# expect: 71.5False
+# expect: HELLO, TYPHOON hello, typhoon
+# expect: True True 7
+# expect: Hello, wasm
+# expect: ["Hello", "Typhoon"] Hello; Typhoon
+# expect: True False
+# expect: True True True
+# expect: a台 2
+# expect: [0, 1, 2, 3, 4] 0 4
+# expect: 4 4
+# expect: ["a", "b"] True True
+# expect: 1 b 5
+# expect: 1024 1024.0
+
+class Box:
+    value: int
+    label: str
+
+class Point:
+    x: int
+    y: int
+
+fn power(base: int, exp: int) -> int:
+    return base ** exp
+
+fn fpower(base: float, exp: float) -> float:
+    return base ** exp
+
+fn main():
+    # every scalar `print` form, with the separator and the newline
+    print(1, 2.5, True, "text")
+
+    # str conversions, including the fixed-point format spec
+    n = 7
+    x = 1.5
+    flag = False
+    print(f"{n} {x} {flag} {x:.3f}")
+    print(str(n) + str(x) + str(flag))
+
+    # str methods
+    s = "  Hello, Typhoon  "
+    t = s.strip()
+    print(t.upper(), t.lower())
+    print(t.startswith("Hello"), t.endswith("Typhoon"), t.find("Typhoon"))
+    print(t.replace("Typhoon", "wasm"))
+    parts = t.split(", ")
+    print(parts, "; ".join(parts))
+    print("Typh" in t, "type" in t)
+    print(t == "Hello, Typhoon", t < "Z", t > "A")
+
+    # str iteration hands out one code point at a time
+    letters = ""
+    for ch in "a台":
+        letters = letters + ch
+    print(letters, len(letters))
+
+    # lists: literal, growth, insert, concat, index, pop, quoted repr
+    xs = [1, 2]
+    xs.append(3)
+    xs.insert(0, 0)
+    ys = xs + [4]
+    print(ys, ys[0], ys[-1])
+    print(ys.pop(), len(ys))
+    names = ["a", "b"]
+    print(names, names == ["a", "b"], "a" in names)
+
+    # a class with a pointer field is traced, one without is not
+    b = Box(value=1, label="b")
+    p = Point(x=2, y=3)
+    print(b.value, b.label, p.x + p.y)
+
+    # powers are runtime calls on both backends
+    print(power(2, 10), fpower(2.0, 10.0))

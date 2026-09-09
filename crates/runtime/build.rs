@@ -10,6 +10,12 @@
 //! 2. it makes the emitted `--print native-static-libs` list self-describing.
 //!
 //! `TYPHOON_GC_LIB_DIR` overrides the search path for Boehm GC.
+//!
+//! The wasm build (`--target wasm32-unknown-unknown`, DESIGN §6.2.1) has no
+//! GC at all — it allocates from Rust's global allocator and never frees — so
+//! none of this applies there and `-lgc` must *not* be recorded: a native
+//! archive is not a wasm object and `rust-lld` would complain about every
+//! member of it.
 
 use std::process::Command;
 
@@ -17,6 +23,10 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-env-changed=TYPHOON_GC_LIB_DIR");
+
+    if std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("wasm32") {
+        return;
+    }
 
     if let Some(dir) = gc_lib_dir() {
         println!("cargo:rustc-link-search=native={dir}");

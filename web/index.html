@@ -26,8 +26,10 @@
     </header>
 
     <p class="note">
-      Runs the real typhoon frontend in your browser via WebAssembly. Native execution:
-      <code>typhoon run file.ty</code> (see README). In-browser execution is planned.
+      Runs the real typhoon compiler in your browser via WebAssembly, and the programs too:
+      <strong>Run</strong> compiles with the wasm backend and executes in a worker, stopping
+      after 10&nbsp;s. That backend has no GC yet, so allocation-heavy loops run out of memory.
+      Native execution: <code>typhoon run file.ty</code> (see README).
     </p>
 
     <main class="panes">
@@ -37,7 +39,10 @@
           <select id="example-select" aria-label="Load an example program">
             <option value="">loading…</option>
           </select>
-          <span class="hint">Ctrl/&#8984;+Enter to compile</span>
+          <button id="run" class="run" type="button" title="Compile and run (Ctrl/&#8984;+Shift+Enter)">
+            Run
+          </button>
+          <span class="hint">Ctrl/&#8984;+Enter compiles &#183; +Shift runs</span>
         </div>
         <div id="editor" class="editor"></div>
         <p id="example-description" class="example-description"></p>
@@ -48,6 +53,7 @@
           <button class="tab" role="tab" data-tab="diagnostics" aria-selected="false">
             Diagnostics<span id="diag-count" class="badge"></span>
           </button>
+          <button class="tab" role="tab" data-tab="output" aria-selected="false">Output</button>
           <button class="tab" role="tab" data-tab="llvm_ir" aria-selected="true">LLVM IR</button>
           <button class="tab" role="tab" data-tab="ast" aria-selected="false">AST</button>
           <button class="tab" role="tab" data-tab="tokens" aria-selected="false">Tokens</button>
@@ -55,6 +61,7 @@
         </div>
         <div class="panels">
           <pre class="panel" id="panel-diagnostics" role="tabpanel" hidden></pre>
+          <pre class="panel" id="panel-output" role="tabpanel" hidden></pre>
           <pre class="panel" id="panel-llvm_ir" role="tabpanel"></pre>
           <pre class="panel" id="panel-ast" role="tabpanel" hidden></pre>
           <pre class="panel" id="panel-tokens" role="tabpanel" hidden></pre>

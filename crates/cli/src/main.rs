@@ -1,11 +1,16 @@
 //! `typhoon` — the compiler's command line interface (DESIGN section 6.1).
 //!
 //! ```text
-//! typhoon build <file> [-o OUT] [-O 0..3] [--emit-ir] [--keep-temps]
+//! typhoon build <file> [-o OUT] [-O 0..3] [--target native|wasm] [--emit-ir] [--keep-temps]
 //! typhoon run   <file> [-- ARGS...]
 //! typhoon emit-ir <file> [-o OUT]
 //! typhoon check <file>
 //! ```
+//!
+//! `--target wasm` (DESIGN §6.2.1) writes a directory rather than an
+//! executable: the compiled program, the Typhoon runtime as a second wasm
+//! module, an ES-module loader that runs them under Node or in a browser, and a
+//! `README.txt` saying how.
 //!
 //! Exit codes: `0` success, `1` compile or link error (diagnostics on stderr),
 //! `2` usage error (bad flags, or an input file that cannot be read).
@@ -15,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use clap::{Parser, Subcommand};
-use typhoon_driver::{BuildOptions, DriverError, compile_source, compile_to_ir};
+use typhoon_driver::{BuildOptions, DriverError, Target, compile_source, compile_to_ir};
 
 /// Exit code for a compile or link failure.
 const EXIT_ERROR: u8 = 1;
@@ -36,13 +41,19 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Compile a Typhoon source file to a native executable.
+    /// Compile a Typhoon source file to a native executable or a wasm build.
     Build {
         /// The `.ty` file to compile.
         file: PathBuf,
-        /// Where to write the executable (defaults to the source file's stem).
+        /// Where to write the executable — or, with `--target wasm`, the
+        /// directory the build goes in (defaults to the source file's stem,
+        /// plus `-wasm` for a wasm build).
         #[arg(short = 'o', long = "output", value_name = "OUT")]
         output: Option<PathBuf>,
+        /// What to build: a native executable, or a WebAssembly package that
+        /// runs under Node and in browsers.
+        #[arg(long, value_name = "TARGET", default_value = "native")]
+        target: String,
         /// Optimisation level passed to clang.
         #[arg(
             short = 'O',
@@ -132,9 +143,21 @@ fn display_name(file: &Path) -> String {
     file.to_string_lossy().into_owned()
 }
 
-/// Default output path for `build`: the source file's stem in the current directory.
-fn default_output(file: &Path) -> PathBuf {
-    PathBuf::from(file.file_stem().unwrap_or(file.as_os_str()))
+/// Default output path for `build`: the source file's stem in the current
+/// directory, with `-wasm` appended for a wasm build so that it cannot
+/// overwrite the native executable of the same program.
+fn default_output(file: &Path, target: Target) -> PathBuf {
+    let stem = file.file_stem().unwrap_or(file.as_os_str());
+    match target {
+        Target::Native => PathBuf::from(stem),
+        Target::Wasm => PathBuf::from(format!("{}-wasm", stem.to_string_lossy())),
+    }
+}
+
+/// The file name of a path, for the one-line summary of a wasm build.
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
 }
 
 fn run(cmd: Cmd) -> Result<ExitCode, Error> {
@@ -142,22 +165,38 @@ fn run(cmd: Cmd) -> Result<ExitCode, Error> {
         Cmd::Build {
             file,
             output,
+            target,
             opt_level,
             emit_ir,
             keep_temps,
         } => {
+            let target: Target = target.parse().map_err(Error::Usage)?;
             let source = read_source(&file)?;
-            let output = output.unwrap_or_else(|| default_output(&file));
+            let output = output.unwrap_or_else(|| default_output(&file, target));
             let opts = BuildOptions {
                 opt_level,
                 emit_ir,
                 keep_temps,
                 output: Some(output.clone()),
+                target,
             };
             let artifact = compile_source(&display_name(&file), &source, &opts)?;
             if let Some(ir) = artifact.ir() {
                 let ir_path = output.with_extension("ll");
                 std::fs::write(&ir_path, ir).map_err(DriverError::Io)?;
+            }
+            // A wasm build is a directory of four files, so say what it wrote
+            // and how to run it; a native build is one executable at a path the
+            // user just typed, and stays silent.
+            if let Some(package) = artifact.wasm_package() {
+                println!(
+                    "wrote {} ({}, {}, {})\nrun it with: node {}",
+                    output.display(),
+                    file_name(&package.program),
+                    file_name(&package.runtime),
+                    file_name(&package.loader),
+                    package.loader.display(),
+                );
             }
             Ok(ExitCode::SUCCESS)
         }

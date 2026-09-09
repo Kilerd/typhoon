@@ -30,8 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # No clang and no Boehm GC here: the playground is the frontend only, it
-      # stops at textual LLVM IR and never links anything.
+      # No clang and no Boehm GC here: the playground is the frontend plus the
+      # wasm backend, so it stops at textual LLVM IR / a wasm module and never
+      # links anything natively. web/build.sh also builds crates/runtime for
+      # wasm32-unknown-unknown, hence the target below.
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -69,9 +71,7 @@ jobs:
         run: bash web/build.sh
 
       - uses: actions/configure-pages@v5
-
         with:
-
           enablement: true
 
       - uses: actions/upload-pages-artifact@v3

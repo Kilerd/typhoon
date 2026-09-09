@@ -1,5 +1,9 @@
 // The typhoon playground: an editor on the left, the compiler's output on the
-// right, and the real typhoon frontend compiled to WebAssembly in between.
+// right, and the real typhoon compiler compiled to WebAssembly in between.
+//
+// Programs run here too, but not in this file: `Run` compiles with the wasm
+// backend (DESIGN 6.2.1) and hands the module to ./worker.js, because a
+// Typhoon `while True:` would freeze a tab that ran it on the main thread.
 //
 // No bundler and no npm: this file is an ES module the browser loads directly,
 // CodeMirror comes from a CDN (with a <textarea> fallback when it does not),
@@ -22,6 +26,25 @@ const CDN = {
 const DEFAULT_EXAMPLE = "fib.ty";
 const DEBOUNCE_MS = 150;
 
+// How long a program may run before the worker is terminated. Long enough for
+// the slowest example (fib(30) is a few hundred milliseconds), short enough
+// that an accidental infinite loop is an inconvenience rather than a hang.
+const RUN_TIMEOUT_MS = 10_000;
+
+// A runaway `print` loop can emit megabytes a second; past this much the pane
+// stops growing and says so, so that the page stays responsive enough to show
+// the termination note.
+const MAX_OUTPUT_CHARS = 200_000;
+
+// Resolved against this module rather than against the page, so that the
+// playground keeps working when it is not served from the site root.
+const RUNTIME_URL = new URL("./pkg/typhoon_rt.wasm", import.meta.url).href;
+const WORKER_URL = new URL("./worker.js", import.meta.url);
+
+const OUTPUT_PLACEHOLDER =
+  "Nothing has run yet. Press Run (Ctrl/\u2318+Shift+Enter) to compile with the " +
+  "wasm backend and execute the program here.";
+
 // Shown when web/examples/ has not been generated (build.sh copies it there).
 const FALLBACK_SOURCE = `fn fib(n: int) -> int:
     if n < 2:
@@ -37,6 +60,7 @@ fn main():
 const els = {
   editor: document.getElementById("editor"),
   examples: document.getElementById("example-select"),
+  run: document.getElementById("run"),
   description: document.getElementById("example-description"),
   diagCount: document.getElementById("diag-count"),
   state: document.getElementById("status-state"),
@@ -135,6 +159,7 @@ async function createEditor(host, initialDoc, onChange) {
 
 let editor = null;
 let compileFn = null;
+let compileWasmFn = null;
 let debounce = null;
 
 function scheduleCompile() {
@@ -142,9 +167,9 @@ function scheduleCompile() {
   debounce = setTimeout(compileNow, DEBOUNCE_MS);
 }
 
-// Ctrl/Cmd+Enter compiles immediately. Capturing at the document means the
-// binding also works in the textarea fallback, and that CodeMirror's own
-// Mod-Enter never sees it.
+// Ctrl/Cmd+Enter compiles immediately, and with Shift it runs. Capturing at
+// the document means the bindings also work in the textarea fallback, and that
+// CodeMirror's own Mod-Enter never sees them.
 document.addEventListener(
   "keydown",
   (event) => {
@@ -152,7 +177,11 @@ document.addEventListener(
       event.preventDefault();
       event.stopPropagation();
       clearTimeout(debounce);
-      compileNow();
+      if (event.shiftKey) {
+        runNow();
+      } else {
+        compileNow();
+      }
     }
   },
   true,
@@ -228,6 +257,235 @@ function compileNow() {
     `codegen ${ms(t.codegen)} · total ${ms(total)} ms`;
 }
 
+// --------------------------------------------------------------------- run
+//
+// Running a program is a second compilation — the wasm backend, not the LLVM
+// one — plus a worker that instantiates the module against the Typhoon runtime
+// in web/pkg/typhoon_rt.wasm. The worker exists to be killable: `terminate()`
+// is the only way to stop wasm that has decided not to come back.
+
+let worker = null;
+let runTimer = null;
+
+// Output arrives one flush at a time and is appended on an animation frame:
+// merging what a print loop emitted between two frames turns thousands of DOM
+// mutations into one.
+let queued = [];
+let flushHandle = null;
+let outputChars = 0;
+let outputTruncated = false;
+let outputAtLineStart = true;
+
+function clearOutput() {
+  const panel = els.panel("output");
+  panel.textContent = "";
+  panel.classList.remove("empty");
+  if (flushHandle !== null) {
+    cancelAnimationFrame(flushHandle);
+    flushHandle = null;
+  }
+  queued = [];
+  outputChars = 0;
+  outputTruncated = false;
+  outputAtLineStart = true;
+}
+
+function queueOutput(kind, text) {
+  if (outputTruncated) return;
+  queued.push([kind, text]);
+  if (flushHandle === null) {
+    flushHandle = requestAnimationFrame(flushOutput);
+  }
+}
+
+function flushOutput() {
+  if (flushHandle !== null) {
+    cancelAnimationFrame(flushHandle);
+    flushHandle = null;
+  }
+  if (queued.length === 0) return;
+
+  const panel = els.panel("output");
+  // Follow the output only while the reader is at the end, so that scrolling
+  // back into a long run is not undone by the next line.
+  const following = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 24;
+  for (const [kind, text] of queued) {
+    appendOutput(kind, text);
+  }
+  queued = [];
+  if (following) {
+    panel.scrollTop = panel.scrollHeight;
+  }
+}
+
+function appendOutput(kind, text) {
+  if (outputTruncated) return;
+
+  let chunk = text;
+  if (outputChars + chunk.length > MAX_OUTPUT_CHARS) {
+    chunk = chunk.slice(0, MAX_OUTPUT_CHARS - outputChars);
+    outputTruncated = true;
+  }
+  if (chunk.length > 0) {
+    outputChars += chunk.length;
+    outputAtLineStart = chunk.endsWith("\n");
+    const panel = els.panel("output");
+    if (kind === "stderr") {
+      const span = document.createElement("span");
+      span.className = "stream-err";
+      span.textContent = chunk;
+      panel.appendChild(span);
+    } else {
+      // A text node, never innerHTML: this is the program's output, and the
+      // program is whatever the visitor typed.
+      panel.appendChild(document.createTextNode(chunk));
+    }
+  }
+  if (outputTruncated) {
+    outputNote(`--- output truncated after ${MAX_OUTPUT_CHARS} characters ---`, "bad");
+  }
+}
+
+/** Appends one line of the playground's own commentary, on its own line. */
+function outputNote(text, cls) {
+  const span = document.createElement("span");
+  span.className = `run-note ${cls}`;
+  // The note carries its own newlines, so that it never shares a line with a
+  // program that did not end its output with one.
+  span.textContent = `${outputAtLineStart ? "" : "\n"}${text}\n`;
+  outputAtLineStart = true;
+
+  const panel = els.panel("output");
+  panel.appendChild(span);
+  // Always scrolled to: the exit line is the point of the pane.
+  panel.scrollTop = panel.scrollHeight;
+}
+
+/** Bytes of a standard-base64 string; `wasm` from `compile_wasm` is one. */
+function decodeBase64(text) {
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/** Kills the current run, if any, and forgets it. */
+function stopRun() {
+  if (runTimer !== null) {
+    clearTimeout(runTimer);
+    runTimer = null;
+  }
+  if (worker !== null) {
+    worker.terminate();
+    worker = null;
+  }
+}
+
+function runNow() {
+  if (!compileWasmFn || !editor) return;
+
+  // Whatever was running is abandoned: the pane is about to be cleared, and a
+  // second worker would interleave its output with the first one's.
+  stopRun();
+  clearTimeout(debounce);
+  // Keep the other tabs showing the program that is about to run.
+  compileNow();
+
+  let result;
+  try {
+    result = JSON.parse(compileWasmFn(editor.getValue()));
+  } catch (err) {
+    console.error(err);
+    setStatus("error", "the compiler crashed — see the browser console");
+    setPanel("diagnostics", String(err), "");
+    selectTab("diagnostics");
+    return;
+  }
+
+  if (!result.ok) {
+    // The two backends run the same frontend, so these are the diagnostics
+    // `compileNow` just showed; re-rendering them keeps the pane right even if
+    // one backend ever rejects what the other accepts.
+    setPanel("diagnostics", result.diagnostics.join("\n\n"), "");
+    selectTab("diagnostics");
+    setStatus("error", "the program does not compile");
+    return;
+  }
+
+  clearOutput();
+  selectTab("output");
+  setStatus("busy", "running…");
+
+  try {
+    worker = new Worker(WORKER_URL, { type: "module" });
+  } catch (err) {
+    // Module workers are the one modern feature the page cannot do without;
+    // say so plainly rather than leaving an empty pane behind.
+    console.error(err);
+    worker = null;
+    outputNote(`--- this browser cannot run programs: ${err} ---`, "bad");
+    setStatus("error", "this browser has no module workers");
+    return;
+  }
+
+  const started = performance.now();
+
+  worker.onmessage = (event) => {
+    const message = event.data;
+    if (message.type === "stdout" || message.type === "stderr") {
+      queueOutput(message.type, message.text);
+      return;
+    }
+    if (message.type !== "exit") return;
+
+    // `exit` is the last message the worker sends, and messages are delivered
+    // in order, so everything the program wrote has already been queued.
+    stopRun();
+    flushOutput();
+    if (message.error) {
+      outputNote(`--- could not run: ${message.error} ---`, "bad");
+      setStatus("error", "could not run the program");
+      return;
+    }
+    const suffix = message.note ? ` (${message.note})` : "";
+    const footer = `exit ${message.code} · ${Math.round(message.ms)} ms${suffix}`;
+    const ok = message.code === 0;
+    outputNote(footer, ok ? "ok" : "bad");
+    setStatus(ok ? "ok" : "error", footer);
+  };
+
+  worker.onerror = (event) => {
+    // Fires when worker.js itself cannot load — a missing web/pkg, or a
+    // browser that ignored `type: "module"`.
+    event.preventDefault();
+    console.error(event.message ?? event);
+    stopRun();
+    flushOutput();
+    // Chrome hides the reason a worker script failed to load, so the note
+    // names the likeliest cause when the event carries no message.
+    const detail = event.message ? `: ${event.message}` : " (has web/build.sh been run?)";
+    outputNote(`--- could not start the runner${detail} ---`, "bad");
+    setStatus("error", "could not start the runner — see the browser console");
+  };
+
+  // The module is transferred rather than copied; the page has no use for it
+  // afterwards.
+  const program = decodeBase64(result.wasm);
+  worker.postMessage({ wasm: program, runtimeUrl: RUNTIME_URL }, [program.buffer]);
+
+  runTimer = setTimeout(() => {
+    stopRun();
+    flushOutput();
+    const seconds = ((performance.now() - started) / 1000).toFixed(1);
+    outputNote(`--- terminated after ${seconds}s ---`, "bad");
+    setStatus("error", `terminated after ${seconds}s`);
+  }, RUN_TIMEOUT_MS);
+}
+
+els.run.addEventListener("click", runNow);
+
 // ----------------------------------------------------------------- startup
 
 async function loadExamples() {
@@ -279,6 +537,10 @@ async function setupExamples() {
 
 async function main() {
   selectTab("llvm_ir");
+  setPanel("output", "", OUTPUT_PLACEHOLDER);
+  // Armed once the compiler is in memory; a click before that would do
+  // nothing, and a dead button says so better than one that ignores you.
+  els.run.disabled = true;
   editor = await createEditor(els.editor, FALLBACK_SOURCE, scheduleCompile);
 
   setStatus("busy", "loading the compiler…");
@@ -286,6 +548,8 @@ async function main() {
     const wasm = await import("./pkg/typhoon_playground.js");
     await wasm.default();
     compileFn = wasm.compile;
+    compileWasmFn = wasm.compile_wasm;
+    els.run.disabled = false;
   } catch (err) {
     console.error(err);
     setStatus("error", "could not load the compiler (web/pkg is missing?)");

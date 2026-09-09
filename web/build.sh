@@ -4,6 +4,10 @@
 # wasm-bindgen over it into web/pkg, and copies examples/ into web/examples
 # together with the index the page fetches.
 #
+# It also assembles the half of the page that *runs* programs (DESIGN 6.2.1):
+# the Typhoon runtime compiled to wasm, and the loader that wires it to the
+# module the playground emits. Both land in web/pkg next to the frontend.
+#
 # Runs from any working directory. Preview the result with:
 #
 #     web/build.sh && python3 -m http.server -d web 8000
@@ -68,6 +72,39 @@ wasm-bindgen "$wasm_in" \
   --no-typescript \
   --out-dir "$web_dir/pkg"
 
+# ----------------------------------------------------------------- runtime
+#
+# The second half of every Typhoon wasm program: the module that owns the
+# linear memory and exports the `ty_*` ABI the compiled program imports. The
+# runtime's manifest stays a `staticlib` for native builds, so the wasm build
+# asks for the `cdylib` on the command line instead of adding a crate type that
+# every native build would then have to link. This is exactly what
+# crates/driver/build.rs does for the CLI.
+echo "==> cargo rustc -p typhoon-runtime --target $target --profile $profile --crate-type cdylib"
+cargo rustc \
+  --manifest-path "$root_dir/Cargo.toml" \
+  -p typhoon-runtime \
+  --target "$target" \
+  --profile "$profile" \
+  --crate-type cdylib
+
+runtime_in="$root_dir/target/$target/$profile/typhoon_runtime.wasm"
+if [ ! -f "$runtime_in" ]; then
+  echo "error: $runtime_in was not produced" >&2
+  exit 1
+fi
+# Named after what the loader and the CLI call it, not after the crate.
+cp "$runtime_in" "$web_dir/pkg/typhoon_rt.wasm"
+
+# ------------------------------------------------------------------ loader
+#
+# A verbatim copy of the CLI's loader: crates/driver/assets/loader.js is the
+# single source of truth (the CLI embeds the same bytes in the .js it writes),
+# so web/pkg/loader.js must never be edited in place — every build overwrites
+# it, and a fix belongs in crates/driver/assets/loader.js.
+echo "==> copying the wasm loader"
+cp "$root_dir/crates/driver/assets/loader.js" "$web_dir/pkg/loader.js"
+
 # ---------------------------------------------------------------- examples
 #
 # The dropdown fetches web/examples/index.json; every entry is one
@@ -113,7 +150,11 @@ printf '\n]\n' >>"$index"
 
 echo
 echo "built:"
-for artifact in "$web_dir/pkg/typhoon_playground.js" "$web_dir/pkg/typhoon_playground_bg.wasm"; do
+for artifact in \
+  "$web_dir/pkg/typhoon_playground.js" \
+  "$web_dir/pkg/typhoon_playground_bg.wasm" \
+  "$web_dir/pkg/typhoon_rt.wasm" \
+  "$web_dir/pkg/loader.js"; do
   printf '    %-28s %s\n' "web/pkg/$(basename "$artifact")" "$(du -h "$artifact" | cut -f1)"
 done
 echo "    $(grep -c '"file"' "$index") examples in web/examples/"

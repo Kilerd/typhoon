@@ -1,6 +1,8 @@
 //! Shared helpers for the driver's integration tests and the golden harness.
 #![allow(dead_code)]
 
+pub mod wasm;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;

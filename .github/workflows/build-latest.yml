@@ -20,9 +20,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `targets:` is needed for the wasm backend: crates/driver's build.rs
+      # compiles crates/runtime for wasm32-unknown-unknown and embeds the
+      # resulting module, and `cargo test --workspace` now also runs the wasm
+      # differential pass under wasmtime.
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
 

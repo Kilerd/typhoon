@@ -1,0 +1,52 @@
+---
+source: crates/codegen-wasm/tests/wat.rs
+expression: "wat(\"fn fib(n: int) -> int:\\n    if n < 2:\\n        return n\\n    return fib(n - 1) + fib(n - 2)\\n\\nfn main():\\n    print(fib(10))\\n\")"
+---
+(module $typhoon
+  (type (;0;) (func (param i64) (result i64)))
+  (type (;1;) (func))
+  (type (;2;) (func (param i64)))
+  (type (;3;) (func (param i32)))
+  (import "env" "memory" (memory (;0;) 0))
+  (import "env" "ty_rt_init" (func $ty_rt_init (;0;) (type 1)))
+  (import "env" "ty_rt_exit" (func $ty_rt_exit (;1;) (type 3)))
+  (import "env" "ty_print_int" (func $ty_print_int (;2;) (type 2)))
+  (import "env" "ty_print_end" (func $ty_print_end (;3;) (type 1)))
+  (export "_start" (func $_start))
+  (func $ty_user_fib (;4;) (type 0) (param i64) (result i64)
+    local.get 0
+    i64.const 2
+    i64.lt_s
+    if ;; label = @1
+      local.get 0
+      return
+    end
+    local.get 0
+    i64.const 1
+    i64.sub
+    call $ty_user_fib
+    local.get 0
+    i64.const 2
+    i64.sub
+    call $ty_user_fib
+    i64.add
+    return
+    unreachable
+  )
+  (func $ty_user_main (;5;) (type 1)
+    (local i64)
+    i64.const 10
+    call $ty_user_fib
+    local.set 0
+    local.get 0
+    call $ty_print_int
+    call $ty_print_end
+  )
+  (func $_start (;6;) (type 1)
+    call $ty_rt_init
+    call $ty_user_main
+    i32.const 0
+    call $ty_rt_exit
+    unreachable
+  )
+)

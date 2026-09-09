@@ -7,6 +7,13 @@
 //! source (.ty) --codegen--> text LLVM IR --clang -O2--> native binary
 //! ```
 //!
+//! and, for [`Target::Wasm`] (DESIGN §6.2.1):
+//!
+//! ```text
+//! source (.ty) --codegen-wasm--> a wasm module + the embedded wasm runtime
+//!                                + a JS loader, written to a directory
+//! ```
+//!
 //! It is a library so that the golden test harness can drive exactly the same
 //! pipeline the CLI does.
 //!
@@ -28,6 +35,7 @@
 //! ```
 
 pub mod toolchain;
+pub mod wasm;
 
 pub(crate) mod temp;
 
@@ -36,6 +44,41 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use temp::TempDir;
+
+/// What a build produces (DESIGN §6.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Target {
+    /// A native executable, through textual LLVM IR and `clang`.
+    #[default]
+    Native,
+    /// A WebAssembly build: the program, the wasm runtime and a JS loader,
+    /// written into a directory.
+    Wasm,
+}
+
+impl Target {
+    /// The spelling accepted by `typhoon build --target`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Target::Native => "native",
+            Target::Wasm => "wasm",
+        }
+    }
+}
+
+impl std::str::FromStr for Target {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Target, String> {
+        match text {
+            "native" => Ok(Target::Native),
+            "wasm" => Ok(Target::Wasm),
+            other => Err(format!(
+                "unknown target `{other}`: expected `native` or `wasm`"
+            )),
+        }
+    }
+}
 
 /// How to build a Typhoon program.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,9 +89,12 @@ pub struct BuildOptions {
     pub emit_ir: bool,
     /// Leave the intermediate `.ll` file and scratch directory on disk.
     pub keep_temps: bool,
-    /// Where to write the executable. `None` means a scratch directory owned by
-    /// the returned [`Artifact`].
+    /// Where to write the executable — or, for [`Target::Wasm`], the directory
+    /// the build's files go in. `None` means a scratch directory owned by the
+    /// returned [`Artifact`].
     pub output: Option<PathBuf>,
+    /// What to build.
+    pub target: Target,
 }
 
 impl Default for BuildOptions {
@@ -58,6 +104,7 @@ impl Default for BuildOptions {
             emit_ir: false,
             keep_temps: false,
             output: None,
+            target: Target::Native,
         }
     }
 }
@@ -67,6 +114,7 @@ impl Default for BuildOptions {
 pub struct Artifact {
     binary: PathBuf,
     ir: Option<String>,
+    package: Option<wasm::WasmPackage>,
     /// Kept alive so that a scratch-directory binary outlives this value, and
     /// is deleted with it.
     _scratch: Option<TempDir>,
@@ -81,6 +129,11 @@ impl Artifact {
     /// The textual LLVM IR, present when [`BuildOptions::emit_ir`] was set.
     pub fn ir(&self) -> Option<&str> {
         self.ir.as_deref()
+    }
+
+    /// The files of a [`Target::Wasm`] build.
+    pub fn wasm_package(&self) -> Option<&wasm::WasmPackage> {
+        self.package.as_ref()
     }
 }
 
@@ -183,6 +236,10 @@ pub fn compile_to_ir(name: &str, src: &str) -> Result<String, DriverError> {
 /// [`DriverError::Link`] if `clang` fails, [`DriverError::Toolchain`] if part
 /// of the toolchain is missing.
 pub fn compile_source(name: &str, src: &str, opts: &BuildOptions) -> Result<Artifact, DriverError> {
+    if opts.target == Target::Wasm {
+        return compile_source_wasm(name, src, opts);
+    }
+
     let ir = compile_to_ir(name, src)?;
 
     let (binary, scratch) = match &opts.output {
@@ -204,6 +261,42 @@ pub fn compile_source(name: &str, src: &str, opts: &BuildOptions) -> Result<Arti
     Ok(Artifact {
         binary,
         ir: opts.emit_ir.then_some(ir),
+        package: None,
+        _scratch: scratch,
+    })
+}
+
+/// Builds a WebAssembly package: the program, the runtime and a JS loader.
+///
+/// `opts.output` names the *directory* the three files go in; `None` uses a
+/// scratch directory owned by the returned [`Artifact`].
+fn compile_source_wasm(
+    name: &str,
+    src: &str,
+    opts: &BuildOptions,
+) -> Result<Artifact, DriverError> {
+    let module = wasm::compile_to_wasm(name, src)?;
+    let stem = Path::new(name).file_stem().map_or_else(
+        || "program".to_string(),
+        |s| s.to_string_lossy().into_owned(),
+    );
+
+    let (dir, scratch) = match &opts.output {
+        Some(path) => (path.clone(), None),
+        None => {
+            let mut scratch = TempDir::new("typhoon-wasm")?;
+            if opts.keep_temps {
+                scratch.keep();
+            }
+            (scratch.path().to_path_buf(), Some(scratch))
+        }
+    };
+
+    let package = wasm::write_package(&stem, &module, &dir)?;
+    Ok(Artifact {
+        binary: package.program.clone(),
+        ir: None,
+        package: Some(package),
         _scratch: scratch,
     })
 }
@@ -339,6 +432,44 @@ mod tests {
         assert!(!opts.emit_ir);
         assert!(!opts.keep_temps);
         assert_eq!(opts.output, None);
+        assert_eq!(opts.target, Target::Native);
+    }
+
+    #[test]
+    fn targets_round_trip_through_their_names() {
+        for target in [Target::Native, Target::Wasm] {
+            assert_eq!(target.as_str().parse::<Target>().unwrap(), target);
+        }
+        let err = "llvm".parse::<Target>().unwrap_err();
+        assert!(err.contains("unknown target `llvm`"), "{err}");
+        assert!(err.contains("`native` or `wasm`"), "{err}");
+    }
+
+    #[test]
+    fn a_wasm_build_writes_a_runnable_package() {
+        if !wasm::is_available() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("typhoon-wasm-pkg-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let opts = BuildOptions {
+            output: Some(dir.clone()),
+            target: Target::Wasm,
+            ..BuildOptions::default()
+        };
+        let artifact =
+            compile_source("greet.ty", "fn main():\n    print(\"hi\")\n", &opts).unwrap();
+        let package = artifact.wasm_package().expect("a wasm package");
+        assert_eq!(package.program, dir.join("greet.wasm"));
+        assert!(package.program.is_file());
+        assert!(package.runtime.is_file());
+        assert!(package.loader.is_file());
+        assert!(package.readme.is_file());
+        let program = std::fs::read(&package.program).unwrap();
+        assert_eq!(&program[..4], b"\0asm");
+        let loader = std::fs::read_to_string(&package.loader).unwrap();
+        assert!(loader.contains("./greet.wasm"), "{loader}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
