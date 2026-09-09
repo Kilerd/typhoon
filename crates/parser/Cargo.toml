@@ -1,0 +1,6 @@
+[package]
+name = "typhoon-parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

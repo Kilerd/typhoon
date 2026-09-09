@@ -1,0 +1,10 @@
+[package]
+name = "typhoon"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "typhoon"
+path = "src/main.rs"
+
+[dependencies]

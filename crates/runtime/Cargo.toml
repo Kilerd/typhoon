@@ -1,0 +1,10 @@
+[package]
+name = "typhoon-runtime"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "typhoon_runtime"
+crate-type = ["staticlib"]
+
+[dependencies]

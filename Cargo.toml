@@ -1,2 +1,12 @@
 [workspace]
-members = ["parser", "core", "ast", "typhoon"]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+
+[profile.release]
+debug = 1
