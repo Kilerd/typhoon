@@ -1,0 +1,33 @@
+# dict<str, int>: word frequency over a fixed list, printed in sorted key order.
+# expect: fast: 2
+# expect: is: 1
+# expect: typhoon: 3
+# expect: 3
+# expect: 6
+# expect: 0
+
+fn count_words(words: list<str>) -> dict<str, int>:
+    counts: dict<str, int> = {}
+    for w in words:
+        if w in counts:
+            counts[w] = counts[w] + 1
+        else:
+            counts[w] = 1
+    return counts
+
+fn main():
+    words: list<str> = ["typhoon", "is", "fast", "typhoon", "fast", "typhoon"]
+    counts = count_words(words)
+
+    for key in sorted(counts.keys()):
+        print(f"{key}: {counts[key]}")
+
+    print(len(counts))
+
+    total = 0
+    for key in counts.keys():
+        total = total + counts[key]
+    print(total)
+
+    empty: dict<str, int> = {}
+    print(len(empty))

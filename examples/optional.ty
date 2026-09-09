@@ -1,0 +1,38 @@
+# `T | None` and flow-sensitive narrowing with `is None` / `is not None`.
+# expect: found at 2
+# expect: not found
+# expect: 20
+# expect: -1
+
+fn find(xs: list<int>, target: int) -> int | None:
+    for i in range(len(xs)):
+        if xs[i] == target:
+            return i
+    return None
+
+fn find_or(xs: list<int>, target: int, fallback: int) -> int:
+    r = find(xs, target)
+    if r is None:
+        return fallback
+    return r        # narrowed to int in this branch
+
+fn main():
+    xs: list<int> = [10, 20, 30]
+
+    r = find(xs, 30)
+    if r is None:
+        print("not found")
+    else:
+        print(f"found at {r}")
+
+    r2 = find(xs, 99)
+    if r2 is None:
+        print("not found")
+    else:
+        print(f"found at {r2}")
+
+    idx = find(xs, 20)
+    if idx is not None:
+        print(xs[idx])
+
+    print(find_or(xs, 99, -1))

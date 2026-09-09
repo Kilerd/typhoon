@@ -1,0 +1,28 @@
+# A dataclass-style class: keyword constructor, fields, methods.
+# expect: Point(3.0, 4.0)
+# expect: 5.0
+# expect: dist=5.000
+# expect: Point(6.0, 8.0)
+# expect: 10.0
+
+class Point:
+    x: float
+    y: float
+
+    fn dist(self) -> float:
+        return (self.x * self.x + self.y * self.y) ** 0.5
+
+    fn scale(self, factor: float):
+        self.x = self.x * factor
+        self.y = self.y * factor
+
+fn main():
+    p = Point(x=3.0, y=4.0)
+    print(f"Point({p.x}, {p.y})")
+    print(p.dist())
+    print(f"dist={p.dist():.3f}")
+
+    # class instances are references: scale mutates `p` in place
+    p.scale(2.0)
+    print(f"Point({p.x}, {p.y})")
+    print(p.dist())

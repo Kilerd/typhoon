@@ -1,0 +1,29 @@
+# Arithmetic: int vs float, `/` vs `//`, `%`, `**`, and explicit float().
+# expect: 9
+# expect: 5
+# expect: 14
+# expect: 3.5
+# expect: 3
+# expect: 1
+# expect: 49
+# expect: 7.0
+# expect: 3.50
+# expect: 8.0
+
+fn main():
+    a: int = 7
+    b: int = 2
+
+    print(a + b)
+    print(a - b)
+    print(a * b)
+    print(a / b)        # int / int is float, Python style
+    print(a // b)       # floor division stays int
+    print(a % b)
+    print(a ** b)       # int ** int is int
+
+    # no implicit int -> float conversion, ask for it explicitly
+    x: float = float(a)
+    print(x)
+    print(f"{x / 2.0:.2f}")
+    print(2.0 ** 3.0)

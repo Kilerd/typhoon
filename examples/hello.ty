@@ -1,0 +1,5 @@
+# The smallest complete Typhoon program.
+# expect: Hello, Typhoon!
+
+fn main():
+    print("Hello, Typhoon!")

@@ -1,0 +1,29 @@
+# Strings: f-string, concatenation, len, upper, split and join.
+# expect: Hello, Typhoon!
+# expect: 15
+# expect: HELLO!
+# expect: 3
+# expect: fast
+# expect: a-fast-language
+# expect: name=Typhoon year=2026
+# expect: pi=3.14
+
+fn shout(text: str) -> str:
+    return text.upper() + "!"
+
+fn main():
+    name: str = "Typhoon"
+    greeting = "Hello, " + name + "!"
+    print(greeting)
+    print(len(greeting))
+
+    print(shout("hello"))
+
+    words: list<str> = "a fast language".split(" ")
+    print(len(words))
+    print(words[1])
+    print("-".join(words))
+
+    year = 2026
+    print(f"name={name} year={year}")
+    print(f"pi={3.14159:.2f}")

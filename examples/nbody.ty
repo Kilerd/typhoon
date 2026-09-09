@@ -1,0 +1,40 @@
+# Two-body gravitational integrator, the shape of the M1 float benchmark (values from an f64 reference, re-verify at M1).
+# expect: -0.000500
+# expect: -0.000500
+# expect: 0.539632 0.841308
+
+class Body:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    mass: float
+
+fn energy(a: Body, b: Body) -> float:
+    dx = a.x - b.x
+    dy = a.y - b.y
+    ke = 0.5 * a.mass * (a.vx * a.vx + a.vy * a.vy) + 0.5 * b.mass * (b.vx * b.vx + b.vy * b.vy)
+    return ke - a.mass * b.mass / ((dx * dx + dy * dy) ** 0.5)
+
+fn advance(a: Body, b: Body, dt: float):
+    dx = a.x - b.x
+    dy = a.y - b.y
+    d2 = dx * dx + dy * dy
+    mag = dt / (d2 * (d2 ** 0.5))
+    a.vx = a.vx - dx * b.mass * mag
+    a.vy = a.vy - dy * b.mass * mag
+    b.vx = b.vx + dx * a.mass * mag
+    b.vy = b.vy + dy * a.mass * mag
+    a.x = a.x + dt * a.vx
+    a.y = a.y + dt * a.vy
+    b.x = b.x + dt * b.vx
+    b.y = b.y + dt * b.vy
+
+fn main():
+    sun = Body(x=0.0, y=0.0, vx=0.0, vy=0.0, mass=1.0)
+    planet = Body(x=1.0, y=0.0, vx=0.0, vy=1.0, mass=0.001)
+    print(f"{energy(sun, planet):.6f}")
+    for step in range(1000):
+        advance(sun, planet, 0.001)
+    print(f"{energy(sun, planet):.6f}")
+    print(f"{planet.x:.6f} {planet.y:.6f}")

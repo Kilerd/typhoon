@@ -1,0 +1,40 @@
+# Control flow: if/elif/else, while, for over range, break and continue.
+# expect: negative
+# expect: zero
+# expect: positive
+# expect: 10
+# expect: 1
+# expect: 3
+# expect: 5
+# expect: 18
+
+fn classify(n: int) -> str:
+    if n < 0:
+        return "negative"
+    elif n == 0:
+        return "zero"
+    else:
+        return "positive"
+
+fn main():
+    print(classify(-3))
+    print(classify(0))
+    print(classify(7))
+
+    i = 0
+    total = 0
+    while i < 5:
+        total = total + i
+        i = i + 1
+    print(total)
+
+    for n in range(10):
+        if n % 2 == 0:
+            continue
+        if n > 6:
+            break
+        print(n)
+    stepped = 0
+    for n2 in range(0, 10, 3):
+        stepped = stepped + n2
+    print(stepped)

@@ -1,0 +1,32 @@
+# list<int>: literal, append, len, indexing, iteration, sum loop.
+# expect: 3
+# expect: 10
+# expect: 30
+# expect: 10
+# expect: 20
+# expect: 30
+# expect: 60
+# expect: 14
+
+fn sum_all(xs: list<int>) -> int:
+    total = 0
+    for x in xs:
+        total = total + x
+    return total
+
+fn main():
+    xs: list<int> = [10, 20]
+    xs.append(30)
+    print(len(xs))
+    print(xs[0])
+    print(xs[2])
+
+    for x in xs:
+        print(x)
+    print(sum_all(xs))
+
+    # an empty literal needs an annotation: inference is local, not global
+    squares: list<int> = []
+    for i in range(1, 4):
+        squares.append(i * i)
+    print(sum_all(squares))

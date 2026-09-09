@@ -1,0 +1,17 @@
+# Recursive fibonacci: the shape of the M1 pure-CPU benchmark.
+# expect: 832040
+# expect: 0
+# expect: 1
+# expect: 1
+# expect: 2
+# expect: 3
+
+fn fib(n: int) -> int:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn main():
+    print(fib(30))
+    for i in range(5):
+        print(fib(i))
