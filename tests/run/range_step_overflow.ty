@@ -1,0 +1,33 @@
+# `range(start, stop, step)` ends when the next value would pass the end of
+# `int` instead of wrapping around and looping forever (DESIGN 3.5): with a
+# literal or a run-time step, upwards and downwards, with `continue`, and in
+# a comprehension (which also pre-sizes its list from the bounds).
+# milestone: M3
+# expect: [-9223372036854775807, -4611686018427387903, 1, 4611686018427387905]
+# expect: [0, 3074457345618258603, 6148914691236517206]
+# expect: [9223372036854775807, 3074457345618258604, -3074457345618258599, -9223372036854775802]
+# expect: 2 2
+# expect: [9223372036854775806]
+# expect: [0, 3, 6, 9]
+
+fn walk(start: int, stop: int, step: int) -> list<int>:
+    out: list<int> = []
+    for i in range(start, stop, step):
+        out.append(i)
+    return out
+
+fn main():
+    big = 9223372036854775807
+    print([i for i in range(-big, big, 4611686018427387904)])
+    print(walk(0, big, 3074457345618258603))
+    print(walk(big, -big - 1, -6148914691236517203))
+    n = 0
+    skipped = 0
+    for i in range(1, big, 4611686018427387904):
+        n = n + 1
+        if i > 0:
+            skipped = skipped + 1
+            continue
+    print(n, skipped)
+    print([i for i in range(big - 1, big, 2)])
+    print([i for i in range(0, 10, 3)])

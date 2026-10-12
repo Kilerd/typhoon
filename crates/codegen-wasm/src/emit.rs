@@ -875,10 +875,39 @@ impl<'p> Emitter<'p> {
         self.loops.pop();
         self.end();
 
-        self.ins(Instruction::LocalGet(iv));
-        self.ins(Instruction::LocalGet(step_local));
-        self.ins(Instruction::I64Add);
-        self.ins(Instruction::LocalSet(iv));
+        match literal_step {
+            // The test let `i` in only if `i < stop` (or `i > stop`), so a
+            // unit step cannot overflow: the common loop stays as it was.
+            Some(1 | -1) => {
+                self.ins(Instruction::LocalGet(iv));
+                self.ins(Instruction::LocalGet(step_local));
+                self.ins(Instruction::I64Add);
+                self.ins(Instruction::LocalSet(iv));
+            }
+            // A wider step can jump past the end of `i64`; the next value is
+            // then beyond `stop` in the direction of the step, so the range is
+            // over (as in Python) instead of wrapping around. The wrapped sum
+            // overflowed exactly when its sign differs from both operands'.
+            _ => {
+                let next = self.scratch(ValType::I64);
+                self.ins(Instruction::LocalGet(iv));
+                self.ins(Instruction::LocalGet(step_local));
+                self.ins(Instruction::I64Add);
+                self.ins(Instruction::LocalSet(next));
+                self.ins(Instruction::LocalGet(iv));
+                self.ins(Instruction::LocalGet(next));
+                self.ins(Instruction::I64Xor);
+                self.ins(Instruction::LocalGet(step_local));
+                self.ins(Instruction::LocalGet(next));
+                self.ins(Instruction::I64Xor);
+                self.ins(Instruction::I64And);
+                self.ins(Instruction::I64Const(0));
+                self.ins(Instruction::I64LtS);
+                self.br_if(break_label);
+                self.ins(Instruction::LocalGet(next));
+                self.ins(Instruction::LocalSet(iv));
+            }
+        }
         self.br(head);
 
         self.end();

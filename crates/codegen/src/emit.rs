@@ -705,9 +705,33 @@ impl<'p> Emitter<'p> {
         let cur = self.fresh();
         let inc = self.fresh();
         self.emit(&format!("{cur} = load i64, ptr {iv}, align 8"));
-        self.emit(&format!("{inc} = add i64 {cur}, {step_value}"));
-        self.emit(&format!("store i64 {inc}, ptr {iv}, align 8"));
-        self.br(&head);
+        match literal_step {
+            // The test let `i` in only if `i < stop` (or `i > stop`), so a
+            // unit step cannot overflow: the common loop stays as it was.
+            Some(1 | -1) => {
+                self.emit(&format!("{inc} = add i64 {cur}, {step_value}"));
+                self.emit(&format!("store i64 {inc}, ptr {iv}, align 8"));
+                self.br(&head);
+            }
+            // A wider step can jump past the end of `i64`; the next value
+            // is then beyond `stop` in the direction of the step, so the
+            // range is over (as in Python) instead of wrapping around.
+            _ => {
+                self.decls
+                    .insert("declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)");
+                let pair = self.fresh();
+                let overflow = self.fresh();
+                self.emit(&format!(
+                    "{pair} = call {{ i64, i1 }} @llvm.sadd.with.overflow.i64(i64 {cur}, i64 {step_value})"
+                ));
+                self.emit(&format!("{inc} = extractvalue {{ i64, i1 }} {pair}, 0"));
+                self.emit(&format!(
+                    "{overflow} = extractvalue {{ i64, i1 }} {pair}, 1"
+                ));
+                self.emit(&format!("store i64 {inc}, ptr {iv}, align 8"));
+                self.cond_br(&overflow, &end, &head);
+            }
+        }
 
         self.start_block(&end);
     }

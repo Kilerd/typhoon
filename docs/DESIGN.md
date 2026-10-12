@@ -215,7 +215,7 @@ fn main():
         print(item)
 ```
 
-`range(n)` / `range(a, b)` / `range(a, b, step)` 是语言内建形式，编译为计数循环，**不分配对象**。`for ... in` 作用于 `list`、`str`、`dict`（迭代 key）、`set` 与 `range`。对 `str` 迭代按 Unicode 码点进行（整体 O(n)，与按码点索引的 O(n)/次不同）；迭代产出的元素类型（独立的 `char` 类型还是长度为 1 的 `str`）随第 9 节第 5 条一并决定。MVP 没有 `else` 子句挂在循环上（Python 的 `for...else` 不引入）。
+`range(n)` / `range(a, b)` / `range(a, b, step)` 是语言内建形式，编译为计数循环，**不分配对象**。下一个值越过 `int` 的表示范围时循环结束（与 Python 一致，不回绕成死循环）；步长为 `1` / `-1` 时循环条件已保证不会溢出，生成的代码不带检查，其余步长每轮多一次溢出判断。`for ... in` 作用于 `list`、`str`、`dict`（迭代 key）、`set` 与 `range`。对 `str` 迭代按 Unicode 码点进行（整体 O(n)，与按码点索引的 O(n)/次不同）；迭代产出的元素类型（独立的 `char` 类型还是长度为 1 的 `str`）随第 9 节第 5 条一并决定。MVP 没有 `else` 子句挂在循环上（Python 的 `for...else` 不引入）。
 
 ### 3.6 运算符
 

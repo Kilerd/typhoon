@@ -56,13 +56,15 @@ for.body.8:
 
 for.step.9:
   %t13 = load i64, ptr %for.iv.6, align 8
-  %t14 = add i64 %t13, -2
+  %t15 = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %t13, i64 -2)
+  %t14 = extractvalue { i64, i1 } %t15, 0
+  %t16 = extractvalue { i64, i1 } %t15, 1
   store i64 %t14, ptr %for.iv.6, align 8
-  br label %for.cond.7
+  br i1 %t16, label %for.end.10, label %for.cond.7
 
 for.end.10:
-  %t15 = load i64, ptr %total.addr, align 8
-  call void @ty_print_int(i64 %t15)
+  %t17 = load i64, ptr %total.addr, align 8
+  call void @ty_print_int(i64 %t17)
   call void @ty_print_end()
   ret void
 }
@@ -81,3 +83,4 @@ declare void @ty_print_end() nounwind
 declare void @ty_print_int(i64) nounwind
 declare void @ty_rt_exit(i32) noreturn nounwind
 declare void @ty_rt_init()
+declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)
