@@ -1,0 +1,31 @@
+# One-member tuple keys share their member's layout and must hash as that member.
+# milestone: M3
+# expect: 2 {(1,): "one", (2,): "two"}
+# expect: True False
+# expect: one
+# expect: 2 {(True,), (False,)} True
+# expect: 2 {("a",), ("b",)}
+# expect: True False
+# expect: [(1,), (2,)]
+
+fn main():
+    d: dict<tuple<int>, str> = {}
+    d[(1,)] = "one"
+    d[(2,)] = "two"
+    print(len(d), d)
+    print((1,) in d, (3,) in d)
+    print(d[(1,)])
+
+    b: set<tuple<bool>> = set()
+    b.add((True,))
+    b.add((False,))
+    b.add((True,))
+    print(len(b), b, (True,) in b)
+
+    s: set<tuple<str>> = set()
+    s.add(("a",))
+    s.add(("b",))
+    s.add(("a",))
+    print(len(s), s)
+    print(("b",) in s, ("c",) in s)
+    print(sorted(d.keys()))

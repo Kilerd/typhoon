@@ -37,6 +37,12 @@ impl<'p> Emitter<'p> {
                 self.ins(Instruction::LocalGet(value[0]));
                 self.ins(Instruction::I64ExtendI32U);
             }
+            // A one-member tuple has its member's layout and key descriptor,
+            // so the runtime treats it as that scalar: pass the member itself.
+            Type::Tuple(id) if self.types.tuple_members(id).len() == 1 => {
+                let member = self.types.tuple_members(id)[0];
+                self.push_key_word(member, value);
+            }
             _ => {
                 self.call_rt(Rt::KeyBuf);
                 let buf = self.scratch(ValType::I32);

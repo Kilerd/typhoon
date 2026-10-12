@@ -45,6 +45,21 @@ impl<'p> Emitter<'p> {
                 self.emit(&format!("{out} = ptrtoint ptr {value} to i64"));
                 out
             }
+            // A one-member tuple has its member's layout and key descriptor,
+            // so the runtime treats it as that scalar: pass the member itself.
+            Type::Tuple(id) if self.types.tuple_members(id).len() == 1 => {
+                let member = self.types.tuple_members(id)[0];
+                let llvm = self.llvm_ty(ty);
+                let out = self.fresh();
+                self.emit(&format!("{out} = extractvalue {llvm} {value}, 0"));
+                if matches!(self.types.get(member), Type::Bool) {
+                    // Inside an aggregate a bool is its `i8` memory form.
+                    let word = self.fresh();
+                    self.emit(&format!("{word} = zext i8 {out} to i64"));
+                    return word;
+                }
+                self.key_word(member, &out)
+            }
             _ => {
                 // A tuple key is passed by address: a stack slot laid out like
                 // the tuple in memory, which is what the runtime reads.
@@ -348,7 +363,7 @@ impl<'p> Emitter<'p> {
         let a = self.expr(func, start);
         let b = self.expr(func, stop);
         self.decls
-            .insert("declare ptr @ty_str_slice(ptr nocapture readonly, i64, i64) nounwind");
+            .insert("declare ptr @ty_str_slice(ptr readonly, i64, i64) nounwind");
         let out = self.fresh();
         self.emit(&format!(
             "{out} = call ptr @ty_str_slice(ptr {s}, i64 {a}, i64 {b})"
