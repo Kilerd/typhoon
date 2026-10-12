@@ -1533,6 +1533,18 @@ impl Checker<'_> {
                         }
                         Some(self.types.tuple_of(&members))
                     }
+                    "dict" if args.len() == 2 => {
+                        let key = self.subst(&args[0], generics, bindings)?;
+                        let value = self.subst(&args[1], generics, bindings)?;
+                        (self.types.is_hashable(key) && value != TypeId::UNIT)
+                            .then(|| self.types.dict_of(key, value))
+                    }
+                    "set" if args.len() == 1 => {
+                        let elem = self.subst(&args[0], generics, bindings)?;
+                        self.types
+                            .is_hashable(elem)
+                            .then(|| self.types.set_of(elem))
+                    }
                     _ if self.generics.has_class(text) => {
                         let wanted = self.generics.classes[text].decl.generics.len();
                         if args.len() != wanted {
@@ -1576,8 +1588,12 @@ impl Checker<'_> {
                     return;
                 }
                 match (text, self.types.get(ty)) {
-                    ("list", Type::List(elem)) if args.len() == 1 => {
+                    ("list", Type::List(elem)) | ("set", Type::Set(elem)) if args.len() == 1 => {
                         self.unify(&args[0], elem, generics, bindings);
+                    }
+                    ("dict", Type::Dict(key, value)) if args.len() == 2 => {
+                        self.unify(&args[0], key, generics, bindings);
+                        self.unify(&args[1], value, generics, bindings);
                     }
                     ("tuple", Type::Tuple(id)) => {
                         let members = self.types.tuple_members(id).to_vec();
