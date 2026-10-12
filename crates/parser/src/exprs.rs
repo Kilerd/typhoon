@@ -11,7 +11,8 @@
 //! of their own: `(a + b)` is just the `a + b` node.
 
 use typhoon_ast::{
-    Arg, BinOp, BoolOp, CmpOp, CompareTail, Expr, ExprKind, FStringPart, Ident, TypeExpr, UnaryOp,
+    Arg, BinOp, BoolOp, CmpOp, CompClause, CompareTail, Expr, ExprKind, FStringPart, Ident,
+    TypeExpr, UnaryOp,
 };
 use typhoon_diag::{Diagnostic, Span};
 use typhoon_lexer::{RawFStringPart, TokenKind};
@@ -476,9 +477,69 @@ impl<'a> Parser<'a> {
     fn parse_list(&mut self) -> Expr {
         let start = self.span();
         self.bump();
-        let items = self.parse_comma_list(&TokenKind::RBracket);
+        // `[elem for x in xs if cond]` (DESIGN 3.10) is told apart from a
+        // literal by the `for` right after its first element.
+        let mut items = Vec::new();
+        if !self.at(&TokenKind::RBracket)
+            && !matches!(self.kind(), TokenKind::Eof | TokenKind::Newline)
+        {
+            let first = self.parse_expr();
+            if self.at(&TokenKind::For) {
+                return self.parse_list_comp(start, first);
+            }
+            items.push(first);
+            if self.eat(&TokenKind::Comma) {
+                items.extend(self.parse_comma_list(&TokenKind::RBracket));
+            }
+        }
         self.expect(&TokenKind::RBracket, "`]`");
         Expr::new(ExprKind::List(items), self.span_from(start))
+    }
+
+    /// The rest of `[elem for ...]`, from the first `for` to the `]`.
+    fn parse_list_comp(&mut self, start: Span, elem: Expr) -> Expr {
+        let clauses = self.parse_comp_clauses();
+        self.expect(&TokenKind::RBracket, "`]`");
+        Expr::new(
+            ExprKind::ListComp {
+                elem: Box::new(elem),
+                clauses,
+            },
+            self.span_from(start),
+        )
+    }
+
+    /// `for x in xs if cond for y in ys ...`: the clauses of a comprehension,
+    /// starting at its first `for`. The iterable and the condition are
+    /// ordinary expressions, which stop in front of the next `for` / `if`
+    /// keyword by themselves.
+    fn parse_comp_clauses(&mut self) -> Vec<CompClause> {
+        let mut clauses = Vec::new();
+        loop {
+            let start = self.span();
+            match self.kind() {
+                TokenKind::For => {
+                    self.bump();
+                    let Some(var) = self.expect_ident("a comprehension variable name") else {
+                        break;
+                    };
+                    if !self.expect(&TokenKind::In, "`in` after the comprehension variable") {
+                        break;
+                    }
+                    let iter = self.parse_expr();
+                    let span = self.span_from(start);
+                    clauses.push(CompClause::For { var, iter, span });
+                }
+                TokenKind::If => {
+                    self.bump();
+                    let cond = self.parse_expr();
+                    let span = self.span_from(start);
+                    clauses.push(CompClause::If { cond, span });
+                }
+                _ => break,
+            }
+        }
+        clauses
     }
 
     fn parse_dict_or_set(&mut self) -> Expr {

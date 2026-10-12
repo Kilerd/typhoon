@@ -190,3 +190,14 @@ fn the_emitted_module_carries_names_for_its_functions() {
         "{text}"
     );
 }
+
+#[test]
+fn an_optional_value_is_a_tag_and_a_payload() {
+    // DESIGN 3.10: a value `T | None` is scalarised like a tuple, tag first; a
+    // reference `T | None` is one `i32` address with `None` as 0.
+    let text = wat(
+        "fn half(n: int) -> int | None:\n    if n % 2 == 0:\n        return n // 2\n    return None\n\nfn name(n: int) -> str | None:\n    if n > 0:\n        return \"x\"\n    return None\n\nfn main():\n    print(half(4), name(0))\n",
+    );
+    assert!(text.contains("(param i64) (result i32 i64)"), "{text}");
+    assert!(text.contains("(param i64) (result i32)"), "{text}");
+}

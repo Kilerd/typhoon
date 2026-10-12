@@ -36,10 +36,25 @@ impl Checker<'_> {
         expr: &ast::Expr,
         expected: Option<TypeId>,
     ) -> hir::Expr {
+        if !self.chain_operands.is_empty()
+            && let Some(lowered) = self.chain_operand(expr, expected)
+        {
+            return lowered;
+        }
         let span = expr.span;
+        // A container literal checked against `T | None` is checked against `T`
+        // and widened by the caller.
+        let literal_hint = expected.map(|ty| self.types.as_optional(ty).unwrap_or(ty));
         match &expr.kind {
-            ast::ExprKind::List(items) => return self.check_list_literal(items, expected, span),
-            ast::ExprKind::Tuple(items) => return self.check_tuple_literal(items, expected, span),
+            ast::ExprKind::List(items) => {
+                return self.check_list_literal(items, literal_hint, span);
+            }
+            ast::ExprKind::Tuple(items) => {
+                return self.check_tuple_literal(items, literal_hint, span);
+            }
+            ast::ExprKind::ListComp { elem, clauses } => {
+                return self.check_list_comp(elem, clauses, literal_hint, span);
+            }
             // DESIGN §3.9, §4.4: a generic call infers from the expected type too.
             ast::ExprKind::Call {
                 callee,
@@ -90,7 +105,9 @@ impl Checker<'_> {
             ast::ExprKind::Attribute { base, attr } => self.check_attribute(base, attr, span),
             ast::ExprKind::Index { base, index } => self.check_index(base, index, span),
             // Handled above, with the expected type.
-            ast::ExprKind::List(_) | ast::ExprKind::Tuple(_) => self.error_expr(span),
+            ast::ExprKind::List(_) | ast::ExprKind::Tuple(_) | ast::ExprKind::ListComp { .. } => {
+                self.error_expr(span)
+            }
             ast::ExprKind::Dict(entries) => {
                 for (k, v) in entries {
                     self.check_expr(k);
@@ -142,18 +159,27 @@ impl Checker<'_> {
                 );
                 return self.error_expr(span);
             }
-            // A `C | None` the control flow has proved non-null reads as a
-            // plain `C` (DESIGN §3.8); the value is the same pointer.
-            let ty = match self.types.get(ty) {
-                crate::types::Type::Optional(class) if self.narrowed.contains(&id) => {
-                    self.types.class_ty(class)
-                }
-                _ => ty,
-            };
-            return hir::Expr {
+            let read = hir::Expr {
                 kind: hir::ExprKind::Local(id),
                 ty,
                 span,
+            };
+            // A `T | None` the control flow has proved non-`None` reads as a
+            // plain `T` (DESIGN §3.8): the same pointer for a reference, the
+            // payload of the pair otherwise.
+            return match self.types.get(ty) {
+                crate::types::Type::Optional(inner) if self.narrowed.contains(&id) => {
+                    if self.types.is_tagged_optional(ty) {
+                        hir::Expr {
+                            kind: hir::ExprKind::OptionalValue(Box::new(read)),
+                            ty: inner,
+                            span,
+                        }
+                    } else {
+                        hir::Expr { ty: inner, ..read }
+                    }
+                }
+                _ => read,
             };
         }
         if let Some(entry) = self.consts.get(name.as_str()) {
@@ -240,6 +266,10 @@ impl Checker<'_> {
             (ast::UnaryOp::Not, TypeId::BOOL) => {
                 (hir::ExprKind::Not(Box::new(value)), TypeId::BOOL)
             }
+            _ if self.types.as_optional(value.ty).is_some() => {
+                self.require_narrowed(value.span, value.ty);
+                return self.error_expr(span);
+            }
             _ => {
                 let found = self.types.name(value.ty);
                 let mut diag = Diagnostic::error(format!(
@@ -277,6 +307,9 @@ impl Checker<'_> {
         let lhs = self.check_expr(lhs);
         let rhs = self.check_expr_hint(rhs, Some(lhs.ty));
         if lhs.ty == TypeId::ERROR || rhs.ty == TypeId::ERROR {
+            return self.error_expr(span);
+        }
+        if self.reject_optional_operand(&lhs) || self.reject_optional_operand(&rhs) {
             return self.error_expr(span);
         }
         if lhs.ty != rhs.ty {
@@ -502,21 +535,22 @@ impl Checker<'_> {
         self.error_expr(value.span)
     }
 
-    fn check_compare(
+    pub(crate) fn check_compare(
         &mut self,
         left: &ast::Expr,
         tail: &[ast::CompareTail],
         span: Span,
     ) -> hir::Expr {
         if tail.len() > 1 {
-            self.check_expr(left);
-            for t in tail {
-                self.check_expr(&t.rhs);
-            }
-            self.unsupported(span, "a comparison chain", "M3");
-            return self.error_expr(span);
+            return self.check_compare_chain(left, tail, span);
         }
         let entry = &tail[0];
+        if matches!(entry.op, ast::CmpOp::Eq | ast::CmpOp::Ne)
+            && (matches!(left.kind, ast::ExprKind::None)
+                || matches!(entry.rhs.kind, ast::ExprKind::None))
+        {
+            return self.compare_with_none(left, entry, span);
+        }
         let op = match entry.op {
             ast::CmpOp::Eq => hir::CmpOp::Eq,
             ast::CmpOp::Ne => hir::CmpOp::Ne,
@@ -535,6 +569,17 @@ impl Checker<'_> {
         if lhs.ty == TypeId::ERROR || rhs.ty == TypeId::ERROR {
             return self.error_expr(span);
         }
+        let ordered = !matches!(op, hir::CmpOp::Eq | hir::CmpOp::Ne);
+        // `==` between a `T | None` and a `T` widens the `T`, as in Python;
+        // ordering a possibly-`None` value needs narrowing first.
+        let (lhs, rhs) = if ordered {
+            if self.reject_optional_operand(&lhs) || self.reject_optional_operand(&rhs) {
+                return self.error_expr(span);
+            }
+            (lhs, rhs)
+        } else {
+            self.widen_to_optional(lhs, rhs)
+        };
         if lhs.ty != rhs.ty {
             let (l, r) = (self.types.name(lhs.ty), self.types.name(rhs.ty));
             let mut diag =
@@ -550,7 +595,6 @@ impl Checker<'_> {
             return self.error_expr(span);
         }
 
-        let ordered = !matches!(op, hir::CmpOp::Eq | hir::CmpOp::Ne);
         let kind = match self.types.get(lhs.ty) {
             crate::types::Type::Int => hir::ExprKind::IntCmp {
                 op,
@@ -586,6 +630,16 @@ impl Checker<'_> {
                     );
                     return self.error_expr(span);
                 }
+                hir::ExprKind::StructEq {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                }
+            }
+            // `T | None` compares as `None == None`, else the payloads.
+            crate::types::Type::Optional(inner)
+                if self.types.class_of(inner).is_none() && self.types.is_printable(inner) =>
+            {
                 hir::ExprKind::StructEq {
                     op,
                     lhs: Box::new(lhs),
@@ -662,12 +716,15 @@ impl Checker<'_> {
             if value.ty == TypeId::ERROR {
                 return self.error_expr(span);
             }
-            if self.types.class_of(value.ty).is_none() {
+            // Testing a local the flow has already narrowed tests the local
+            // itself, not its narrowed reading.
+            let value = self.unnarrowed(value);
+            if !matches!(self.types.get(value.ty), Type::Optional(_) | Type::Class(_)) {
                 let found = self.types.name(value.ty);
                 self.error(
                     Diagnostic::error(format!("`{found}` can never be `None`"))
                         .with_label(value.span, format!("this is {}", a_type(&found)))
-                        .with_help("only a class reference written `C | None` may be absent"),
+                        .with_help("only a value whose type is written `T | None` may be absent"),
                 );
                 return self.error_expr(span);
             }
@@ -781,6 +838,11 @@ impl Checker<'_> {
                     ty: TypeId::BOOL,
                     span,
                 }
+            }
+            crate::types::Type::Optional(_) => {
+                self.check_expr(left);
+                self.require_narrowed(haystack.span, haystack.ty);
+                self.error_expr(span)
             }
             _ => {
                 self.check_expr(left);
@@ -1916,6 +1978,10 @@ impl Checker<'_> {
                             span,
                         }
                     }
+                    Type::Optional(_) => {
+                        self.require_narrowed(value.span, value.ty);
+                        self.error_expr(span)
+                    }
                     _ => {
                         let found = self.types.name(value.ty);
                         self.error(
@@ -1938,6 +2004,12 @@ impl Checker<'_> {
                     // `str(s)` on a `str` is the identity.
                     TypeId::STR => value,
                     TypeId::INT | TypeId::FLOAT | TypeId::BOOL => hir::Expr {
+                        kind: hir::ExprKind::StrFrom(Box::new(value)),
+                        ty: TypeId::STR,
+                        span,
+                    },
+                    // `str(x)` of a `T | None` is `"None"` or `str` of the value.
+                    ty if self.types.as_optional(ty).is_some_and(is_scalar) => hir::Expr {
                         kind: hir::ExprKind::StrFrom(Box::new(value)),
                         ty: TypeId::STR,
                         span,
@@ -2020,10 +2092,10 @@ impl Checker<'_> {
                         );
                         continue;
                     }
-                    if !matches!(
-                        value.ty,
-                        TypeId::INT | TypeId::FLOAT | TypeId::BOOL | TypeId::STR
-                    ) {
+                    // A `T | None` renders as its value or `None`, like Python.
+                    let scalar = is_scalar(value.ty)
+                        || self.types.as_optional(value.ty).is_some_and(is_scalar);
+                    if !scalar {
                         let found = self.types.name(value.ty);
                         self.error(
                             Diagnostic::error(format!("cannot interpolate {}", a_type(&found)))
@@ -2121,6 +2193,12 @@ impl Checker<'_> {
             }
         }
     }
+}
+
+/// Whether `ty` is one of the four scalars `print` and f-strings render
+/// directly.
+fn is_scalar(ty: TypeId) -> bool {
+    matches!(ty, TypeId::INT | TypeId::FLOAT | TypeId::BOOL | TypeId::STR)
 }
 
 fn lhs_ty_is_float(kind: &hir::ExprKind) -> bool {

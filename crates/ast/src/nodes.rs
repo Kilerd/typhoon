@@ -301,6 +301,28 @@ pub struct CompareTail {
     pub rhs: Expr,
 }
 
+/// One `for` or `if` clause of a comprehension, e.g. the `for x in xs` and
+/// `if x > 0` of `[x for x in xs if x > 0]` (DESIGN 3.10).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompClause {
+    /// `for var in iter`.
+    For {
+        /// The comprehension variable, scoped to the comprehension.
+        var: Ident,
+        /// The iterated expression.
+        iter: Expr,
+        /// Span from `for` to the end of the iterable.
+        span: Span,
+    },
+    /// `if cond`.
+    If {
+        /// The filter condition.
+        cond: Expr,
+        /// Span from `if` to the end of the condition.
+        span: Span,
+    },
+}
+
 /// An expression: an [`ExprKind`] plus its span.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
@@ -403,8 +425,7 @@ pub enum ExprKind {
         /// Right operand.
         rhs: Box<Expr>,
     },
-    /// A comparison, possibly chained. Chains parse but sema rejects them
-    /// until M3 (DESIGN 3.6).
+    /// A comparison, possibly chained: `a < b < c` (DESIGN 3.6).
     Compare {
         /// The left-most operand.
         left: Box<Expr>,
@@ -413,6 +434,14 @@ pub enum ExprKind {
     },
     /// `[a, b]`.
     List(Vec<Expr>),
+    /// `[elem for x in xs if cond ...]`: a list comprehension (DESIGN 3.10).
+    /// The first clause is always a `for`.
+    ListComp {
+        /// The element expression.
+        elem: Box<Expr>,
+        /// The `for` / `if` clauses, in source order.
+        clauses: Vec<CompClause>,
+    },
     /// `{k: v}`. An empty `{}` is a dict, not a set (DESIGN 3.7).
     Dict(Vec<(Expr, Expr)>),
     /// `{a, b}`.

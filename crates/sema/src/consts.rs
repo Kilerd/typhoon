@@ -74,13 +74,18 @@ impl Checker<'_> {
                 }
             }
             ast::ExprKind::Compare { left, tail } => {
-                if tail.len() != 1 {
-                    self.unsupported(expr.span, "a comparison chain", "M3");
-                    return None;
+                // A chain holds when every link does (DESIGN §3.6).
+                let mut lhs = self.eval_const(left)?;
+                let mut holds = true;
+                for link in tail {
+                    let rhs = self.eval_const(&link.rhs)?;
+                    match self.const_compare(link.op, &lhs, &rhs, expr.span)? {
+                        ConstValue::Bool(value) => holds &= value,
+                        other => return Some(other),
+                    }
+                    lhs = rhs;
                 }
-                let a = self.eval_const(left)?;
-                let b = self.eval_const(&tail[0].rhs)?;
-                self.const_compare(tail[0].op, &a, &b, expr.span)
+                Some(ConstValue::Bool(holds))
             }
             _ => {
                 self.not_constant(expr.span, "this is not a constant expression");

@@ -1,0 +1,15 @@
+# Assigning a `T | None` to a narrowed local forgets the narrowing
+# (DESIGN 3.8).
+# milestone: M3
+# error: `str | None` may be `None` here
+
+fn label(n: int) -> str | None:
+    if n > 0:
+        return "pos"
+    return None
+
+fn main():
+    s = label(1)
+    if s is not None:
+        s = label(0)
+        print(s.upper())

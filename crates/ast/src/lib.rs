@@ -25,7 +25,8 @@ mod ops;
 
 pub use dump::{dump, dump_expr, dump_stmt, dump_type};
 pub use nodes::{
-    Arg, Block, ClassDecl, CompareTail, ConstDecl, ElifBranch, Expr, ExprKind, FStringPart, Field,
-    FnDecl, GenericParam, Ident, Item, Module, Param, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    Arg, Block, ClassDecl, CompClause, CompareTail, ConstDecl, ElifBranch, Expr, ExprKind,
+    FStringPart, Field, FnDecl, GenericParam, Ident, Item, Module, Param, Stmt, StmtKind, TypeExpr,
+    TypeExprKind,
 };
 pub use ops::{BinOp, BoolOp, CmpOp, UnaryOp};

@@ -899,3 +899,37 @@ fn a_str_method_is_a_runtime_call_but_iteration_is_not() {
     assert!(walk.contains("each.body"), "{walk}");
     no_runtime_calls(&walk, &["ty_list_", "ty_iter"], &["ty_list_new"]);
 }
+
+#[test]
+fn an_optional_is_a_tagged_pair_or_a_nullable_pointer() {
+    // DESIGN 3.10: no boxing. A value `T | None` is a `{ tag, T }` pair passed
+    // by value; a reference `T | None` is the pointer itself, `None` the null.
+    let text = ir(
+        "fn half(n: int) -> int | None:\n    if n % 2 == 0:\n        return n // 2\n    return None\n\nfn name(n: int) -> str | None:\n    if n > 0:\n        return \"x\"\n    return None\n\nfn main():\n    print(half(4), name(0))\n",
+    );
+    assert!(
+        text.contains("define internal { i8, i64 } @ty_user_half(i64 %n.arg)"),
+        "{text}"
+    );
+    assert!(text.contains("ret { i8, i64 } zeroinitializer"), "{text}");
+    assert!(
+        text.contains("insertvalue { i8, i64 } poison, i8 1, 0"),
+        "{text}"
+    );
+    assert!(
+        text.contains("define internal ptr @ty_user_name(i64 %n.arg)"),
+        "{text}"
+    );
+    assert!(text.contains("ret ptr null"), "{text}");
+    assert!(!text.contains("@ty_alloc"), "{text}");
+}
+
+#[test]
+fn a_comprehension_of_known_length_allocates_its_list_once() {
+    let text = ir("fn main():\n    n = 8\n    print([i * i for i in range(n)])\n");
+    assert!(
+        text.contains("call ptr @ty_list_new(i64 8, i8 1, i64 %t"),
+        "{text}"
+    );
+    assert!(text.contains("for.cond"), "{text}");
+}

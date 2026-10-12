@@ -102,11 +102,90 @@ fn comparison_operators() {
 }
 
 #[test]
-fn comparison_chains_parse_and_are_left_for_sema() {
-    // DESIGN 3.6: chains are an M3 feature; the parser accepts them so sema can
-    // reject them with a proper diagnostic.
+fn comparison_chains_are_one_compare_node() {
+    // DESIGN 3.6: a chain is a single `Compare` with one tail entry per
+    // operator; sema lowers it so that every middle operand runs once.
     assert_eq!(expr("a < b < c"), "(cmp a < b < c)");
     assert_eq!(expr("a < b <= c == d"), "(cmp a < b <= c == d)");
+    assert_eq!(expr("a is not b is None"), "(cmp a is not b is None)");
+    assert_eq!(expr("a in xs not in ys"), "(cmp a in xs not in ys)");
+    assert_eq!(expr("a < b < c and d"), "(and (cmp a < b < c) d)");
+    // DESIGN 3.9 rule 3 still wins over a chain: `a < b > (c)` is a call.
+    assert_eq!(expr("a < b > (c)"), "(call a<b> c)");
+    assert_eq!(expr("a < b > c"), "(cmp a < b > c)");
+    assert_eq!(expr("0 < b > (c)"), "(cmp 0 < b > c)");
+}
+
+#[test]
+fn list_comprehensions() {
+    // DESIGN 3.10.
+    assert_eq!(
+        expr("[x * x for x in xs]"),
+        "(listcomp (* x x) for x in xs)"
+    );
+    assert_eq!(
+        expr("[x for x in xs if x > 0]"),
+        "(listcomp x for x in xs if (cmp x > 0))"
+    );
+    assert_eq!(
+        expr("[(x, y) for x in range(3) if x != 1 for y in ys if y in x if True]"),
+        "(listcomp (tuple x y) for x in (call range 3) if (cmp x != 1) \
+         for y in ys if (cmp y in x) if True)"
+    );
+    // A comprehension is an ordinary operand.
+    assert_eq!(
+        expr("[x for x in xs] + [1]"),
+        "(+ (listcomp x for x in xs) (list 1))"
+    );
+    assert_eq!(
+        expr("[[y for y in row] for row in m]"),
+        "(listcomp (listcomp y for y in row) for row in m)"
+    );
+    // The iterable of a clause may itself be a comparison chain or a call.
+    assert_eq!(
+        expr("[a < b < c for a in f(1)]"),
+        "(listcomp (cmp a < b < c) for a in (call f 1))"
+    );
+    // Like any bracketed form, it may span lines.
+    assert_eq!(
+        expr("[\n    x\n    for x in xs\n    if x\n]"),
+        "(listcomp x for x in xs if x)"
+    );
+}
+
+#[test]
+fn list_comprehension_spans() {
+    insta::assert_snapshot!(expr_dump("[x for x in xs if x]"), @r"
+    ListComp @0..20
+      elem Name `x` @1..2
+      for `x` @3..14
+        in Name `xs` @12..14
+      if If @15..19
+        Name `x` @18..19
+    ");
+}
+
+#[test]
+fn malformed_comprehensions_are_reported() {
+    let (_, diags) = expr_with_diags("[x for in xs]");
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.contains("expected a comprehension variable name")),
+        "{diags:?}"
+    );
+    let (_, diags) = expr_with_diags("[x for y xs]");
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.contains("expected `in` after the comprehension variable")),
+        "{diags:?}"
+    );
+    let (_, diags) = expr_with_diags("[x, y for y in xs]");
+    assert!(
+        diags.iter().any(|d| d.contains("expected `]`")),
+        "{diags:?}"
+    );
 }
 
 #[test]

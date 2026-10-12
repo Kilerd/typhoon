@@ -308,11 +308,56 @@ impl<'p> Emitter<'p> {
                 let slot = self.field_slot(&obj, *class, *field);
                 self.load_slot(&slot, expr.ty, Tbaa::ClassField)
             }
+            hir::ExprKind::NoneRef if self.types.is_tagged_optional(expr.ty) => {
+                "zeroinitializer".to_string()
+            }
             hir::ExprKind::NoneRef => "null".to_string(),
             hir::ExprKind::IsNone { value, negated } => {
+                let ty = value.ty;
                 let value = self.expr(func, value);
                 let pred = if *negated { "ne" } else { "eq" };
+                if self.types.is_tagged_optional(ty) {
+                    let llvm = self.llvm_ty(ty);
+                    let tag = self.fresh();
+                    self.emit(&format!("{tag} = extractvalue {llvm} {value}, 0"));
+                    return self.binop(&format!("icmp {pred}"), "i8", &tag, "0");
+                }
                 self.binop(&format!("icmp {pred}"), "ptr", &value, "null")
+            }
+            hir::ExprKind::OptionalSome(value) => {
+                let inner = value.ty;
+                let value = self.expr(func, value);
+                let value = self.widen(inner, &value);
+                let llvm = self.llvm_ty(expr.ty);
+                let tagged = self.fresh();
+                self.emit(&format!("{tagged} = insertvalue {llvm} poison, i8 1, 0"));
+                let out = self.fresh();
+                self.emit(&format!(
+                    "{out} = insertvalue {llvm} {tagged}, {} {value}, 1",
+                    self.store_ty(inner)
+                ));
+                out
+            }
+            hir::ExprKind::OptionalValue(value) => {
+                let ty = value.ty;
+                let value = self.expr(func, value);
+                self.optional_payload(ty, &value)
+            }
+            hir::ExprKind::Seq { stmts, value } => {
+                self.block(func, stmts);
+                self.expr(func, value)
+            }
+            hir::ExprKind::ListWithCapacity { elem, cap } => {
+                let cap = self.expr(func, cap);
+                self.decls
+                    .insert("declare noalias ptr @ty_list_new(i64, i8, i64) nounwind");
+                let out = self.fresh();
+                self.emit(&format!(
+                    "{out} = call ptr @ty_list_new(i64 {}, i8 {}, i64 {cap})",
+                    self.size_of(*elem),
+                    self.atomic_flag(*elem)
+                ));
+                out
             }
             hir::ExprKind::RefEq { lhs, rhs, negated } => {
                 let lhs = self.expr(func, lhs);
@@ -331,6 +376,36 @@ impl<'p> Emitter<'p> {
                 equal
             }
         }
+    }
+
+    /// Whether a `T | None` value (or a plain class reference) is present, as
+    /// an `i1`: a non-null pointer, or a set tag.
+    pub(super) fn optional_present(&mut self, ty: TypeId, value: &str) -> String {
+        if self.types.is_tagged_optional(ty) {
+            let llvm = self.llvm_ty(ty);
+            let tag = self.fresh();
+            self.emit(&format!("{tag} = extractvalue {llvm} {value}, 0"));
+            return self.binop("icmp ne", "i8", &tag, "0");
+        }
+        self.binop("icmp ne", "ptr", value, "null")
+    }
+
+    /// The `T` inside a present `T | None`: the payload of the pair, or the
+    /// pointer itself when `T` is a reference.
+    pub(super) fn optional_payload(&mut self, ty: TypeId, value: &str) -> String {
+        if !self.types.is_tagged_optional(ty) {
+            return value.to_string();
+        }
+        let inner = self.types.as_optional(ty).expect("a tagged optional");
+        let llvm = self.llvm_ty(ty);
+        let raw = self.fresh();
+        self.emit(&format!("{raw} = extractvalue {llvm} {value}, 1"));
+        if self.types.get(inner) == Type::Bool {
+            let out = self.fresh();
+            self.emit(&format!("{out} = trunc i8 {raw} to i1"));
+            return out;
+        }
+        raw
     }
 
     /// `%t = <op> <ty> <lhs>, <rhs>`.
@@ -676,6 +751,25 @@ impl<'p> Emitter<'p> {
             return out;
         }
         match self.types.get(ty) {
+            Type::Optional(inner) => {
+                // `"None"`, or the payload formatted, chosen through a slot.
+                let slot = self.scratch("ptr", 8);
+                let none = self.string_literal("None");
+                self.emit(&format!("store ptr {none}, ptr {slot}, align 8"));
+                let present = self.optional_present(ty, value);
+                let some = self.fresh_label("fmt.some");
+                let end = self.fresh_label("fmt.end");
+                self.cond_br(&present, &some, &end);
+                self.start_block(&some);
+                let payload = self.optional_payload(ty, value);
+                let text = self.format_value(inner, &payload, spec);
+                self.emit(&format!("store ptr {text}, ptr {slot}, align 8"));
+                self.br(&end);
+                self.start_block(&end);
+                let out = self.fresh();
+                self.emit(&format!("{out} = load ptr, ptr {slot}, align 8"));
+                out
+            }
             Type::Str => value.to_string(),
             Type::Int => {
                 self.decls

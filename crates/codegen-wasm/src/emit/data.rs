@@ -49,6 +49,12 @@ impl<'p> Emitter<'p> {
     /// or a class field work at all: it has no wasm representation of its own.
     pub(crate) fn load_value(&mut self, address: u32, ty: TypeId, offset: u32) {
         match self.types.get(ty) {
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                self.ins(Instruction::LocalGet(address));
+                self.ins(Instruction::I32Load8U(mem(offset, 1)));
+                let payload = self.layout.optional_payload_offset(inner);
+                self.load_value(address, inner, offset + payload);
+            }
             Type::Int => {
                 self.ins(Instruction::LocalGet(address));
                 self.ins(Instruction::I64Load(mem(offset, 8)));
@@ -79,6 +85,13 @@ impl<'p> Emitter<'p> {
     /// Stores the previously spilled `value` of type `ty` at `address + offset`.
     pub(crate) fn store_value(&mut self, address: u32, ty: TypeId, offset: u32, value: &[u32]) {
         match self.types.get(ty) {
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                self.ins(Instruction::LocalGet(address));
+                self.ins(Instruction::LocalGet(value[0]));
+                self.ins(Instruction::I32Store8(mem(offset, 1)));
+                let payload = self.layout.optional_payload_offset(inner);
+                self.store_value(address, inner, offset + payload, &value[1..]);
+            }
             Type::Int => {
                 self.ins(Instruction::LocalGet(address));
                 self.ins(Instruction::LocalGet(value[0]));
@@ -636,7 +649,35 @@ impl<'p> Emitter<'p> {
                 }
             }
             Type::List(elem) => self.lists_equal(elem, lhs[0], rhs[0]),
+            // Both present with equal payloads, or both `None`. The payloads
+            // are only compared when both are present, since a `None` payload
+            // may be a null `str`.
+            Type::Optional(inner) => {
+                let payload = usize::from(self.types.is_tagged_optional(ty));
+                let (a, b) = (lhs[payload..].to_vec(), rhs[payload..].to_vec());
+                self.optional_present(ty, lhs);
+                self.optional_present(ty, rhs);
+                self.ins(Instruction::I32And);
+                self.open_if(BlockType::Result(ValType::I32));
+                self.values_equal(inner, &a, &b);
+                self.else_();
+                // Not both present: equal exactly when both are absent.
+                self.optional_present(ty, lhs);
+                self.optional_present(ty, rhs);
+                self.ins(Instruction::I32Eq);
+                self.end();
+            }
             _ => self.ins(Instruction::I32Const(0)),
+        }
+    }
+
+    /// Pushes whether the spilled `T | None` (or plain class reference) is
+    /// present: its tag, or whether its pointer is non-null.
+    pub(crate) fn optional_present(&mut self, ty: TypeId, value: &[u32]) {
+        self.ins(Instruction::LocalGet(value[0]));
+        if !self.types.is_tagged_optional(ty) {
+            self.ins(Instruction::I32Const(0));
+            self.ins(Instruction::I32Ne);
         }
     }
 
@@ -825,6 +866,17 @@ impl<'p> Emitter<'p> {
                     self.print_raw(",");
                 }
                 self.print_raw(")");
+            }
+            // The value, or `None` (DESIGN §4.6).
+            Type::Optional(inner) => {
+                let payload = usize::from(self.types.is_tagged_optional(ty));
+                let inner_value = value[payload..].to_vec();
+                self.optional_present(ty, value);
+                self.open_if(BlockType::Empty);
+                self.print_value(inner, &inner_value, quoted);
+                self.else_();
+                self.print_raw("None");
+                self.end();
             }
             _ => {}
         }

@@ -1,0 +1,57 @@
+# Optionals of references (`str`, `list<T>`, a class) are a possibly-null
+# pointer: no tag, no box. Narrowing, mutation through a narrowed list,
+# equality, printing inside containers, and a unit call widened to `None`.
+# milestone: M3
+# expect: ["a", None] True False
+# expect: [1, 2, 3]
+# expect: None
+# expect: ("x", 1) (None, 2)
+# expect: 3 2 1
+# expect: done
+# expect: None
+# expect: True False
+
+class Node:
+    value: int
+    next: Node | None = None
+
+fn note(text: str):
+    print(text)
+
+fn push(xs: list<int> | None, v: int) -> list<int> | None:
+    if xs is None:
+        return None
+    xs.append(v)
+    return xs
+
+fn main():
+    names: list<str | None> = ["a", None]
+    print(names, names == ["a", None], names == [None, "a"])
+
+    xs: list<int> | None = [1, 2]
+    print(push(xs, 3))
+    print(push(None, 4))
+
+    t1: tuple<str | None, int> = ("x", 1)
+    t2: tuple<str | None, int> = (None, 2)
+    print(t1, t2)
+
+    head = Node(value=1)
+    head = Node(value=2, next=head)
+    head = Node(value=3, next=head)
+    cur: Node | None = head
+    out: list<int> = []
+    for i in range(10):
+        if cur is None:
+            break
+        out.append(cur.value)
+        cur = cur.next
+    print(out[0], out[1], out[2])
+
+    # A unit call still runs when its `None` fills a `T | None`.
+    gone: str | None = note("done")
+    print(gone)
+
+    a: str | None = "k"
+    b: str | None = None
+    print(a == "k", a == b)

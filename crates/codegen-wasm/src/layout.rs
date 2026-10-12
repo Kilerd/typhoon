@@ -47,6 +47,10 @@ impl<'t> Layout<'t> {
     /// a tuple or a class instance.
     pub fn size_of(&self, ty: TypeId) -> u32 {
         match self.types.get(ty) {
+            // `{ tag: bool, payload: T }`, the C layout of the native backend.
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                self.struct_size(&[TypeId::BOOL, inner])
+            }
             Type::Bool => 1,
             Type::Int | Type::Float => 8,
             Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => PTR_SIZE,
@@ -61,6 +65,7 @@ impl<'t> Layout<'t> {
     /// The alignment of a value of `ty` in memory.
     pub fn align_of(&self, ty: TypeId) -> u32 {
         match self.types.get(ty) {
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => self.align_of(inner),
             Type::Bool => 1,
             Type::Int | Type::Float => 8,
             Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => PTR_SIZE,
@@ -99,6 +104,12 @@ impl<'t> Layout<'t> {
             size += self.size_of(*member);
         }
         offsets
+    }
+
+    /// The byte offset of the payload of a tagged `T | None`, whose tag is the
+    /// byte at offset 0.
+    pub fn optional_payload_offset(&self, inner: TypeId) -> u32 {
+        self.field_offsets(&[TypeId::BOOL, inner])[1]
     }
 
     /// The member types of a tuple type.

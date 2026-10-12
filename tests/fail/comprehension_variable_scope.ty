@@ -1,0 +1,7 @@
+# Comprehension variables are scoped to the comprehension (DESIGN 3.10).
+# milestone: M3
+# error: cannot find value `x` in this scope
+
+fn main():
+    ys = [x * 2 for x in range(3)]
+    print(ys, x)

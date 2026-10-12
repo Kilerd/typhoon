@@ -1,0 +1,43 @@
+# List comprehensions: `[expr for x in iterable if cond ...]`, with as many
+# `for` and `if` clauses as needed. The variables are local to the
+# comprehension; a lone `for` over a list, a str or a range allocates the
+# result once, at its final length.
+# milestone: M3
+# expect: [0, 1, 4, 9, 16]
+# expect: [3, 4, 5]
+# expect: [(1, 0), (2, 0), (2, 1)]
+# expect: ["H", "E", "O"]
+# expect: [[10, 20], [30], []]
+# expect: [1, 3]
+# expect: [0, 2, 4] 3
+# expect: [10, 7, 4, 1]
+# expect: 1000
+# expect: x is free again
+
+fn maybe_even(n: int) -> int | None:
+    if n % 2 == 0:
+        return n
+    return None
+
+fn main():
+    print([x * x for x in range(5)])
+
+    xs = [3, -1, 4, -1, 5]
+    print([x for x in xs if x > 0])
+
+    print([(x, y) for x in range(3) for y in range(x)])
+    print([c.upper() for c in "hello" if c != "l"])
+
+    m = [[1, 2], [3], []]
+    print([[y * 10 for y in row] for row in m])
+    print([y for row in m for y in row if y % 2 == 1])
+
+    # An `if` clause narrows like an `if` statement.
+    found = [v for v in [maybe_even(i) for i in range(5)] if v is not None]
+    print(found, len(found))
+
+    print([i for i in range(10, 0, -3)])
+    print(len([0 for i in range(1000)]))
+
+    x = "x is free again"
+    print(x)

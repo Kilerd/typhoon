@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n: int | str = 1\\n    print(n)\\n\")"
+---
+error: the union `int | str` is not supported
+ --> main.ty:2:8
+  |
+2 |     n: int | str = 1
+  |        ^^^^^^^^^ only `T | None` may be written as a union
+  |
+  = note: typhoon's only union is `T | None`, see DESIGN.md section 3.10
+  = help: use `T | None` for a value that may be absent, or a class to hold the alternatives

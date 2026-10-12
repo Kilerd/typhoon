@@ -2,9 +2,9 @@
 //! [`TypeId`] (DESIGN §6.1, "类型经 interning 表示为 `TypeId`").
 //!
 //! M2 adds the data types of DESIGN §4.1 to M1's scalars: `list<T>`,
-//! `tuple<A, B, …>`, user classes, and the nullable class reference
-//! `C | None` (an early slice of M3's `T | None`, see DESIGN §3.8). Composite
-//! types stay [`Copy`] by referring to side tables:
+//! `tuple<A, B, …>` and user classes; M3 adds `T | None` for every `T`
+//! (DESIGN §3.8, §3.10). Composite types stay [`Copy`] by referring to side
+//! tables:
 //!
 //! * a `tuple` holds a [`TupleId`] into [`TypeTable::tuple_members`];
 //! * a class holds a [`ClassId`] into [`TypeTable::class`].
@@ -35,9 +35,15 @@ pub enum Type {
     Tuple(TupleId),
     /// An instance of a user class, a GC reference (DESIGN §3.8).
     Class(ClassId),
-    /// `C | None`: a class reference that may be absent, represented as a
-    /// possibly-null pointer. Narrowed by `is None` (DESIGN §3.8).
-    Optional(ClassId),
+    /// `T | None`: a `T` that may be absent, narrowed by `is None`
+    /// (DESIGN §3.8, §3.10). The payload is never `None` itself nor another
+    /// optional.
+    ///
+    /// No boxing either way: when `T` is a reference (`str`, `list<T>`, a
+    /// class) `None` is the null pointer, so `T | None` has the layout of `T`;
+    /// otherwise (`int`, `float`, `bool`, a tuple) it is a `{ tag, T }` pair
+    /// passed by value — see [`TypeTable::is_tagged_optional`].
+    Optional(TypeId),
 }
 
 /// A handle into a [`TypeTable`].
@@ -295,7 +301,36 @@ impl TypeTable {
 
     /// The type of `C | None` for the class `id`.
     pub fn optional_ty(&mut self, id: ClassId) -> TypeId {
-        self.intern(Type::Optional(id))
+        let class = self.class_ty(id);
+        self.optional_of(class)
+    }
+
+    /// Interns `inner | None`. `T | None | None` is `T | None`, as in Python.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `inner` is the unit type: `None | None` has no values to tell
+    /// apart, and the checker rejects it before this point.
+    pub fn optional_of(&mut self, inner: TypeId) -> TypeId {
+        assert_ne!(inner, TypeId::UNIT, "`None | None` is not a type");
+        if let Type::Optional(_) = self.get(inner) {
+            return inner;
+        }
+        self.intern(Type::Optional(inner))
+    }
+
+    /// The payload type `T` of `ty` when it is a `T | None`.
+    pub fn as_optional(&self, ty: TypeId) -> Option<TypeId> {
+        match self.get(ty) {
+            Type::Optional(inner) => Some(inner),
+            _ => None,
+        }
+    }
+
+    /// Whether `ty` is a `T | None` stored as a `{ tag, T }` pair, i.e. one
+    /// whose `T` is not a reference and therefore has no null niche.
+    pub fn is_tagged_optional(&self, ty: TypeId) -> bool {
+        matches!(self.get(ty), Type::Optional(inner) if !self.is_reference(inner))
     }
 
     // -- classification ----------------------------------------------------
@@ -305,6 +340,10 @@ impl TypeTable {
     /// Pointer-free payloads are allocated with `ty_alloc_atomic`, which the
     /// collector does not scan (DESIGN §5.1).
     pub fn is_pointer_free(&self, ty: TypeId) -> bool {
+        // A `T | None` holds a pointer exactly when `T` does.
+        if let Type::Optional(inner) = self.get(ty) {
+            return self.is_pointer_free(inner);
+        }
         match self.get(ty) {
             Type::Error | Type::Unit | Type::Int | Type::Float | Type::Bool => true,
             Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => false,
@@ -319,8 +358,12 @@ impl TypeTable {
     ///
     /// M2 has no repr or equality protocol for class instances, so a class —
     /// and anything containing one — is neither printable nor comparable
-    /// (DESIGN §3.8; the protocols arrive in M3).
+    /// (DESIGN §3.8; the protocols arrive in M3). A `T | None` prints as its
+    /// value or `None`, like Python.
     pub fn is_printable(&self, ty: TypeId) -> bool {
+        if let Type::Optional(inner) = self.get(ty) {
+            return self.is_printable(inner);
+        }
         match self.get(ty) {
             Type::Int | Type::Float | Type::Bool | Type::Str => true,
             Type::List(elem) => self.is_printable(elem),
@@ -330,7 +373,12 @@ impl TypeTable {
     }
 
     /// Whether `ty` is a reference to a GC object, i.e. an LLVM `ptr`.
+    ///
+    /// A `T | None` is one exactly when `T` is: it then uses the null niche.
     pub fn is_reference(&self, ty: TypeId) -> bool {
+        if let Type::Optional(inner) = self.get(ty) {
+            return self.is_reference(inner);
+        }
         matches!(
             self.get(ty),
             Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_)
@@ -340,7 +388,11 @@ impl TypeTable {
     /// The class a value of `ty` refers to, whether or not it may be `None`.
     pub fn class_of(&self, ty: TypeId) -> Option<ClassId> {
         match self.get(ty) {
-            Type::Class(id) | Type::Optional(id) => Some(id),
+            Type::Class(id) => Some(id),
+            Type::Optional(inner) => match self.get(inner) {
+                Type::Class(id) => Some(id),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -364,7 +416,7 @@ impl TypeTable {
                 format!("tuple<{}>", inner.join(", "))
             }
             Type::Class(c) => self.class(c).name.clone(),
-            Type::Optional(c) => format!("{} | None", self.class(c).name),
+            Type::Optional(inner) => format!("{} | None", self.name(inner)),
         }
     }
 }
@@ -512,6 +564,49 @@ mod tests {
     }
 
     #[test]
+    fn optionals_of_every_type() {
+        let mut types = TypeTable::new();
+        let int_opt = types.optional_of(TypeId::INT);
+        assert_eq!(types.name(int_opt), "int | None");
+        assert_eq!(types.as_optional(int_opt), Some(TypeId::INT));
+        assert_eq!(types.as_optional(TypeId::INT), None);
+        // `T | None | None` is `T | None`.
+        assert_eq!(types.optional_of(int_opt), int_opt);
+
+        // Value types carry a tag; references use the null niche.
+        assert!(types.is_tagged_optional(int_opt));
+        assert!(!types.is_reference(int_opt));
+        assert!(types.is_pointer_free(int_opt));
+        let str_opt = types.optional_of(TypeId::STR);
+        assert!(!types.is_tagged_optional(str_opt));
+        assert!(types.is_reference(str_opt));
+        assert!(!types.is_pointer_free(str_opt));
+        let pair = types.tuple_of(&[TypeId::INT, TypeId::STR]);
+        let pair_opt = types.optional_of(pair);
+        assert_eq!(types.name(pair_opt), "tuple<int, str> | None");
+        assert!(types.is_tagged_optional(pair_opt));
+        assert!(!types.is_pointer_free(pair_opt));
+
+        // Printable exactly when the payload is; a class is not.
+        assert!(types.is_printable(int_opt));
+        assert!(types.is_printable(str_opt));
+        let (point, point_ty) = types.declare_class("Point");
+        types.set_fields(point, vec![]);
+        let point_opt = types.optional_of(point_ty);
+        assert_eq!(point_opt, types.optional_ty(point));
+        assert!(!types.is_printable(point_opt));
+        assert!(!types.is_tagged_optional(point_opt));
+        assert_eq!(types.class_of(point_opt), Some(point));
+        assert_eq!(types.class_of(int_opt), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "`None | None` is not a type")]
+    fn none_cannot_be_optional() {
+        TypeTable::new().optional_of(TypeId::UNIT);
+    }
+
+    #[test]
     fn printability_stops_at_class_instances() {
         let mut types = TypeTable::new();
         assert!(types.is_printable(TypeId::STR));
@@ -533,7 +628,7 @@ mod tests {
         assert_eq!(type_name(Type::Int), "int");
         assert_eq!(type_name(Type::List(TypeId::INT)), "list");
         assert_eq!(type_name(Type::Class(ClassId(0))), "class");
-        assert_eq!(type_name(Type::Optional(ClassId(0))), "optional");
+        assert_eq!(type_name(Type::Optional(TypeId::INT)), "optional");
         assert_eq!(type_name(Type::Tuple(TupleId(0))), "tuple");
         assert_eq!(TupleId(3).index(), 3);
         assert_eq!(ClassId(2).index(), 2);

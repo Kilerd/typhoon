@@ -23,8 +23,10 @@
 //! # Values
 //!
 //! `int` is `i64`, `float` is `f64`, `bool` is `i32` in a local and one byte in
-//! memory, and every reference (`str`, `list<T>`, a class instance, `C | None`)
-//! is an `i32` address into the shared linear memory, with `None` as 0.
+//! memory, and every reference (`str`, `list<T>`, a class instance, and the
+//! `T | None` of one) is an `i32` address into the shared linear memory, with
+//! `None` as 0. Any other `T | None` is an `i32` tag (1 when present) followed
+//! by the values of `T`, laid out in memory as `{ tag: u8, T }`.
 //!
 //! A `tuple` is a value aggregate with no wasm counterpart, so it is
 //! *scalarised*: a tuple-typed expression leaves one wasm value per (recursive)
@@ -366,6 +368,11 @@ impl<'p> Emitter<'p> {
 
     fn flatten_into(&self, ty: TypeId, out: &mut Vec<ValType>) {
         match self.types.get(ty) {
+            // A `T | None` without a null niche is its tag, then its payload.
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                out.push(ValType::I32);
+                self.flatten_into(inner, out);
+            }
             Type::Int => out.push(ValType::I64),
             Type::Float => out.push(ValType::F64),
             Type::Bool => out.push(ValType::I32),

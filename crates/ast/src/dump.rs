@@ -374,6 +374,24 @@ impl Dumper {
                     }
                 });
             }
+            ExprKind::ListComp { elem, clauses } => {
+                self.line(label, "ListComp", expr.span);
+                self.nested(|d| {
+                    d.expr("elem", elem);
+                    for clause in clauses {
+                        match clause {
+                            CompClause::For { var, iter, span } => {
+                                d.line("for", &format!("`{}`", var.name), *span);
+                                d.nested(|d| d.expr("in", iter));
+                            }
+                            CompClause::If { cond, span } => {
+                                d.line("if", "If", *span);
+                                d.nested(|d| d.expr("", cond));
+                            }
+                        }
+                    }
+                });
+            }
             ExprKind::Set(items) => {
                 self.line(label, "Set", expr.span);
                 self.nested(|d| {

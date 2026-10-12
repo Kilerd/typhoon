@@ -1,7 +1,7 @@
 //! Shared helpers for the parser tests.
 #![allow(dead_code)]
 
-use typhoon_ast::{Expr, ExprKind, FStringPart, Module, TypeExpr, TypeExprKind};
+use typhoon_ast::{CompClause, Expr, ExprKind, FStringPart, Module, TypeExpr, TypeExprKind};
 use typhoon_diag::{Diagnostics, FileId, SourceMap, render_all};
 
 pub const FILE: FileId = FileId(0);
@@ -128,6 +128,19 @@ pub fn sexpr(e: &Expr) -> String {
             out
         }
         ExprKind::List(items) => format!("(list{})", items_str(items)),
+        ExprKind::ListComp { elem, clauses } => {
+            let mut out = format!("(listcomp {}", sexpr(elem));
+            for clause in clauses {
+                match clause {
+                    CompClause::For { var, iter, .. } => {
+                        out.push_str(&format!(" for {} in {}", var.name, sexpr(iter)));
+                    }
+                    CompClause::If { cond, .. } => out.push_str(&format!(" if {}", sexpr(cond))),
+                }
+            }
+            out.push(')');
+            out
+        }
         ExprKind::Set(items) => format!("(set{})", items_str(items)),
         ExprKind::Tuple(items) => format!("(tuple{})", items_str(items)),
         ExprKind::Dict(entries) => {

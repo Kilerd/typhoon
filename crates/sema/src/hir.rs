@@ -516,6 +516,27 @@ pub enum ExprKind {
         /// Right operand.
         rhs: Box<Expr>,
     },
+    /// An empty `list<elem>` with room for `cap` elements, so that the loop of
+    /// a list comprehension whose length is known up front never regrows it.
+    /// A negative `cap` is treated as zero.
+    ListWithCapacity {
+        /// The element type.
+        elem: TypeId,
+        /// The capacity, an `int`.
+        cap: Box<Expr>,
+    },
+    /// Runs `stmts`, then yields `value`: statements inside an expression.
+    ///
+    /// A comparison chain uses it to evaluate a middle operand exactly once
+    /// into a temporary, and a list comprehension is a loop that appends to a
+    /// fresh list and then yields it (DESIGN §3.6, §3.10). The statements never
+    /// contain `return`, `break` or `continue`.
+    Seq {
+        /// The statements, run first.
+        stmts: Block,
+        /// The value of the whole expression.
+        value: Box<Expr>,
+    },
     /// `v in xs` / `v in s` (and their `not in` forms).
     Contains {
         /// The `list<T>` or `str` searched.
@@ -558,15 +579,27 @@ pub enum ExprKind {
         /// Index of the field in the class's declaration order.
         field: u32,
     },
-    /// The `None` of a `C | None`: a null reference.
+    /// The `None` of a `T | None` (the expression's type): a null reference
+    /// when `T` is a reference, otherwise a `{ tag, T }` pair with a clear tag
+    /// and a zeroed payload.
     NoneRef,
-    /// `x is None` / `x is not None`.
+    /// `x is None` / `x is not None` on a `T | None` (or a plain class
+    /// reference): a null test, or a test of the tag.
     IsNone {
-        /// The tested reference.
+        /// The tested value.
         value: Box<Expr>,
         /// Whether the operator was `is not`.
         negated: bool,
     },
+    /// A `T` widened to a *tagged* `T | None` (see
+    /// [`TypeTable::is_tagged_optional`](crate::types::TypeTable::is_tagged_optional)):
+    /// `{ 1, value }`. A reference `T` needs no node — it is the same pointer
+    /// and the checker just retypes it.
+    OptionalSome(Box<Expr>),
+    /// The payload of a tagged `T | None` that the control flow has proved is
+    /// not `None` (DESIGN §3.8); the operand has the optional type, the node
+    /// has type `T`.
+    OptionalValue(Box<Expr>),
     /// `a is b` / `a is not b` on two class references: pointer identity.
     RefEq {
         /// Left operand.

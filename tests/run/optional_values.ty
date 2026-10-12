@@ -1,0 +1,108 @@
+# `T | None` for every `T`, narrowed by `is None` / `is not None`.
+# A reference (`str`, `list`, a class) uses the null pointer for `None`;
+# `int`, `float`, `bool` and tuples carry a tag instead. Neither is boxed.
+# milestone: M3
+# expect: 5 None
+# expect: half=5 half=None
+# expect: 6
+# expect: 2.5 None
+# expect: True False None
+# expect: pos None
+# expect: [2, 4] None
+# expect: (3, "x") None
+# expect: 3.0
+# expect: no point
+# expect: [1, None, 3] 4
+# expect: True False
+# expect: None None
+# expect: 5 five
+# expect: True False True
+# expect: POS
+
+class Point:
+    x: float
+    y: float
+
+class Slot:
+    n: int | None = None
+    label: str | None = None
+
+fn half(n: int) -> int | None:
+    if n % 2 == 0:
+        return n // 2
+    return None
+
+fn maybe_float(ok: bool) -> float | None:
+    if ok:
+        return 2.5
+    return None
+
+fn sign(n: int) -> bool | None:
+    if n == 0:
+        return None
+    return n > 0
+
+fn label(n: int) -> str | None:
+    if n > 0:
+        return "pos"
+    return None
+
+fn pair(n: int) -> list<int> | None:
+    if n > 0:
+        return [n, n * 2]
+    return None
+
+fn tagged(n: int) -> tuple<int, str> | None:
+    if n > 0:
+        return (n, "x")
+    return None
+
+fn origin(n: int) -> Point | None:
+    if n > 0:
+        return Point(x=1.0, y=2.0)
+    return None
+
+fn main():
+    a = half(10)
+    b = half(3)
+    print(a, b)
+    print(f"half={a} half={b}")
+    if a is not None:
+        print(a + 1)        # narrowed to `int` in this branch
+
+    print(maybe_float(True), maybe_float(False))
+    print(sign(4), sign(-4), sign(0))
+    print(label(1), label(0))
+    print(pair(2), pair(0))
+    print(tagged(3), tagged(0))
+
+    p = origin(1)
+    if p is not None:
+        print(p.x + p.y)
+    if origin(0) is None:
+        print("no point")
+
+    # Optionals inside containers print and compare like Python's.
+    xs: list<int | None> = [1, None, 3]
+    total = 0
+    for x in xs:
+        if x is not None:
+            total = total + x
+    print(xs, total)
+    print(xs == [1, None, 3], xs == [1, 2, 3])
+
+    s = Slot()
+    print(s.n, s.label)
+    s.n = 5
+    s.label = "five"
+    print(s.n, s.label)
+
+    # `==` against a plain value widens it; `is None` tests for absence.
+    n: int | None = 3
+    print(n == 3, n is None, n != 4)
+
+    # The early-return form narrows the rest of the function.
+    word = label(7)
+    if word is None:
+        return
+    print(word.upper())

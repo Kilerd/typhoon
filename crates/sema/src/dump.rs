@@ -276,6 +276,16 @@ fn dump_expr(program: &Program, func: &Function, expr: &Expr) -> String {
             program.types.class(*class).fields[*field as usize].name
         ),
         ExprKind::NoneRef => "None".to_string(),
+        ExprKind::OptionalSome(v) => format!("some({})", e(v)),
+        ExprKind::OptionalValue(v) => format!("value({})", e(v)),
+        ExprKind::ListWithCapacity { cap, .. } => format!("list(capacity={})", e(cap)),
+        ExprKind::Seq { stmts, value } => {
+            // The statements are rendered on one line, separated by `;`.
+            let mut inner = String::new();
+            dump_block(&mut inner, program, func, stmts, 0);
+            let lines: Vec<&str> = inner.lines().map(str::trim).collect();
+            format!("{{ {}; {} }}", lines.join("; "), e(value))
+        }
         ExprKind::IsNone { value, negated } => {
             let op = if *negated { "is not" } else { "is" };
             format!("({} {op} None)", e(value))

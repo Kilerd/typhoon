@@ -1500,10 +1500,8 @@ impl Checker<'_> {
                     _ => return None,
                 };
                 let inner = self.subst(inner, generics, bindings)?;
-                match self.types.get(inner) {
-                    Type::Class(class) => Some(self.types.optional_ty(class)),
-                    _ => None,
-                }
+                // Every `T` may be optional (DESIGN §3.10).
+                (inner != TypeId::UNIT).then(|| self.types.optional_of(inner))
             }
             ast::TypeExprKind::Named { name, args } => {
                 let text = name.as_str();
@@ -1589,7 +1587,11 @@ impl Checker<'_> {
                             }
                         }
                     }
-                    (_, Type::Class(class) | Type::Optional(class)) => {
+                    // An instance of a generic class, or the `| None` of one.
+                    _ => {
+                        let Some(class) = self.types.class_of(ty) else {
+                            return;
+                        };
                         let Some((origin, targs)) = self.generics.origins.get(&class) else {
                             return;
                         };
@@ -1600,18 +1602,18 @@ impl Checker<'_> {
                             }
                         }
                     }
-                    _ => {}
                 }
             }
-            // `X | None`: both a `C` and a `C | None` bind `X` to `C`.
+            // `X | None`: both a `T` and a `T | None` bind `X` to `T`; a bare
+            // `None` says nothing about `X`.
             ast::TypeExprKind::Union(members) => {
-                let Some(class) = self.types.class_of(ty) else {
+                if ty == TypeId::UNIT {
                     return;
-                };
-                let class_ty = self.types.class_ty(class);
+                }
+                let inner = self.types.as_optional(ty).unwrap_or(ty);
                 for member in members {
                     if !matches!(member.kind, ast::TypeExprKind::None) {
-                        self.unify(member, class_ty, generics, bindings);
+                        self.unify(member, inner, generics, bindings);
                     }
                 }
             }

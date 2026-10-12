@@ -1,0 +1,12 @@
+---
+source: crates/sema/tests/check.rs
+expression: "err(\"fn main():\\n    n: int | None = None\\n    print(n == None)\\n\")"
+---
+error: use `is None` to compare with `None`, not `==`
+ --> main.ty:3:13
+  |
+3 |     print(n == None)
+  |             ^^ write `is` here
+  |
+  = note: see DESIGN.md section 3.8
+  = help: `None` is tested by identity: `x is None`, which also narrows `x` inside an `if`

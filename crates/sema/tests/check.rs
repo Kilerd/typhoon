@@ -649,10 +649,6 @@ fn later_milestones_are_named_in_the_diagnostic() {
         ),
         ("x = 1\ny = x[0]", "`int` cannot be indexed"),
         ("x = 1\ny = x.field", "`int` has no field `field`"),
-        (
-            "x = 1 < 2 < 3",
-            "a comparison chain is not supported yet (planned for M3)",
-        ),
         ("x = 1\ny = x is None", "`int` can never be `None`"),
         (
             "x = 1\ny = x in \"a\"",
@@ -677,8 +673,8 @@ fn later_milestones_are_named_in_the_diagnostic() {
     }
 
     rejects(
-        "fn f(a: int) -> int | None:\n    return a\n\nfn main():\n    pass\n",
-        ["an optional type (`int | None`) is not supported yet (planned for M3)"].as_slice(),
+        "fn f(a: int) -> int | str:\n    return a\n\nfn main():\n    pass\n",
+        ["the union `int | str` is not supported"].as_slice(),
     );
     rejects(
         "fn f(self) -> int:\n    return 1\n\nfn main():\n    pass\n",
@@ -1363,23 +1359,305 @@ fn a_loop_that_reassigns_the_local_forgets_the_narrowing() {
 }
 
 #[test]
-fn only_a_class_may_be_optional_in_m2() {
-    rejects_main(
-        "x: int | None = None",
+fn every_type_may_be_optional() {
+    // DESIGN 3.10: `T | None` for every `T`. A reference keeps its pointer
+    // (`None` is null); anything else is a `{ tag, T }` pair, whose widening
+    // is an explicit `some(...)` in the IR.
+    let dump = ok(&format!(
+        "{NODE}fn main():\n    a: int | None = 1\n    b: float | None = None\n    c: bool | None = True\n    d: str | None = \"s\"\n    e: list<int> | None = []\n    f: tuple<int, str> | None = (1, \"t\")\n    g: Node | None = Node(value=1)\n    print(a, b, c, d, e, f)\n"
+    ));
+    assert!(dump.contains("local a: int | None"), "{dump}");
+    assert!(dump.contains("a = some(1:int):int | None"), "{dump}");
+    assert!(dump.contains("b = None:float | None"), "{dump}");
+    assert!(dump.contains("c = some(True:bool):bool | None"), "{dump}");
+    assert!(dump.contains("d = \"s\":str | None"), "{dump}");
+    assert!(dump.contains("e = []:list<int> | None"), "{dump}");
+    assert!(
+        dump.contains("f = some((1:int, \"t\":str):tuple<int, str>):tuple<int, str> | None"),
+        "{dump}"
+    );
+    assert!(dump.contains("local g: Node | None"), "{dump}");
+    // `T | None | None` is `T | None`; a parameter default may be `None`.
+    let dump = ok(
+        "fn f(a: int | None | None = None, b: int | None = 3) -> int | None:\n    return a\n\nfn main():\n    print(f())\n",
+    );
+    assert!(
+        dump.contains("fn f(a: int | None, b: int | None) -> int | None"),
+        "{dump}"
+    );
+    assert!(
+        dump.contains("f(None:int | None, some(3:int):int | None)"),
+        "{dump}"
+    );
+}
+
+#[test]
+fn a_narrowed_optional_reads_as_its_payload() {
+    let dump = ok(
+        "fn f(n: int | None, s: str | None) -> int:\n    if n is None:\n        return 0\n    if s is not None:\n        print(s.upper())\n    return n + 1\n\nfn main():\n    print(f(1, None))\n",
+    );
+    // A tagged optional is unwrapped, a reference is the same pointer.
+    assert!(
+        dump.contains("return (value(n:int | None):int + 1:int):int"),
+        "{dump}"
+    );
+    assert!(dump.contains("s:str.upper()"), "{dump}");
+    // `is None` on a narrowed local still tests the local.
+    ok_main(
+        "n: int | None = 1\nif n is not None:\n    print(n + 1)\n    if n is None:\n        print(0)",
+    );
+}
+
+#[test]
+fn an_unnarrowed_optional_is_not_its_payload() {
+    let program = "fn find(n: int) -> int | None:\n    if n > 0:\n        return n\n    return None\n\nfn take(n: int) -> int:\n    return n\n\nfn main():\n    n = find(1)\n    xs: list<int> | None = [1]\n    s: str | None = \"a\"\n";
+    for snippet in [
+        "print(n + 1)",
+        "print(-n)",
+        "print(n < 3)",
+        "print(1 <= n)",
+        "print(len(xs))",
+        "print(xs[0])",
+        "print(1 in xs)",
+        "print(s.upper())",
+        "for x in xs:\n        print(x)",
+        "print([x for x in xs])",
+    ] {
+        rejects(
+            &format!("{program}    {snippet}\n"),
+            ["may be `None` here", "narrow it first"].as_slice(),
+        );
+    }
+    rejects(
+        &format!("{program}    print(take(n))\n"),
         [
-            "an optional type (`int | None`) is not supported yet (planned for M3)",
-            "only a class type may be optional in M2",
+            "mismatched types: expected `int`, found `int | None`",
+            "narrow it first: test it with `x is None`",
+        ]
+        .as_slice(),
+    );
+}
+
+#[test]
+fn none_is_compared_with_is_not_equality() {
+    for (snippet, wanted) in [
+        (
+            "print(n == None)",
+            "use `is None` to compare with `None`, not `==`",
+        ),
+        (
+            "print(None == n)",
+            "use `is None` to compare with `None`, not `==`",
+        ),
+        (
+            "print(n != None)",
+            "use `is not None` to compare with `None`, not `!=`",
+        ),
+        (
+            "print(0 < 1 == None)",
+            "use `is None` to compare with `None`, not `==`",
+        ),
+    ] {
+        rejects_main(
+            &format!("n: int | None = 1\n{snippet}"),
+            [wanted].as_slice(),
+        );
+    }
+    // `==` between a `T | None` and a `T` widens the `T`.
+    let dump = ok_main("n: int | None = 1\nprint(n == 1, 2 != n, n == n)");
+    assert!(
+        dump.contains("(n:int | None == some(1:int):int | None):bool"),
+        "{dump}"
+    );
+    assert!(
+        dump.contains("(some(2:int):int | None != n:int | None):bool"),
+        "{dump}"
+    );
+    // ... but a class keeps comparing by identity only.
+    rejects(
+        &format!("{NODE}fn main():\n    a: Node | None = None\n    print(a == a)\n"),
+        ["use `is` to compare identity"].as_slice(),
+    );
+}
+
+#[test]
+fn the_only_union_is_t_or_none() {
+    rejects_main(
+        "x: int | str = 1",
+        [
+            "the union `int | str` is not supported",
+            "only `T | None` may be written as a union",
         ]
         .as_slice(),
     );
     rejects(
-        "fn f(a: str | None) -> int:\n    return 1\n\nfn main():\n    print(f(None))\n",
-        ["an optional type (`str | None`) is not supported yet"].as_slice(),
+        "fn f(a: int | float | None) -> int:\n    return 1\n\nfn main():\n    pass\n",
+        ["the union `int | float` is not supported"].as_slice(),
+    );
+    rejects_main(
+        "x: None | None = None",
+        ["`None | None` is not a type"].as_slice(),
+    );
+}
+
+#[test]
+fn narrowing_stays_inside_the_if() {
+    let program = "fn find(n: int) -> int | None:\n    if n > 0:\n        return n\n    return None\n\nfn main():\n    n = find(1)\n";
+    for body in [
+        // Not across the operands of `and` / `or` (DESIGN 3.8).
+        "if n is not None and n > 0:\n        print(1)",
+        "if n is None or n > 0:\n        print(1)",
+        // Not out of a loop that may run zero times.
+        "for i in range(3):\n        if n is None:\n            return\n    print(n + 1)",
+        // Not from a loop condition whose body reassigns the local.
+        "while n is not None:\n        print(n + 1)\n        n = find(0)",
+        // Not after the loop a `while` condition guarded.
+        "while n is None:\n        n = find(2)\n    print(n + 1)",
+        // Not past a reassignment.
+        "if n is not None:\n        n = find(0)\n        print(n + 1)",
+        // Not out of the arm that tested it.
+        "if n is not None:\n        print(n + 1)\n    print(n + 1)",
+    ] {
+        rejects(
+            &format!("{program}    {body}\n"),
+            ["`int | None` may be `None` here"].as_slice(),
+        );
+    }
+    // The early-return form narrows the rest of the function.
+    ok(&format!(
+        "{program}    if n is None:\n        return\n    print(n + 1)\n"
+    ));
+}
+
+#[test]
+fn optionals_print_and_interpolate_as_their_value_or_none() {
+    let dump = ok_main(
+        "n: int | None = None\ns: str | None = \"a\"\nprint(n, s, [n], (n, s))\nprint(f\"{n}/{s}\", str(n))",
+    );
+    assert!(dump.contains("str(n:int | None):str"), "{dump}");
+    rejects_main(
+        "n: float | None = 1.5\nprint(f\"{n:.2f}\")",
+        ["the format spec `.2f` requires a `float`, found `float | None`"].as_slice(),
     );
     rejects(
-        "class Bad:\n    xs: list<int> | None\n\nfn main():\n    pass\n",
-        ["an optional type (`list<int> | None`) is not supported yet"].as_slice(),
+        &format!("{NODE}fn main():\n    a: Node | None = None\n    print(a)\n"),
+        ["cannot print a `Node | None`"].as_slice(),
     );
+}
+
+#[test]
+fn a_comparison_chain_evaluates_each_middle_operand_once() {
+    // DESIGN 3.6: `a < f() < c` is `a < t and t < c` with `t = f()` once.
+    let dump =
+        ok("fn f() -> int:\n    return 2\n\nfn main():\n    a = 1\n    print(a < f() <= 3)\n");
+    assert!(dump.contains("local chain."), "{dump}");
+    assert!(
+        dump.contains("((a:int < { chain.1 = f():int; chain.1:int }:int):bool and (chain.1:int <= 3:int):bool):bool"),
+        "{dump}"
+    );
+    // A local or a literal in the middle needs no temporary.
+    let dump = ok_main("a = 1\nb = 2\nprint(a < b < 3 == 3)");
+    assert!(!dump.contains("chain."), "{dump}");
+    assert!(
+        dump.contains(
+            "((a:int < b:int):bool and ((b:int < 3:int):bool and (3:int == 3:int):bool):bool):bool"
+        ),
+        "{dump}"
+    );
+    // Every operator a lone comparison has.
+    ok_main(
+        "xs = [1, 2]\ns = \"b\"\nn: int | None = None\nprint(0 < 1 in xs, 3 not in xs != [], \"a\" < s <= \"c\", n is None is None)",
+    );
+}
+
+#[test]
+fn every_link_of_a_chain_is_type_checked() {
+    rejects_main(
+        "print(1 < 2.0 < 3)",
+        ["mismatched types: expected `int`, found `float`"].as_slice(),
+    );
+    rejects_main(
+        "print(1 < 2 < \"x\")",
+        ["mismatched types: expected `int`, found `str`"].as_slice(),
+    );
+    rejects_main(
+        "print(True < False < True)",
+        ["`<` cannot be applied to `bool` and `bool`"].as_slice(),
+    );
+    // One mistake in the middle is reported once, not once per link.
+    let rendered = err(&in_main("print(1 < nope < 3)"));
+    assert_eq!(rendered.matches("error: ").count(), 1, "{rendered}");
+}
+
+#[test]
+fn a_constant_may_be_a_comparison_chain() {
+    let dump = ok("OK: bool = 1 < 2 <= 2\nNO: bool = 1 < 3 < 2\n\nfn main():\n    print(OK, NO)\n");
+    assert!(dump.contains("print(True:bool, False:bool)"), "{dump}");
+}
+
+#[test]
+fn a_list_comprehension_has_the_type_of_its_element() {
+    let dump = ok_main(
+        "xs = [1, 2, 3]\nsq = [x * x for x in xs]\nev = [x for x in range(10) if x % 2 == 0]\ncs = [c for c in \"ab\"]\npairs = [(x, y) for x in xs for y in cs]",
+    );
+    assert!(dump.contains("local sq: list<int>"), "{dump}");
+    assert!(dump.contains("local ev: list<int>"), "{dump}");
+    assert!(dump.contains("local cs: list<str>"), "{dump}");
+    assert!(
+        dump.contains("local pairs: list<tuple<int, str>>"),
+        "{dump}"
+    );
+    // A lone `for` with a known length allocates once, at that length.
+    assert!(
+        dump.contains("comp.1 = list(capacity=len(xs:list<int>):int)"),
+        "{dump}"
+    );
+    assert!(dump.contains("comp.4 = []:list<int>"), "{dump}");
+    // An annotation widens the element, as for a list literal.
+    let dump = ok_main("xs: list<int | None> = [x for x in range(3)]");
+    assert!(dump.contains(".append(some(x.1:int):int | None)"), "{dump}");
+}
+
+#[test]
+fn comprehension_variables_are_scoped_to_the_comprehension() {
+    // `x` is gone afterwards, so a later `x` is a new variable of any type.
+    ok_main("ys = [x + 1 for x in range(3)]\nx = \"after\"\nprint(ys, x)");
+    rejects_main(
+        "ys = [x for x in range(3)]\nprint(x)",
+        ["cannot find value `x` in this scope"].as_slice(),
+    );
+    // No shadowing (DESIGN 3.4), not even by a comprehension variable.
+    rejects_main(
+        "x = 1\nys = [x for x in range(3)]",
+        ["the comprehension variable `x` shadows the variable `x`"].as_slice(),
+    );
+    // A later clause sees an earlier variable.
+    ok_main("m = [[1], [2, 3]]\nprint([y for row in m for y in row])");
+}
+
+#[test]
+fn comprehension_clauses_follow_the_statement_rules() {
+    rejects_main(
+        "print([x for x in 5])",
+        ["cannot iterate over an `int`"].as_slice(),
+    );
+    rejects_main(
+        "print([x for x in range(3) if x])",
+        ["mismatched types: expected `bool`, found `int`"].as_slice(),
+    );
+    rejects_main(
+        "print([print(x) for x in range(3)])",
+        ["a list element cannot have type `None`"].as_slice(),
+    );
+    rejects_main(
+        "xs: list<str> = [x for x in range(3)]",
+        ["mismatched types: expected `str`, found `int`"].as_slice(),
+    );
+    // An `if` clause narrows the clauses after it and the element.
+    let dump = ok(
+        "fn f(n: int) -> int | None:\n    return None\n\nfn main():\n    ys = [v + 1 for v in [f(1), f(2)] if v is not None]\n    print(ys)\n",
+    );
+    assert!(dump.contains("local ys: list<int>"), "{dump}");
 }
 
 // ---------------------------------------------------------------------------
@@ -1601,8 +1879,8 @@ snapshot_error!(
     "class Point:\n    x: float\n\nfn main():\n    print(Point(x=1.0))\n"
 );
 snapshot_error!(
-    snapshot_comparison_chain_is_a_later_milestone,
-    "fn main():\n    a = 1\n    b = 2\n    c = 3\n    print(a < b < c)\n"
+    snapshot_comparison_with_none,
+    "fn main():\n    n: int | None = None\n    print(n == None)\n"
 );
 snapshot_error!(
     snapshot_range_outside_a_for_loop,
@@ -1653,8 +1931,16 @@ snapshot_error!(
     "class Node:\n    value: int\n    next: Node | None = None\n\nfn main():\n    cur: Node | None = Node(value=1)\n    while cur is not None:\n        cur = cur.next\n"
 );
 snapshot_error!(
-    snapshot_optional_of_a_non_class,
-    "fn main():\n    n: int | None = None\n    print(n)\n"
+    snapshot_union_other_than_none,
+    "fn main():\n    n: int | str = 1\n    print(n)\n"
+);
+snapshot_error!(
+    snapshot_unnarrowed_optional,
+    "fn main():\n    n: int | None = 1\n    print(n + 1)\n"
+);
+snapshot_error!(
+    snapshot_comprehension_shadows_a_local,
+    "fn main():\n    x = 1\n    print([x * 2 for x in range(3)])\n"
 );
 snapshot_error!(
     snapshot_str_has_no_positional_indexing,

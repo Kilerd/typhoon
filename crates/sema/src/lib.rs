@@ -27,22 +27,25 @@
 //! * a function with a return type returns on every path;
 //! * a class constructor is called with keyword arguments only, naming every
 //!   field that has no default exactly once (DESIGN §3.8);
-//! * a `C | None` is narrowed by `is None` before it is used as a `C`;
+//! * a `T | None` is narrowed by `is None` before it is used as a `T`, and
+//!   `T | None` is the only union;
 //! * generic functions and classes are monomorphized: every instance is
 //!   checked with its type arguments substituted, and lowered to ordinary
 //!   functions and classes (DESIGN §3.9, §4.5);
-//! * features that parse but belong to a later milestone (dicts, sets,
-//!   comprehensions, general unions, comparison chains) are rejected with one
-//!   diagnostic each.
+//! * features that parse but belong to a later milestone (dicts, sets) are
+//!   rejected with one diagnostic each.
 
 #![warn(missing_docs)]
 
+mod chain;
 mod check;
+mod comp;
 mod consts;
 mod dump;
 mod exprs;
 mod generics;
 pub mod hir;
+mod optional;
 pub mod types;
 
 use typhoon_ast as ast;

@@ -215,6 +215,11 @@ impl<'p> Emitter<'p> {
     /// [`Emitter::store_ty`] returns.
     pub(super) fn llvm_ty(&self, ty: TypeId) -> String {
         match self.types.get(ty) {
+            // A `T | None` without a null niche is a `{ tag, T }` pair, the tag
+            // an `i8` both in registers and in memory (DESIGN §3.8).
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                format!("{{ i8, {} }}", self.store_ty(inner))
+            }
             Type::Int => "i64".to_string(),
             Type::Float => "double".to_string(),
             Type::Bool => "i1".to_string(),
@@ -254,6 +259,9 @@ impl<'p> Emitter<'p> {
     /// The alignment of a value of `ty` in a register or an `alloca`.
     pub(super) fn align_of(&self, ty: TypeId) -> u32 {
         match self.types.get(ty) {
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                self.store_align_of(inner)
+            }
             Type::Bool => 1,
             Type::Tuple(id) => self
                 .types
@@ -281,6 +289,9 @@ impl<'p> Emitter<'p> {
     /// computes for the struct types this emitter writes.
     pub(super) fn size_of(&self, ty: TypeId) -> u64 {
         match self.types.get(ty) {
+            Type::Optional(inner) if self.types.is_tagged_optional(ty) => {
+                self.struct_size(&[TypeId::BOOL, inner])
+            }
             Type::Bool => 1,
             Type::Tuple(id) => {
                 let members = self.types.tuple_members(id).to_vec();

@@ -1,0 +1,57 @@
+# Every comparison operator may appear in a chain, each link follows the
+# rules of a lone comparison, and a middle operand with side effects runs
+# exactly once wherever it sits (DESIGN 3.6).
+# milestone: M3
+# expect: True True True
+# expect: True False
+# expect: True True
+# expect: tick
+# expect: False 1
+# expect: tick
+# expect: True 2
+# expect: [1, 2]
+# expect: True
+# expect: 2
+# expect: [0, 1, 2]
+
+class Node:
+    value: int
+
+fn tick(counter: list<int>, v: int) -> int:
+    print("tick")
+    counter.append(v)
+    return v
+
+fn main():
+    a = 1
+    xs = [1, 2, 3]
+    print(a == 1 < 2, 1 != 2 != 1, 3 >= 3 > 2 >= 2)
+    print(2 in xs != [], 0 < 4 in xs)
+    s = "mid"
+    print("a" <= s < "z", "m" in s in "a mid b")
+
+    calls: list<int> = []
+    # A false first link skips the rest, a true one evaluates the middle once.
+    print(5 < tick(calls, 1) < tick(calls, 9), len(calls))
+    print(0 < tick(calls, 1) < 2, len(calls))
+    print([v for v in range(4) if 0 < v < 3])
+
+    n1 = Node(value=1)
+    n2 = Node(value=2)
+    o: Node | None = n1
+    print(o is n1 is not n2)
+
+    # A chain is an ordinary `bool` operand.
+    count = 0
+    for i in range(5):
+        if 1 <= i <= 3 and not i == 2:
+            count = count + 1
+    print(count)
+
+    # A middle operand in a loop condition is re-evaluated, once, per test.
+    steps: list<int> = []
+    k = 0
+    while 0 <= len(steps) < 3:
+        steps.append(k)
+        k = k + 1
+    print(steps)

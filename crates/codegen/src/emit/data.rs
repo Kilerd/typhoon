@@ -14,6 +14,8 @@
 //! str       ptr -> { i64 byte_len, i64 char_len, [n x i8] }
 //! class C   ptr -> %C.<n> = type { field storage types, in order }
 //! tuple     a first-class LLVM aggregate, passed and returned by value
+//! T | None  the pointer of `T` (null for `None`) when `T` is a reference,
+//!           otherwise `{ i8 tag, T }` by value (tag 1 when present)
 //! ```
 //!
 //! `bool` is `i1` in registers and `i8` in every one of those containers
@@ -689,8 +691,35 @@ impl<'p> Emitter<'p> {
                 acc.unwrap_or_else(|| "true".to_string())
             }
             Type::List(elem) => self.lists_equal(elem, lhs, rhs),
+            Type::Optional(inner) => self.optionals_equal(ty, inner, lhs, rhs),
             _ => "false".to_string(),
         }
+    }
+
+    /// `a == b` on two `T | None`: both `None`, or both present with equal
+    /// payloads. The payloads are only compared when both are present, since a
+    /// `None` payload may be a null `str`.
+    fn optionals_equal(&mut self, ty: TypeId, inner: TypeId, lhs: &str, rhs: &str) -> String {
+        let result = self.scratch("i1", 1);
+        let a = self.optional_present(ty, lhs);
+        let b = self.optional_present(ty, rhs);
+        let either = self.binop("or", "i1", &a, &b);
+        let neither = self.binop("xor", "i1", &either, "true");
+        self.emit(&format!("store i1 {neither}, ptr {result}, align 1"));
+        let both = self.binop("and", "i1", &a, &b);
+        let compare = self.fresh_label("opt.eq");
+        let end = self.fresh_label("opt.end");
+        self.cond_br(&both, &compare, &end);
+        self.start_block(&compare);
+        let x = self.optional_payload(ty, lhs);
+        let y = self.optional_payload(ty, rhs);
+        let eq = self.values_equal(inner, &x, &y);
+        self.emit(&format!("store i1 {eq}, ptr {result}, align 1"));
+        self.br(&end);
+        self.start_block(&end);
+        let out = self.fresh();
+        self.emit(&format!("{out} = load i1, ptr {result}, align 1"));
+        out
     }
 
     /// Element-by-element list equality, as an inline loop.
@@ -882,6 +911,22 @@ impl<'p> Emitter<'p> {
                     self.print_raw(",");
                 }
                 self.print_raw(")");
+            }
+            // The value, or `None` (DESIGN §4.6).
+            Type::Optional(inner) => {
+                let present = self.optional_present(ty, value);
+                let some = self.fresh_label("print.some");
+                let none = self.fresh_label("print.none");
+                let end = self.fresh_label("print.end");
+                self.cond_br(&present, &some, &none);
+                self.start_block(&some);
+                let payload = self.optional_payload(ty, value);
+                self.print_value(inner, &payload, quoted);
+                self.br(&end);
+                self.start_block(&none);
+                self.print_raw("None");
+                self.br(&end);
+                self.start_block(&end);
             }
             _ => {}
         }

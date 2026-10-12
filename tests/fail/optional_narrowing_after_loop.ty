@@ -1,0 +1,11 @@
+# A loop may run zero times, so what its body proved does not survive it
+# (DESIGN 3.8).
+# milestone: M3
+# error: `float | None` may be `None` here
+
+fn main():
+    x: float | None = None
+    for i in range(3):
+        if x is None:
+            return
+    print(x * 2.0)

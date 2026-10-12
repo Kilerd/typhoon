@@ -1,0 +1,9 @@
+# `None` is compared by identity: `x == None` is rejected in favour of
+# `x is None`, which also narrows (DESIGN 3.8).
+# milestone: M3
+# error: use `is None` to compare with `None`, not `==`
+
+fn main():
+    n: int | None = None
+    if n == None:
+        print("absent")

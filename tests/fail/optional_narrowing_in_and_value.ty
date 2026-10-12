@@ -1,0 +1,9 @@
+# Narrowing flows into an `if` body, not across the operands of `and`, for a
+# tagged optional just as for a class reference (DESIGN 3.8).
+# milestone: M3
+# error: `int | None` may be `None` here
+
+fn main():
+    n: int | None = 3
+    if n is not None and n > 0:
+        print("positive")

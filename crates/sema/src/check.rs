@@ -133,6 +133,11 @@ pub(crate) struct Checker<'a> {
     /// Generic templates, their instances and the type parameters in scope
     /// (DESIGN §3.9, §4.5).
     pub(crate) generics: crate::generics::Generics,
+    /// The middle operands of the comparison chain being checked, keyed by
+    /// node address: `None` until the operand is first lowered, then the
+    /// expression that re-reads its value (DESIGN §3.6: a middle operand is
+    /// evaluated exactly once).
+    pub(crate) chain_operands: HashMap<*const ast::Expr, Option<hir::Expr>>,
 }
 
 /// Whether control can fall out of the bottom of a block.
@@ -169,6 +174,7 @@ impl<'a> Checker<'a> {
             loop_depth: 0,
             narrowed: HashSet::new(),
             generics: crate::generics::Generics::default(),
+            chain_operands: HashMap::new(),
         }
     }
 
@@ -201,6 +207,9 @@ impl<'a> Checker<'a> {
         let mut diag = Diagnostic::error(format!("mismatched types: expected `{e}`, found `{f}`"))
             .with_label(span, format!("expected `{e}`, found `{f}`"));
         diag = match (self.types.get(expected), self.types.get(found)) {
+            (_, Type::Optional(inner)) if inner == expected => diag.with_help(
+                "narrow it first: test it with `x is None` / `x is not None` in an `if`",
+            ),
             (Type::Float, Type::Int) => diag.with_help("use `float(x)` to convert an `int`"),
             (Type::Int, Type::Float) => diag.with_help("use `int(x)` to convert a `float`"),
             (Type::Bool, _) => diag.with_help("compare explicitly, e.g. `x != 0`"),
@@ -242,34 +251,53 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// `C | None`: the only union M2 understands (DESIGN §3.8).
+    /// `T | None`, the only union typhoon has (DESIGN §3.8, §3.10).
     fn resolve_union(&mut self, members: &[ast::TypeExpr], span: Span) -> TypeId {
         let resolved: Vec<TypeId> = members.iter().map(|m| self.resolve_type(m)).collect();
         if resolved.contains(&TypeId::ERROR) {
             return TypeId::ERROR;
         }
-        let nones = resolved.iter().filter(|t| **t == TypeId::UNIT).count();
-        let others: Vec<TypeId> = resolved
-            .iter()
-            .copied()
-            .filter(|t| *t != TypeId::UNIT)
-            .collect();
-        if nones == 1 && others.len() == 1 {
-            if let Type::Class(id) = self.types.get(others[0]) {
-                return self.types.optional_ty(id);
+        let mut nones = 0;
+        let mut others: Vec<TypeId> = Vec::new();
+        for ty in resolved {
+            // `T | None | None` and `(T | None) | None` are both `T | None`.
+            let ty = match self.types.as_optional(ty) {
+                Some(inner) => {
+                    nones += 1;
+                    inner
+                }
+                None => ty,
+            };
+            if ty == TypeId::UNIT {
+                nones += 1;
+            } else if !others.contains(&ty) {
+                others.push(ty);
             }
-            let found = self.types.name(others[0]);
-            self.error(
-                Diagnostic::error(format!(
-                    "an optional type (`{found} | None`) is not supported yet (planned for M3)"
-                ))
-                .with_label(span, "only a class type may be optional in M2")
-                .with_help("M2 supports `C | None` for a class `C`, nothing else")
-                .with_note("see DESIGN.md section 3.10 for the roadmap"),
-            );
-            return TypeId::ERROR;
         }
-        self.unsupported(span, "a union type", "M3");
+        if nones >= 1 && others.len() == 1 {
+            return self.types.optional_of(others[0]);
+        }
+        let written: Vec<String> = others.iter().map(|t| self.types.name(*t)).collect();
+        let (message, label) = if others.is_empty() {
+            (
+                "`None | None` is not a type".to_string(),
+                "a union needs a member besides `None`",
+            )
+        } else {
+            (
+                format!("the union `{}` is not supported", written.join(" | ")),
+                "only `T | None` may be written as a union",
+            )
+        };
+        self.error(
+            Diagnostic::error(message)
+                .with_label(span, label)
+                .with_help(
+                    "use `T | None` for a value that may be absent, \
+                     or a class to hold the alternatives",
+                )
+                .with_note("typhoon's only union is `T | None`, see DESIGN.md section 3.10"),
+        );
         TypeId::ERROR
     }
 
@@ -375,29 +403,49 @@ impl<'a> Checker<'a> {
 
     /// Adapts `expr` to `expected`, reporting a mismatch when it cannot.
     ///
-    /// The only widening M2 performs is `C` to `C | None` (DESIGN §3.8): both
-    /// are one pointer, and `None` becomes the null one. Everything else must
-    /// match exactly — there are no implicit conversions (DESIGN §4.3).
+    /// The only widening typhoon performs is `T` to `T | None` (DESIGN §3.8):
+    /// a reference stays the same pointer and `None` becomes the null one; any
+    /// other `T` gets a tag. Everything else must match exactly — there are no
+    /// implicit conversions (DESIGN §4.3).
     pub(crate) fn coerce(&mut self, expr: hir::Expr, expected: TypeId) -> hir::Expr {
         if expected == TypeId::ERROR || expr.ty == TypeId::ERROR || expr.ty == expected {
             return expr;
         }
         if let Type::Optional(want) = self.types.get(expected) {
-            match self.types.get(expr.ty) {
-                Type::Class(got) if got == want => {
+            let span = expr.span;
+            if expr.ty == want {
+                if !self.types.is_tagged_optional(expected) {
                     return hir::Expr {
                         ty: expected,
                         ..expr
                     };
                 }
-                Type::Unit => {
-                    return hir::Expr {
-                        kind: hir::ExprKind::NoneRef,
-                        ty: expected,
-                        span: expr.span,
-                    };
+                return hir::Expr {
+                    kind: hir::ExprKind::OptionalSome(Box::new(expr)),
+                    ty: expected,
+                    span,
+                };
+            }
+            if expr.ty == TypeId::UNIT {
+                let none = hir::Expr {
+                    kind: hir::ExprKind::NoneRef,
+                    ty: expected,
+                    span,
+                };
+                if matches!(expr.kind, hir::ExprKind::Unit) {
+                    return none;
                 }
-                _ => {}
+                // A call of a unit function still has to run.
+                return hir::Expr {
+                    kind: hir::ExprKind::Seq {
+                        stmts: hir::Block {
+                            stmts: vec![hir::Stmt::Expr(expr)],
+                        },
+                        value: Box::new(none),
+                    },
+                    ty: expected,
+                    span,
+                };
             }
         }
         self.mismatch(expr.span, expected, expr.ty);
@@ -407,12 +455,12 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Reports the use of a possibly-`None` reference where a class instance
-    /// is required, and how to narrow it.
+    /// Reports the use of a possibly-`None` value where a `T` is required, and
+    /// how to narrow it.
     pub(crate) fn require_narrowed(&mut self, span: Span, ty: TypeId) {
         let name = self.types.name(ty);
         let class = match self.types.get(ty) {
-            Type::Optional(id) => self.types.class(id).name.clone(),
+            Type::Optional(inner) => self.types.name(inner),
             _ => name.clone(),
         };
         self.error(
@@ -423,7 +471,7 @@ impl<'a> Checker<'a> {
                      with `x is None` / `x is not None`",
                 )
                 .with_note(
-                    "M2 narrows only inside an `if`; it does not flow through `and`, \
+                    "narrowing happens only inside an `if`; it does not flow through `and`, \
                      `or` or a loop condition, see DESIGN.md section 3.8",
                 ),
         );
@@ -466,6 +514,21 @@ impl<'a> Checker<'a> {
         id
     }
 
+    /// Declares a compiler-generated local named `<prefix>.<index>`, which no
+    /// source name can reach (identifiers have no `.`). It counts as assigned.
+    pub(crate) fn declare_hidden(&mut self, prefix: &str, ty: TypeId, span: Span) -> hir::LocalId {
+        let id = hir::LocalId(self.locals.len() as u32);
+        self.locals.push(hir::Local {
+            name: format!("{prefix}.{}", id.index()),
+            ty,
+            span,
+            is_param: false,
+        });
+        self.sync_assigned();
+        self.assigned[id.index()] = true;
+        id
+    }
+
     /// Declares `name` with the error type when it is not already in scope.
     ///
     /// A rejected declaration must still bind its name, so that later reads of
@@ -489,11 +552,11 @@ impl<'a> Checker<'a> {
     fn mark_assigned(&mut self, local: hir::LocalId, value: &hir::Expr) {
         self.sync_assigned();
         self.assigned[local.index()] = true;
-        // Storing a `C` into a `C | None` local proves it non-null; storing
-        // anything else (including a `C | None`) forgets what we knew.
+        // Storing a `T` into a `T | None` local proves it non-null; storing
+        // anything else (including a `T | None`) forgets what we knew.
         let declared = self.locals[local.index()].ty;
         let proven = matches!(self.types.get(declared), Type::Optional(want)
-            if self.types.get(value.ty) == Type::Class(want));
+            if value.ty == want);
         if proven {
             self.narrowed.insert(local);
         } else {
@@ -509,8 +572,7 @@ impl<'a> Checker<'a> {
             return true;
         }
         match (self.types.get(expected), self.types.get(found)) {
-            (Type::Optional(want), Type::Class(got)) => want == got,
-            (Type::Optional(_), Type::Unit) => true,
+            (Type::Optional(want), _) => want == found || found == TypeId::UNIT,
             _ => false,
         }
     }
@@ -1039,7 +1101,7 @@ impl<'a> Checker<'a> {
     /// Only the two shapes DESIGN §3.8 promises are recognised — `x is None`
     /// and `x is not None`, optionally behind a `not` — because they are the
     /// ones that make `C | None` usable without a general flow analysis.
-    fn narrowing_of(&self, cond: &ast::Expr) -> Option<(hir::LocalId, bool)> {
+    pub(crate) fn narrowing_of(&self, cond: &ast::Expr) -> Option<(hir::LocalId, bool)> {
         match &cond.kind {
             ast::ExprKind::Unary {
                 op: ast::UnaryOp::Not,
@@ -1075,7 +1137,7 @@ impl<'a> Checker<'a> {
 
     /// Applies the narrowing of a condition to the current state; `holds` is
     /// whether the condition is known true on this path.
-    fn apply_narrowing(&mut self, narrow: Option<(hir::LocalId, bool)>, holds: bool) {
+    pub(crate) fn apply_narrowing(&mut self, narrow: Option<(hir::LocalId, bool)>, holds: bool) {
         if let Some((id, non_none)) = narrow {
             if non_none == holds {
                 self.narrowed.insert(id);
@@ -1168,6 +1230,10 @@ impl<'a> Checker<'a> {
             Type::List(elem) => (hir::IterKind::List, elem),
             Type::Str => (hir::IterKind::Str, TypeId::STR),
             Type::Error => return (self.check_dead_loop_body(var, body), Flow::Falls),
+            Type::Optional(_) => {
+                self.require_narrowed(iterable.span, iterable.ty);
+                return (self.check_dead_loop_body(var, body), Flow::Falls);
+            }
             _ => {
                 let found = self.types.name(iterable.ty);
                 self.error(
@@ -1241,7 +1307,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Whether `iter` is a call to the builtin `range`.
-    fn is_range_call(&self, iter: &ast::Expr) -> bool {
+    pub(crate) fn is_range_call(&self, iter: &ast::Expr) -> bool {
         let ast::ExprKind::Call { callee, .. } = &iter.kind else {
             return false;
         };
@@ -1250,7 +1316,10 @@ impl<'a> Checker<'a> {
     }
 
     /// Checks the `range(...)` header of a `for` loop (DESIGN §3.5).
-    fn check_range(&mut self, iter: &ast::Expr) -> Option<(hir::Expr, hir::Expr, hir::Expr)> {
+    pub(crate) fn check_range(
+        &mut self,
+        iter: &ast::Expr,
+    ) -> Option<(hir::Expr, hir::Expr, hir::Expr)> {
         let ast::ExprKind::Call {
             type_args, args, ..
         } = &iter.kind

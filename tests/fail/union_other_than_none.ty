@@ -1,0 +1,11 @@
+# `T | None` is the only union; anything else is rejected by name
+# (DESIGN 3.10).
+# milestone: M3
+# error: the union `int | str` is not supported
+# error: only `T | None` may be written as a union
+
+fn parse(text: str) -> int | str:
+    return text
+
+fn main():
+    print(1)

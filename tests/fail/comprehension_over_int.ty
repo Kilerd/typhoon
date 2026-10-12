@@ -1,0 +1,6 @@
+# A comprehension walks what a `for` statement walks (DESIGN 3.5, 3.10).
+# milestone: M3
+# error: cannot iterate over an `int`
+
+fn main():
+    print([x for x in 10])

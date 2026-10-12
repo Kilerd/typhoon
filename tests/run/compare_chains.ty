@@ -1,0 +1,43 @@
+# Comparison chains: `a < b < c` means `a < b and b < c`, with every middle
+# operand evaluated exactly once and the links short-circuiting left to right.
+# milestone: M3
+# expect: True False True
+# expect: in range
+# expect: eval mid
+# expect: True
+# expect: eval low
+# expect: eval mid
+# expect: False
+# expect: True True
+# expect: [0, 1, 2]
+
+fn trace(label: str, v: int) -> int:
+    print(f"eval {label}")
+    return v
+
+fn clamp_ok(x: float) -> bool:
+    return 0.0 <= x <= 1.0
+
+fn main():
+    a = 1
+    b = 2
+    c = 3
+    print(a < b < c, a < c < b, c > b > a)
+
+    if 0 <= a < 10:
+        print("in range")
+
+    # `trace("mid", ...)` runs once even though two links use it.
+    print(1 < trace("mid", 5) <= 5)
+    # The first false link skips the rest: `never` is not evaluated.
+    print(trace("low", 1) > trace("mid", 3) > trace("never", 0))
+
+    xs = [1, 2, 3]
+    print(0 < len(xs) in xs, "a" < "b" != "c")
+
+    i = 0
+    seen: list<int> = []
+    while 0 <= i < 3 and clamp_ok(0.5):
+        seen.append(i)
+        i = i + 1
+    print(seen)

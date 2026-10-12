@@ -306,15 +306,50 @@ impl<'p> Emitter<'p> {
                 let offset = self.layout.class_offsets(*class)[*field as usize];
                 self.load_value(address, expr.ty, offset);
             }
-            hir::ExprKind::NoneRef => self.ins(Instruction::I32Const(0)),
+            // A clear tag and a zeroed payload, or the null pointer.
+            hir::ExprKind::NoneRef => {
+                for vt in self.flat(expr.ty) {
+                    self.ins(match vt {
+                        ValType::I64 => Instruction::I64Const(0),
+                        ValType::F64 => Instruction::F64Const(0.0.into()),
+                        _ => Instruction::I32Const(0),
+                    });
+                }
+            }
             hir::ExprKind::IsNone { value, negated } => {
+                let ty = value.ty;
                 self.expr(func, value);
+                if self.types.is_tagged_optional(ty) {
+                    // Keep the tag, drop the payload above it.
+                    let spilled = self.spill(ty);
+                    self.ins(Instruction::LocalGet(spilled[0]));
+                }
                 if *negated {
                     self.ins(Instruction::I32Const(0));
                     self.ins(Instruction::I32Ne);
                 } else {
                     self.ins(Instruction::I32Eqz);
                 }
+            }
+            hir::ExprKind::OptionalSome(value) => {
+                self.ins(Instruction::I32Const(1));
+                self.expr(func, value);
+            }
+            hir::ExprKind::OptionalValue(value) => {
+                let spilled = self.spill_expr(func, value);
+                self.push_locals(&spilled[1..]);
+            }
+            hir::ExprKind::Seq { stmts, value } => {
+                self.block(func, stmts);
+                self.expr(func, value);
+            }
+            hir::ExprKind::ListWithCapacity { elem, cap } => {
+                let size = i64::from(self.layout.size_of(*elem));
+                let atomic = self.atomic_flag(*elem);
+                self.ins(Instruction::I64Const(size));
+                self.ins(Instruction::I32Const(atomic));
+                self.expr(func, cap);
+                self.call_rt(Rt::ListNew);
             }
             hir::ExprKind::RefEq { lhs, rhs, negated } => {
                 self.expr(func, lhs);
@@ -718,6 +753,20 @@ impl<'p> Emitter<'p> {
             return;
         }
         match self.types.get(ty) {
+            // `"None"`, or the payload formatted.
+            Type::Optional(inner) => {
+                let value = self.spill(ty);
+                let payload = usize::from(self.types.is_tagged_optional(ty));
+                let inner_value = value[payload..].to_vec();
+                self.optional_present(ty, &value);
+                self.open_if(BlockType::Result(ValType::I32));
+                self.push_locals(&inner_value);
+                self.format_value(inner, spec);
+                self.else_();
+                let none = self.string_literal("None");
+                self.ins(Instruction::GlobalGet(none));
+                self.end();
+            }
             Type::Str => {}
             Type::Int => self.call_rt(Rt::StrFromInt),
             Type::Float => self.call_rt(Rt::StrFromFloat),

@@ -1,0 +1,15 @@
+# A `T | None` must be narrowed before it is used as a `T`, whatever `T` is
+# (DESIGN 3.8, 3.10).
+# milestone: M3
+# error: `int | None` may be `None` here
+# error: narrow it first
+
+fn find(xs: list<int>, target: int) -> int | None:
+    for i in range(len(xs)):
+        if xs[i] == target:
+            return i
+    return None
+
+fn main():
+    i = find([1, 2], 2)
+    print(i + 1)

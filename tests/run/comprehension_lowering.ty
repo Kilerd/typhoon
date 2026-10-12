@@ -1,0 +1,68 @@
+# How comprehensions lower: pre-sized ranges with every kind of step, a `str`
+# walked by code point, an iterable evaluated exactly once, a list that grows
+# while it is walked, and comprehensions inside conditions and other
+# comprehensions (DESIGN 3.10).
+# milestone: M3
+# expect: [0, 1, 2] [] [5, 3, 1] [] [0, 3, 6, 9] [-1, -2]
+# expect: 4 ["h", "é", "l", "o"]
+# expect: source
+# expect: [2, 4, 6]
+# expect: [1, 2, 1, 2]
+# expect: 3 2
+# expect: [[0], [0, 1], [0, 1, 2]]
+# expect: [True, False, True]
+# expect: ["a=1", "b=2"]
+# expect: [1, 2, 3]
+
+fn source() -> list<int>:
+    print("source")
+    return [1, 2, 3]
+
+fn evens(n: int) -> list<int>:
+    return [i for i in range(n) if i % 2 == 0]
+
+fn main():
+    n = 3
+    print(
+        [i for i in range(n)],
+        [i for i in range(n, 0)],
+        [i for i in range(5, 0, -2)],
+        [i for i in range(0, 5, -1)],
+        [i for i in range(0, 10, 3)],
+        [i for i in range(-1, -3, -1)],
+    )
+    word = "hélo"
+    chars = [c for c in word]
+    print(len(chars), chars)
+
+    print([x * 2 for x in source()])
+
+    # The loop re-reads the length, as a `for` statement does.
+    grow = [1, 2]
+    for v in [x for x in grow]:
+        grow.append(v)
+    print(grow)
+
+    i = 0
+    while len(evens(i)) < 2:
+        i = i + 1
+    j = 0
+    while len([g for g in grow if g > j]) > 0:
+        j = j + 1
+    print(i, j)
+
+    print([[m for m in range(k + 1)] for k in range(3)])
+    print([k % 2 == 0 for k in range(3)])
+    names = ["a", "b"]
+    print([f"{s}={idx + 1}" for s in names for idx in range(2) if names[idx] == s])
+    print(sorted_copy([3, 1, 2]))
+
+fn sorted_copy(xs: list<int>) -> list<int>:
+    out = [x for x in xs]
+    for a in range(len(out)):
+        for b in range(len(out) - 1):
+            if out[b] > out[b + 1]:
+                t = out[b]
+                out[b] = out[b + 1]
+                out[b + 1] = t
+    return out

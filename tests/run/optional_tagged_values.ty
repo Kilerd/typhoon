@@ -1,0 +1,70 @@
+# Tagged optionals (`int`, `float`, `bool`, tuples) in every place a value
+# can live: locals, parameters with defaults, returns, class fields, list
+# elements and tuple members; plus their printing, f-strings and equality.
+# milestone: M3
+# expect: None 7
+# expect: [None, True, False]
+# expect: (None, 2.5)
+# expect: None (1, False)
+# expect: some 1.5 none
+# expect: n=None b=True (1, False)
+# expect: True False True False
+# expect: True True False
+# expect: 3
+# expect: None|0
+# expect: 12
+
+class Cell:
+    v: int | None = None
+    on: bool | None = None
+    pair: tuple<int, bool> | None = None
+
+fn pick(n: int | None = None) -> int | None:
+    return n
+
+fn describe(f: float | None) -> str:
+    if f is None:
+        return "none"
+    return f"some {f}"
+
+fn first_set(xs: list<int | None>) -> int:
+    for x in xs:
+        if x is not None:
+            return x
+    return -1
+
+fn main():
+    print(pick(), pick(7))
+    flags: list<bool | None> = [None, True, False]
+    print(flags)
+    t: tuple<int | None, float | None> = (None, 2.5)
+    print(t)
+
+    c = Cell()
+    print(c.pair, (1, False))
+    c.pair = (1, False)
+    c.on = True
+    print(describe(1.5), describe(None))
+    print(f"n={c.v} b={c.on}", c.pair)
+
+    x: int | None = None
+    y: int | None = None
+    z: int | None = 5
+    print(x == y, x == z, z == 5, z != 5)
+    nan: float | None = 0.0 / 0.0
+    print(x is None, z is not None, nan == nan)
+
+    print(first_set([None, None, 3, 4]))
+
+    # Reassigning drops what was known; testing again narrows again.
+    w: int | None = 1
+    if w is not None:
+        w = None
+        if w is None:
+            print(f"{w}|{0}")
+
+    total = 0
+    for v in [pick(4), pick(), pick(8)]:
+        if v is not None:
+            total = total + v
+    print(total)
