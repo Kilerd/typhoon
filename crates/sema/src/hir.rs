@@ -296,7 +296,7 @@ pub enum FloatOp {
 }
 
 /// The comparison operators that survive into the HIR.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CmpOp {
     /// `==`
     Eq,

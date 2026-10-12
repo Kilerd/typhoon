@@ -322,7 +322,20 @@ impl Checker<'_> {
     /// `a < b` for two values of the same type, after
     /// [`Checker::ensure_ord`] accepted it.
     pub(crate) fn lt_values(&mut self, a: hir::Expr, b: hir::Expr, span: Span) -> hir::Expr {
-        let op = hir::CmpOp::Lt;
+        self.ordered_values(hir::CmpOp::Lt, a, b, span)
+    }
+
+    /// `a op b` for an ordering `op` and two values of the same type, after
+    /// [`Checker::ensure_ord`] accepted it: natively on scalars, member-wise
+    /// on tuples, and through `__lt__` on a class — the only type where
+    /// `a <= b` is `not (b < a)` (DESIGN §3.11).
+    pub(crate) fn ordered_values(
+        &mut self,
+        op: hir::CmpOp,
+        a: hir::Expr,
+        b: hir::Expr,
+        span: Span,
+    ) -> hir::Expr {
         let ty = a.ty;
         let (lhs, rhs) = (Box::new(a), Box::new(b));
         let kind = match self.types.get(ty) {
@@ -332,12 +345,12 @@ impl Checker<'_> {
             Type::Str => hir::ExprKind::StrCmp { op, lhs, rhs },
             Type::Class(class) => {
                 return match self.proto_method(class, Builtin::Ord, span) {
-                    Some(func) => self.call_fn(func, vec![*lhs, *rhs], vec![0, 1], span),
+                    Some(func) => self.ordered_call(func, op, *lhs, *rhs, span),
                     None => boolean(false, span),
                 };
             }
             _ => {
-                let func = self.synth_fn(SynthKind::TupleLt, ty, span);
+                let func = self.synth_fn(SynthKind::TupleOrder(op), ty, span);
                 return self.call_fn(func, vec![*lhs, *rhs], vec![0, 1], span);
             }
         };
@@ -456,7 +469,15 @@ impl Checker<'_> {
         }
         let name = self.types.name(ty);
         let (label, params, ret) = match kind {
-            SynthKind::TupleLt => ("lt", vec![("a", ty), ("b", ty)], TypeId::BOOL),
+            SynthKind::TupleOrder(op) => {
+                let label = match op {
+                    hir::CmpOp::Le => "le",
+                    hir::CmpOp::Gt => "gt",
+                    hir::CmpOp::Ge => "ge",
+                    _ => "lt",
+                };
+                (label, vec![("a", ty), ("b", ty)], TypeId::BOOL)
+            }
             SynthKind::TupleHash => ("hash", vec![("x", ty)], TypeId::INT),
             SynthKind::Min => ("min", vec![("a", ty), ("b", ty)], ty),
             SynthKind::Max => ("max", vec![("a", ty), ("b", ty)], ty),
@@ -519,7 +540,7 @@ impl Checker<'_> {
         let ty = job.ty;
         let stmts = match job.kind {
             SynthKind::Derive(builtin) => self.derived_body(builtin, ty, span),
-            SynthKind::TupleLt => {
+            SynthKind::TupleOrder(op) => {
                 let (a, b) = (hir::LocalId(0), hir::LocalId(1));
                 let members = self.types.as_tuple(ty).unwrap_or_default().to_vec();
                 let pairs = members
@@ -527,7 +548,7 @@ impl Checker<'_> {
                     .enumerate()
                     .map(|(i, m)| (member(a, ty, i, *m, span), member(b, ty, i, *m, span)))
                     .collect();
-                self.lexicographic(pairs, span)
+                self.lexicographic(op, pairs, span)
             }
             SynthKind::TupleHash => {
                 let x = hir::LocalId(0);
@@ -565,16 +586,23 @@ impl Checker<'_> {
         }
     }
 
-    /// `for each pair: if a != b: return a < b`, then `return False`: the
-    /// lexicographic `<` of tuples and of derived `Ord`.
-    fn lexicographic(&mut self, pairs: Vec<(hir::Expr, hir::Expr)>, span: Span) -> Vec<hir::Stmt> {
+    /// `for each pair: if a != b: return a op b`, then whether `op` holds for
+    /// equal sequences (`<=` and `>=` do): the lexicographic ordering of
+    /// tuples, as Python compares them, and the `<` of derived `Ord`.
+    fn lexicographic(
+        &mut self,
+        op: hir::CmpOp,
+        pairs: Vec<(hir::Expr, hir::Expr)>,
+        span: Span,
+    ) -> Vec<hir::Stmt> {
         let mut stmts = Vec::with_capacity(pairs.len() + 1);
         for (a, b) in pairs {
             let differ = not(self.eq_values(a.clone(), b.clone(), span));
-            let less = self.lt_values(a, b, span);
-            stmts.push(when(differ, vec![ret(less)]));
+            let decided = self.ordered_values(op, a, b, span);
+            stmts.push(when(differ, vec![ret(decided)]));
         }
-        stmts.push(ret(boolean(false, span)));
+        let equal = matches!(op, hir::CmpOp::Le | hir::CmpOp::Ge);
+        stmts.push(ret(boolean(equal, span)));
         stmts
     }
 
@@ -896,7 +924,7 @@ impl Checker<'_> {
                         (field(this, i, f.ty), field(other, i, f.ty))
                     })
                     .collect();
-                self.lexicographic(pairs, span)
+                self.lexicographic(hir::CmpOp::Lt, pairs, span)
             }
             Builtin::Hash => {
                 let mut acc = int(HASH_SEED, span);

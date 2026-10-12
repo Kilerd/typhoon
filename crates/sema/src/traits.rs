@@ -210,8 +210,9 @@ pub(crate) struct SynthJob {
 pub(crate) enum SynthKind {
     /// The field-wise `__eq__` / `__lt__` / `__hash__` / `__repr__` of a class.
     Derive(Builtin),
-    /// Lexicographic `<` of two tuples.
-    TupleLt,
+    /// A lexicographic ordering (`<`, `<=`, `>` or `>=`) of two tuples, as
+    /// Python compares them: the first members that differ decide.
+    TupleOrder(hir::CmpOp),
     /// The hash of a flat tuple of `int`, `bool` and `str`.
     TupleHash,
     /// `min(a, b)` on an `Ord` type without a native minimum.

@@ -285,7 +285,8 @@ impl Checker<'_> {
         false
     }
 
-    /// `<` / `<=` / `>` / `>=` on two tuples, lexicographically.
+    /// `<` / `<=` / `>` / `>=` on two tuples, lexicographically and directly:
+    /// `a <= b` is not `not (b < a)`, which a NaN member would get wrong.
     pub(crate) fn tuple_ordering(
         &mut self,
         op: hir::CmpOp,
@@ -293,8 +294,7 @@ impl Checker<'_> {
         rhs: hir::Expr,
         span: Span,
     ) -> hir::Expr {
-        let func = self.synth_fn(SynthKind::TupleLt, lhs.ty, span);
-        self.ordered_call(func, op, lhs, rhs, span)
+        self.ordered_values(op, lhs, rhs, span)
     }
 
     /// `x.__eq__(y)`, `x.__hash__()`, … on a value of a builtin type: the
