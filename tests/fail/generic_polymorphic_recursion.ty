@@ -1,0 +1,13 @@
+# A generic function that calls itself with an ever larger type argument
+# cannot be monomorphized (DESIGN 4.5).
+# milestone: M3
+# error: exceeds the depth limit of 64 nested instantiations
+# error: polymorphic recursion
+
+fn nest<T>(x: T, n: int) -> int:
+    if n == 0:
+        return 0
+    return nest([x], n - 1) + 1
+
+fn main():
+    print(nest(1, 3))

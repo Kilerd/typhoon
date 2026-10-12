@@ -1,0 +1,11 @@
+# An explicit instantiation must supply every type parameter (DESIGN 3.9).
+# milestone: M3
+# error: `max` takes 1 type argument but 2 were supplied
+
+fn max<T>(a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+fn main():
+    print(max<int, str>(1, 2))

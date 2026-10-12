@@ -1,0 +1,10 @@
+# Only a class declared with type parameters takes type arguments (DESIGN 3.9).
+# milestone: M3
+# error: `Stack` takes no type arguments; it is not generic
+
+class Stack:
+    n: int
+
+fn main():
+    s: Stack<int> = Stack(n=0)
+    print(s.n)

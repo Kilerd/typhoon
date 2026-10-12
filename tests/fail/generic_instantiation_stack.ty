@@ -1,0 +1,19 @@
+# An error inside a nested instantiation lists the whole instantiation stack,
+# innermost first (DESIGN 3.9).
+# milestone: M3
+# error: `+` cannot be applied to `bool` and `bool`
+# error: in instantiation of `add<bool>`
+# error: in instantiation of `sum_all<bool>`
+
+fn add<T>(a: T, b: T) -> T:
+    return a + b
+
+fn sum_all<T>(xs: list<T>, zero: T) -> T:
+    acc = zero
+    for x in xs:
+        acc = add(acc, x)
+    return acc
+
+fn main():
+    print(sum_all([1, 2], 0))
+    print(sum_all([True], False))

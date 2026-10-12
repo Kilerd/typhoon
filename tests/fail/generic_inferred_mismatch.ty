@@ -1,0 +1,13 @@
+# The first argument fixes `T`; a later one of another type is a mismatch,
+# and the diagnostic points at where `T` was inferred (DESIGN 4.3, 4.4).
+# milestone: M3
+# error: mismatched types: expected `int`, found `float`
+# error: `T` is inferred as `int` from this argument
+
+fn max<T>(a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+fn main():
+    print(max(1, 2.5))

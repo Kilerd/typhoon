@@ -1,0 +1,108 @@
+# Generic functions (DESIGN 3.9, 4.4, 4.5): type arguments inferred from the
+# arguments, from the expected type, or written explicitly; generic functions
+# calling generic functions; several type parameters; nested type arguments
+# whose `>>` the parser splits; defaults; one monomorphic copy per instance.
+# milestone: M3
+# expect: 9
+# expect: zoo
+# expect: 2.5
+# expect: 1 a
+# expect: ("a", 1)
+# expect: [7]
+# expect: []
+# expect: ["ab", "ab"]
+# expect: [1.5, 1.5, 1.5]
+# expect: 6
+# expect: 0.75
+# expect: [[1, 2], [3]]
+# expect: [3]
+# expect: 3
+# expect: True False
+# expect: [3, 2, 1]
+# expect: ["c", "b", "a"]
+# expect: 120
+
+fn max<T>(a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+# A generic function calling a generic function: `max3<int>` instantiates
+# `max<int>`.
+fn max3<T>(a: T, b: T, c: T) -> T:
+    return max(max(a, b), c)
+
+fn first<A, B>(pair: tuple<A, B>) -> A:
+    return pair[0]
+
+fn second<A, B>(pair: tuple<A, B>) -> B:
+    return pair[1]
+
+fn swap<A, B>(pair: tuple<A, B>) -> tuple<B, A>:
+    return (pair[1], pair[0])
+
+# `T` appears only in the return type: it comes from the expected type or
+# from an explicit `empty<str>()`.
+fn empty<T>() -> list<T>:
+    xs: list<T> = []
+    return xs
+
+fn repeat<T>(value: T, times: int = 2) -> list<T>:
+    out: list<T> = []
+    for i in range(times):
+        out.append(value)
+    return out
+
+fn total<T>(xs: list<T>, zero: T) -> T:
+    acc = zero
+    for x in xs:
+        acc = acc + x
+    return acc
+
+fn last<T>(xs: list<T>) -> T:
+    return xs[-1]
+
+fn contains<T>(xs: list<T>, wanted: T) -> bool:
+    for x in xs:
+        if x == wanted:
+            return True
+    return False
+
+fn reversed<T>(xs: list<T>) -> list<T>:
+    out: list<T> = []
+    i = len(xs) - 1
+    while i >= 0:
+        out.append(xs[i])
+        i = i - 1
+    return out
+
+# Recursion with the same type arguments is ordinary recursion.
+fn product<T>(xs: list<T>, i: int, one: T) -> T:
+    if i == len(xs):
+        return one
+    return xs[i] * product(xs, i + 1, one)
+
+fn main():
+    print(max3(4, 9, 2))
+    print(max3("pear", "apple", "zoo"))
+    print(max<float>(2.5, 1.5))
+    pair = (1, "a")
+    print(first(pair), second(pair))
+    print(swap(pair))
+    xs: list<int> = empty()
+    xs.append(7)
+    print(xs)
+    print(empty<str>())
+    print(repeat("ab"))
+    print(repeat(1.5, times=3))
+    print(total([1, 2, 3], 0))
+    print(total([0.5, 0.25], 0.0))
+    nested: list<list<int>>= [[1, 2]]
+    nested = nested + repeat<list<int>>([3], times=1)
+    print(nested)
+    print(last<list<int>>(nested))
+    print(last(last(nested)))
+    print(contains(["x", "y"], "y"), contains([1, 2], 5))
+    print(reversed([1, 2, 3]))
+    print(reversed(["a", "b", "c"]))
+    print(product([1, 2, 3, 4, 5], 0, 1))

@@ -28,9 +28,12 @@
 //! * a class constructor is called with keyword arguments only, naming every
 //!   field that has no default exactly once (DESIGN §3.8);
 //! * a `C | None` is narrowed by `is None` before it is used as a `C`;
+//! * generic functions and classes are monomorphized: every instance is
+//!   checked with its type arguments substituted, and lowered to ordinary
+//!   functions and classes (DESIGN §3.9, §4.5);
 //! * features that parse but belong to a later milestone (dicts, sets,
-//!   generics, comprehensions, general unions, comparison chains) are rejected
-//!   with one diagnostic each.
+//!   comprehensions, general unions, comparison chains) are rejected with one
+//!   diagnostic each.
 
 #![warn(missing_docs)]
 
@@ -38,6 +41,7 @@ mod check;
 mod consts;
 mod dump;
 mod exprs;
+mod generics;
 pub mod hir;
 pub mod types;
 
@@ -70,6 +74,9 @@ pub fn check_module(
     for (id, decl) in fn_decls.iter().enumerate() {
         functions.push(checker.check_function(decl, hir::FuncId(id as u32)));
     }
+    // The instances of generic functions and methods requested so far, and
+    // the ones those request in turn (DESIGN §4.5).
+    checker.check_instances(&mut functions);
     let main = checker.check_entry_point(&fn_decls, whole_file);
 
     let types = checker.types.clone();
@@ -105,6 +112,7 @@ impl<'a> Checker<'a> {
                 self.collect_const(decl);
             }
         }
+        self.validate_generic_classes();
         for item in &module.items {
             if let ast::Item::Class(decl) = item {
                 self.collect_class_fields(decl);
@@ -114,6 +122,7 @@ impl<'a> Checker<'a> {
         let mut decls: Vec<&'m ast::FnDecl> = Vec::new();
         for item in &module.items {
             match item {
+                ast::Item::Fn(decl) if !decl.generics.is_empty() => self.collect_generic_fn(decl),
                 ast::Item::Fn(decl) => {
                     if self.collect_fn(decl, hir::FuncId(decls.len() as u32), None) {
                         decls.push(decl);
@@ -138,9 +147,7 @@ impl<'a> Checker<'a> {
     /// Registers a class name, before any field type is resolved.
     fn collect_class_name(&mut self, decl: &ast::ClassDecl) {
         if !decl.generics.is_empty() {
-            let span = decl.generics[0].span;
-            self.unsupported(span, "a generic class", "M3");
-            self.poisoned.insert(decl.name.name.clone());
+            self.collect_generic_class(decl);
             return;
         }
         if self.classes.contains_key(decl.name.as_str())
@@ -250,9 +257,10 @@ impl<'a> Checker<'a> {
     /// checked. `class` is `Some` for a method, whose first parameter is the
     /// untyped `self` receiver (DESIGN §3.8).
     fn collect_fn(&mut self, decl: &ast::FnDecl, id: hir::FuncId, class: Option<ClassId>) -> bool {
+        // Generic free functions never get here; a method takes the type
+        // parameters of its class, never its own (DESIGN §3.9).
         if !decl.generics.is_empty() {
-            let span = decl.generics[0].span;
-            self.unsupported(span, "a generic function", "M3");
+            self.reject_generic_method(decl);
             return false;
         }
         let (qualified, symbol) = match class {
@@ -385,7 +393,8 @@ impl<'a> Checker<'a> {
             .get(name)
             .map(|id| self.sigs[id.index()].name_span)
             .or_else(|| self.consts.get(name).map(|c| c.span))
-            .or_else(|| self.classes.get(name).map(|c| c.name_span));
+            .or_else(|| self.classes.get(name).map(|c| c.name_span))
+            .or_else(|| self.generics.name_span(name));
         match previous {
             Some(previous) => {
                 self.error(

@@ -40,6 +40,14 @@ impl Checker<'_> {
         match &expr.kind {
             ast::ExprKind::List(items) => return self.check_list_literal(items, expected, span),
             ast::ExprKind::Tuple(items) => return self.check_tuple_literal(items, expected, span),
+            // DESIGN §3.9, §4.4: a generic call infers from the expected type too.
+            ast::ExprKind::Call {
+                callee,
+                type_args,
+                args,
+            } if self.is_generic_call(callee, type_args.is_some()) => {
+                return self.check_generic_call(callee, type_args.as_deref(), args, expected, span);
+            }
             ast::ExprKind::None => {
                 if let Some(expected) = expected
                     && matches!(self.types.get(expected), Type::Optional(_))
@@ -154,7 +162,7 @@ impl Checker<'_> {
         if self.poisoned.contains(name.as_str()) {
             return self.error_expr(span);
         }
-        if self.fn_index.contains_key(name.as_str()) {
+        if self.fn_index.contains_key(name.as_str()) || self.generics.has_fn(name.as_str()) {
             self.error(
                 Diagnostic::error(format!("`{}` is a function, not a value", name.as_str()))
                     .with_label(span, "functions cannot be used as values")
@@ -945,7 +953,9 @@ impl Checker<'_> {
                         name.as_str()
                     ))
                     .with_label(name.span, "unknown field");
-                    if self.methods.contains_key(&(class, name.name.clone())) {
+                    if self.methods.contains_key(&(class, name.name.clone()))
+                        || self.is_generic_method(class, name.as_str())
+                    {
                         diag = diag.with_help(format!("`{}` is a method; call it", name.as_str()));
                     } else if !known.is_empty() {
                         diag = diag.with_help(format!("`{class_name}` has {known}"));
@@ -1108,7 +1118,7 @@ impl Checker<'_> {
     // -- constructors and methods -------------------------------------------
 
     /// `C(field=value, …)`: the generated keyword constructor (DESIGN §3.8).
-    fn check_construct(
+    pub(crate) fn check_construct(
         &mut self,
         class: ClassId,
         callee_span: Span,
@@ -1245,8 +1255,21 @@ impl Checker<'_> {
                 }
                 self.error_expr(span)
             }
-            Type::Class(class) => match self.methods.get(&(class, name.name.clone())).copied() {
+            Type::Class(class) => match self
+                .methods
+                .get(&(class, name.name.clone()))
+                .copied()
+                // The methods of a generic class are instantiated on first call.
+                .or_else(|| self.instantiate_method(class, name))
+            {
                 Some(func) => self.check_user_call(func, name.span, args, span, Some(recv)),
+                // It exists but could not be instantiated; that was reported.
+                None if self.is_generic_method(class, name.as_str()) => {
+                    for arg in args {
+                        self.check_expr(&arg.value);
+                    }
+                    self.error_expr(span)
+                }
                 None => {
                     for arg in args {
                         self.check_expr(&arg.value);

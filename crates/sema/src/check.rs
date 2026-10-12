@@ -129,6 +129,10 @@ pub(crate) struct Checker<'a> {
     /// Locals of type `C | None` that the control flow has proved non-`None`
     /// at the current point (DESIGN §3.8).
     pub(crate) narrowed: HashSet<hir::LocalId>,
+
+    /// Generic templates, their instances and the type parameters in scope
+    /// (DESIGN §3.9, §4.5).
+    pub(crate) generics: crate::generics::Generics,
 }
 
 /// Whether control can fall out of the bottom of a block.
@@ -164,13 +168,17 @@ impl<'a> Checker<'a> {
             fn_name: String::new(),
             loop_depth: 0,
             narrowed: HashSet::new(),
+            generics: crate::generics::Generics::default(),
         }
     }
 
     // -- diagnostics ------------------------------------------------------
 
     pub(crate) fn error(&mut self, diag: Diagnostic) {
-        self.diags.push(diag);
+        // Inside generic code, add the instantiation stack (or drop a repeat).
+        if let Some(diag) = self.in_instantiation(diag) {
+            self.diags.push(diag);
+        }
     }
 
     /// Reports a feature that parses but has no meaning before `milestone`.
@@ -309,7 +317,7 @@ impl<'a> Checker<'a> {
                 self.types.tuple_of(args)
             }
             "int" | "float" | "bool" | "str" if !args.is_empty() => {
-                self.unsupported(span, "a generic type", "M3");
+                arity_error(self, "no type arguments");
                 TypeId::ERROR
             }
             "int" => TypeId::INT,
@@ -326,8 +334,21 @@ impl<'a> Checker<'a> {
                 self.unsupported(span, &what, "M3");
                 TypeId::ERROR
             }
+            // DESIGN §3.9: a type parameter in scope, or a generic class.
+            _ if self.type_param(text).is_some() => self.resolve_type_param(name, args, span),
+            _ if self.generics.has_class(text) => self.resolve_generic_class(name, args, span),
+            _ if !args.is_empty() && self.classes.contains_key(text) => {
+                arity_error(self, "no type arguments; it is not generic");
+                TypeId::ERROR
+            }
             _ if !args.is_empty() => {
-                self.unsupported(span, "a generic type", "M3");
+                if self.poisoned.contains(text) {
+                    return TypeId::ERROR;
+                }
+                self.error(
+                    Diagnostic::error(format!("cannot find type `{text}` in this scope"))
+                        .with_label(span, "not a known type"),
+                );
                 TypeId::ERROR
             }
             _ => match self.classes.get(text) {
@@ -1237,7 +1258,11 @@ impl<'a> Checker<'a> {
             return None;
         };
         if type_args.is_some() {
-            self.unsupported(iter.span, "a generic call", "M3");
+            self.error(
+                Diagnostic::error("`range` is not generic")
+                    .with_label(iter.span, "unexpected type arguments")
+                    .with_help("remove the `<...>`"),
+            );
             return None;
         }
         if let Some(kw) = args.iter().find(|a| a.name.is_some()) {

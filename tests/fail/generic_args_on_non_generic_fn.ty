@@ -1,0 +1,10 @@
+# Explicit type arguments `f<int>(...)` only make sense on a generic function
+# (DESIGN 3.9).
+# milestone: M3
+# error: `identity` is not generic
+
+fn identity(a: int) -> int:
+    return a
+
+fn main():
+    print(identity<int>(1))

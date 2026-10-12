@@ -1,0 +1,142 @@
+# Generic classes (DESIGN 3.9, 4.5): one class per instance, type arguments
+# from an annotation, from the constructor's fields, or written explicitly;
+# methods instantiated with their class; a self-referential generic class;
+# classes and other instances as type arguments; nested type arguments.
+# milestone: M3
+# expect: 3
+# expect: 3 2 0
+# expect: none
+# expect: 42 k
+# expect: k 42
+# expect: 3 6
+# expect: 3.5
+# expect: [3] 1
+# expect: [[1]]
+# expect: 3 1
+# expect: 7
+# expect: 4 kiwi
+# expect: 10 20
+# expect: True
+# expect: 5
+
+class Stack<T>:
+    items: list<T>
+
+    fn push(self, value: T):
+        self.items.append(value)
+
+    fn pop(self) -> T:
+        return self.items.pop()
+
+    fn size(self) -> int:
+        return len(self.items)
+
+    # A method calling another method of the same instance.
+    fn peek_or(self, fallback: T) -> T:
+        if self.size() == 0:
+            return fallback
+        return self.items[-1]
+
+class Pair<K, V>:
+    key: K
+    value: V
+
+    # A method returning a different instance of its own class.
+    fn flip(self) -> Pair<V, K>:
+        return Pair(key=self.value, value=self.key)
+
+class Node<T>:
+    value: T
+    next: Node<T> | None = None
+
+class LinkedList<T>:
+    head: Node<T> | None = None
+    size: int = 0
+
+    fn push(self, value: T):
+        self.head = Node(value=value, next=self.head)
+        self.size = self.size + 1
+
+    fn sum_with(self, zero: T) -> T:
+        acc = zero
+        cur = self.head
+        done = False
+        while not done:
+            if cur is None:
+                done = True
+            else:
+                acc = acc + cur.value
+                cur = cur.next
+        return acc
+
+class Point:
+    x: int
+    y: int
+
+class Counter<T>:
+    key: T
+    count: int = 0
+
+    fn bump(self, by: int = 1) -> int:
+        self.count = self.count + by
+        return self.count
+
+# A generic function over a generic class.
+fn drain<T>(s: Stack<T>) -> list<T>:
+    out: list<T> = []
+    while s.size() > 0:
+        out.append(s.pop())
+    return out
+
+fn sizes<T>(s: Stack<T>, t: Stack<T>) -> int:
+    return s.size() + t.size()
+
+fn main():
+    s: Stack<int> = Stack(items=[])
+    s.push(1)
+    s.push(2)
+    s.push(3)
+    print(s.size())
+    print(s.pop(), s.pop(), s.size() - 1)
+    t: Stack<str> = Stack<str>(items=[])
+    print(t.peek_or("none"))
+
+    p = Pair(key="k", value=42)
+    q = p.flip()
+    print(q.key, q.value)
+    print(q.flip().key, q.flip().value)
+
+    ll: LinkedList<int> = LinkedList()
+    ll.push(1)
+    ll.push(2)
+    ll.push(3)
+    print(ll.size, ll.sum_with(0))
+    lf: LinkedList<float> = LinkedList()
+    lf.push(1.25)
+    lf.push(2.25)
+    print(lf.sum_with(0.0))
+
+    nested: Stack<list<int>> = Stack(items=[])
+    nested.push([1, 2])
+    nested.push([3])
+    print(nested.pop(), nested.size())
+    deep: Stack<list<list<int>>>= Stack<list<list<int>>>(items=[[[1]]])
+    print(deep.peek_or([]))
+
+    pts = Stack(items=[Point(x=1, y=2), Point(x=3, y=4)])
+    print(pts.pop().x, pts.peek_or(Point(x=0, y=0)).x)
+    print(drain(Stack(items=[5, 6, 7]))[0])
+
+    c = Counter(key="kiwi")
+    c.bump()
+    c.bump(by=3)
+    print(c.count, c.key)
+
+    boxes: Stack<Pair<str, int>> = Stack(items=[Pair(key="a", value=10)])
+    boxes.push(Pair(key="b", value=20))
+    second = boxes.pop()
+    print(boxes.pop().value, second.value)
+
+    maybe: Node<int> | None = Node(value=1)
+    print(maybe is not None)
+    print(sizes(Stack(items=[1, 2]), Stack(items=[3, 4, 5])))

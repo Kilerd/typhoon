@@ -677,20 +677,8 @@ fn later_milestones_are_named_in_the_diagnostic() {
     }
 
     rejects(
-        "class Stack<T>:\n    n: int\n\nfn main():\n    pass\n",
-        ["a generic class is not supported yet (planned for M3)"].as_slice(),
-    );
-    rejects(
-        "fn f<T>(a: T) -> T:\n    return a\n\nfn main():\n    pass\n",
-        ["a generic function is not supported yet (planned for M3)"].as_slice(),
-    );
-    rejects(
         "fn f(a: int) -> int | None:\n    return a\n\nfn main():\n    pass\n",
         ["an optional type (`int | None`) is not supported yet (planned for M3)"].as_slice(),
-    );
-    rejects(
-        "fn f(a: int) -> int:\n    return a\n\nfn main():\n    print(f<int>(1))\n",
-        ["a generic call is not supported yet (planned for M3)"].as_slice(),
     );
     rejects(
         "fn f(self) -> int:\n    return 1\n\nfn main():\n    pass\n",

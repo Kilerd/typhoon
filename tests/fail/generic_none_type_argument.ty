@@ -1,0 +1,9 @@
+# `None` has no values, so it cannot be a type argument (DESIGN 4.1).
+# milestone: M3
+# error: `None` cannot be a type argument, in `Box<None>`
+
+class Box<T>:
+    item: T
+
+fn main():
+    b: Box<None> = Box(item=None)

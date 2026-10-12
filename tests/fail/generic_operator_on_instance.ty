@@ -1,0 +1,19 @@
+# There are no constraints on type parameters: `>` on a `T` is checked once
+# `T` is known, and the error names the instantiation (DESIGN 3.9).
+# milestone: M3
+# error: `Point` values cannot be compared with `>`
+# error: in instantiation of `max<Point>`
+# error: `max<Point>` instantiated here
+
+class Point:
+    x: float
+
+fn max<T>(a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+fn main():
+    p = Point(x=1.0)
+    q = Point(x=2.0)
+    print(max(p, q).x)

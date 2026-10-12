@@ -1,0 +1,10 @@
+# A generic class must be given exactly its type arguments (DESIGN 3.9).
+# milestone: M3
+# error: `Stack` takes 1 type argument but 2 were supplied
+
+class Stack<T>:
+    items: list<T>
+
+fn main():
+    s: Stack<int, str> = Stack(items=[])
+    print(1)

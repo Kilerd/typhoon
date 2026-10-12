@@ -201,6 +201,9 @@ fn every_example_is_accepted_or_names_its_milestone() {
         let out = typhoon(&["check", &rel]);
         if milestone <= CURRENT_MILESTONE {
             assert_eq!(code(&out), 0, "{rel} must check:\n{}", stderr(&out));
+        } else if code(&out) == 0 {
+            // A later milestone's feature that has already landed; the golden
+            // suite enforces its output once the milestone is raised.
         } else {
             assert_eq!(code(&out), 1, "{rel} must be rejected");
             assert!(

@@ -1,0 +1,11 @@
+# A type parameter that neither the arguments nor the expected type determine
+# must be written explicitly (DESIGN 4.4).
+# milestone: M3
+# error: cannot infer the type argument `T` of `empty`
+
+fn empty<T>() -> list<T>:
+    xs: list<T> = []
+    return xs
+
+fn main():
+    print(len(empty()))
