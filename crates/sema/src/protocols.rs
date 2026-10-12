@@ -31,8 +31,6 @@ use crate::types::{ClassId, Type, TypeId};
 /// FNV-1a's 64-bit offset basis and prime, the field / member hash mixer.
 const HASH_SEED: i64 = 0xcbf2_9ce4_8422_2325_u64 as i64;
 const HASH_PRIME: i64 = 0x0000_0100_0000_01b3;
-/// The hash of `None` in a `T | None`.
-const HASH_NONE: i64 = 0x9e37_79b9_7f4a_7c15_u64 as i64;
 
 /// Small constructors for synthesized HIR.
 fn expr(kind: hir::ExprKind, ty: TypeId, span: Span) -> hir::Expr {
@@ -259,17 +257,21 @@ impl Checker<'_> {
         }
     }
 
-    /// Whether `hash(x)` is defined on `ty`.
+    /// Whether `hash(x)` is defined on `ty`: exactly the key types of a dict
+    /// in M3 — `int`, `bool`, `str`, flat tuples of those, and a class with
+    /// `__hash__` (DESIGN §3.11). A `T | None` and a tuple holding a class
+    /// are deferred along with them as keys.
     pub(crate) fn ensure_hash(&mut self, ty: TypeId, at: Span) -> bool {
         match self.types.get(ty) {
             Type::Error | Type::Int | Type::Bool | Type::Str => true,
-            Type::Optional(inner) => self.ensure_hash(inner, at),
-            Type::Tuple(id) => {
-                let members = self.types.tuple_members(id).to_vec();
-                members.into_iter().all(|m| self.ensure_hash(m, at))
-            }
+            Type::Tuple(_) => self.types.is_hashable(ty),
             Type::Class(class) => self.proto_method(class, Builtin::Hash, at).is_some(),
-            Type::Unit | Type::Float | Type::List(_) | Type::Dict(..) | Type::Set(_) => false,
+            Type::Unit
+            | Type::Float
+            | Type::Optional(_)
+            | Type::List(_)
+            | Type::Dict(..)
+            | Type::Set(_) => false,
         }
     }
 
@@ -377,10 +379,6 @@ impl Checker<'_> {
                 let func = self.synth_fn(SynthKind::TupleHash, value.ty, span);
                 self.call_fn(func, vec![value], vec![0], span)
             }
-            Type::Optional(_) => {
-                let func = self.synth_fn(SynthKind::OptionalHash, value.ty, span);
-                self.call_fn(func, vec![value], vec![0], span)
-            }
             _ => int(0, span),
         }
     }
@@ -459,9 +457,7 @@ impl Checker<'_> {
         let name = self.types.name(ty);
         let (label, params, ret) = match kind {
             SynthKind::TupleLt => ("lt", vec![("a", ty), ("b", ty)], TypeId::BOOL),
-            SynthKind::TupleHash | SynthKind::OptionalHash => {
-                ("hash", vec![("x", ty)], TypeId::INT)
-            }
+            SynthKind::TupleHash => ("hash", vec![("x", ty)], TypeId::INT),
             SynthKind::Min => ("min", vec![("a", ty), ("b", ty)], ty),
             SynthKind::Max => ("max", vec![("a", ty), ("b", ty)], ty),
             SynthKind::KeyProbe => {
@@ -542,25 +538,6 @@ impl Checker<'_> {
                     acc = mix(acc, value);
                 }
                 vec![ret(acc)]
-            }
-            SynthKind::OptionalHash => {
-                let x = local(hir::LocalId(0), ty, span);
-                let inner = self.types.as_optional(ty).unwrap_or(TypeId::ERROR);
-                let is_none = expr(
-                    hir::ExprKind::IsNone {
-                        value: Box::new(x.clone()),
-                        negated: false,
-                    },
-                    TypeId::BOOL,
-                    span,
-                );
-                let payload = if self.types.is_tagged_optional(ty) {
-                    expr(hir::ExprKind::OptionalValue(Box::new(x)), inner, span)
-                } else {
-                    hir::Expr { ty: inner, ..x }
-                };
-                let hash = self.hash_value(payload, span);
-                vec![when(is_none, vec![ret(int(HASH_NONE, span))]), ret(hash)]
             }
             SynthKind::Min | SynthKind::Max => {
                 let a = local(hir::LocalId(0), ty, span);

@@ -1,0 +1,34 @@
+# `Hash` is exactly what a dict key or a set element needs, and in M3 a
+# `T | None` or a tuple holding a class cannot be one, so neither implements
+# `Hash` yet (DESIGN 3.10, 3.11): a `T: Hash` bound rejects them where the
+# instance is written, `hash(x)` rejects them, and a derived `Hash` rejects
+# such a field.
+# milestone: M3
+# error: the type `int | None` does not implement the trait `Hash`
+# error: the type `tuple<K, int>` does not implement the trait `Hash`
+# error: a `T | None` or a tuple holding a class cannot be a key yet
+# error: `int | None` is not hashable
+# error: `tuple<K, str>` is not hashable
+# error: cannot derive `Hash` for `Link`: the field `next` has type `Link | None`
+
+class K(Eq, Hash):
+    n: int
+
+class Link(Eq, Hash):
+    n: int
+    next: Link | None
+
+class Counter<T: Hash>:
+    counts: dict<T, int>
+
+fn count<T: Hash>(xs: list<T>) -> int:
+    s: set<T> = set()
+    for x in xs:
+        s.add(x)
+    return len(s)
+
+fn main():
+    c: Counter<int | None> = Counter(counts={})
+    print(count([(K(n=1), 2)]))
+    o: int | None = 3
+    print(hash(o), hash((K(n=1), "a")))

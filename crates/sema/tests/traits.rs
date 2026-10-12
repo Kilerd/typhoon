@@ -167,7 +167,7 @@ fn ad<T: Add>(a: T, b: T) -> T:
 
 fn main():
     o_int: int | None = 1
-    print(h(1), h(True), h(\"s\"), h((1, \"a\")), h(o_int))
+    print(h(1), h(True), h(\"s\"), h((1, \"a\")))
     print(o(1, 2), o(1.5, 2.5), o(\"a\", \"b\"), o(False, True), o((1, 2), (1, 3)))
     print(r([1]), r((1, \"a\")), r(o_int), r({\"k\": 1}))
     print(ad(1, 2), ad(1.5, 2.5), ad(\"a\", \"b\"), ad([1], [2]))
@@ -182,8 +182,14 @@ fn main():
         ("h([1])", "list<int>"),
         ("o([1], [2])", "list<int>"),
         ("ad(1 == 1, True)", "bool"),
+        // Deferred with `T | None` keys (DESIGN §3.11).
+        ("h(o_int)", "int | None"),
+        ("h((1, [2]))", "tuple<int, list<int>>"),
     ] {
-        let src = ok_src.replace("fn main():\n", &format!("fn main():\n    print({call})\n"));
+        let src = ok_src.replace(
+            "    print(o(1, 2)",
+            &format!("    print({call})\n    print(o(1, 2)"),
+        );
         rejects(
             &src,
             &[&format!("the type `{ty}` does not implement the trait")],

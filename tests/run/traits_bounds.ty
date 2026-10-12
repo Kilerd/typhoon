@@ -78,8 +78,7 @@ fn main():
     print(sum_all([Money(cents=5), Money(cents=7)], Money(cents=0)))
     print(largest([3, 9, 2]), largest(["b", "z", "a"]), largest([(1, "b"), (2, "a")]), largest([True, False]))
     print(largest([Money(cents=3), Money(cents=30), Money(cents=4)]))
-    o: int | None = 3
-    print(same_hash(5), same_hash("ab"), same_hash((1, "x")), same_hash(o))
+    print(same_hash(5), same_hash("ab"), same_hash((1, "x")), same_hash(True))
     print(describe(Dog(n="fido")))
     print((1).__eq__(1), "a".__lt__("b"), (2).__hash__() == hash(2), (2).__add__(3), (2.5).__neg__())
     print(first_or([Money(cents=1)], Money(cents=2), 0))

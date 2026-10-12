@@ -50,5 +50,5 @@ fn main():
     print(m == b, n == m, n is None, m != a)
     print([a, b] == [P(v=1), P(v=2)], [a] == [b], (a, 1) == (P(v=1), 1), P(v=1) in [b])
     print(P(v=2) in [a, b], None in maybes, b in maybes)
-    print(hash(a), hash(m), hash(n) == hash(n))
+    print(hash(a), hash(b), hash(a) == hash(P(v=1)))
     print(needle(1) in haystack())

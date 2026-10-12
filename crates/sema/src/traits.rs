@@ -212,10 +212,8 @@ pub(crate) enum SynthKind {
     Derive(Builtin),
     /// Lexicographic `<` of two tuples.
     TupleLt,
-    /// The hash of a tuple.
+    /// The hash of a flat tuple of `int`, `bool` and `str`.
     TupleHash,
-    /// The hash of a `T | None`.
-    OptionalHash,
     /// `min(a, b)` on an `Ord` type without a native minimum.
     Min,
     /// `max(a, b)` on an `Ord` type without a native maximum.
@@ -981,10 +979,15 @@ impl Checker<'_> {
                     ),
                 )
                 .with_secondary(bound.span, "bound declared here");
+                let hash = id == Builtin::Hash.id();
                 diag = match self.types.get(arg) {
                     Type::Class(class) if self.is_opaque(class) => {
                         diag.with_help(format!("add the bound: `{ty}: {trait_name}`"))
                     }
+                    Type::Optional(_) | Type::Tuple(_) if hash => diag.with_help(
+                        "`Hash` is what a dict key needs, and a `T | None` or a tuple holding \
+                         a class cannot be a key yet",
+                    ),
                     Type::Class(_) => {
                         let list = if Builtin::of_id(id).is_some_and(Builtin::requires_eq) {
                             format!("Eq, {trait_name}")
@@ -1099,8 +1102,10 @@ impl Checker<'_> {
                 builtin,
                 Eq | Ord | Repr | Add | Sub | Mul | Div | FloorDiv | Mod | Neg
             ),
+            // `Hash` only for the flat tuples a dict takes as keys in M3.
+            Type::Tuple(_) if builtin == Hash => self.types.is_hashable(ty),
             Type::Tuple(id) => {
-                matches!(builtin, Eq | Ord | Hash | Repr) && {
+                matches!(builtin, Eq | Ord | Repr) && {
                     let members = self.types.tuple_members(id).to_vec();
                     members.into_iter().all(|m| self.satisfies(m, builtin.id()))
                 }
@@ -1111,8 +1116,9 @@ impl Checker<'_> {
                 Add => true,
                 _ => false,
             },
+            // No `Hash` yet: a `T | None` key is deferred (DESIGN §3.10).
             Type::Optional(inner) => {
-                matches!(builtin, Eq | Hash | Repr) && self.satisfies(inner, builtin.id())
+                matches!(builtin, Eq | Repr) && self.satisfies(inner, builtin.id())
             }
             // No `==` on dicts and sets yet, and they are mutable.
             Type::Set(elem) => builtin == Repr && self.satisfies(elem, builtin.id()),

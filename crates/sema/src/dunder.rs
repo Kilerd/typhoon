@@ -447,6 +447,14 @@ impl Checker<'_> {
             let help = match self.types.get(value.ty) {
                 Type::Float => "`float` has no hash: NaN breaks hash consistency",
                 Type::List(_) => "a `list` is mutable and has no hash; use a tuple",
+                Type::Optional(_) => {
+                    "a `T | None` has no hash yet, like a `T | None` dict key; \
+                     narrow it first"
+                }
+                Type::Tuple(_) => {
+                    "only a tuple of `int`, `bool` and `str` has a hash yet, \
+                     like a tuple dict key"
+                }
                 _ => "a class needs `__hash__` (or to declare `Eq` and `Hash`)",
             };
             self.error(
