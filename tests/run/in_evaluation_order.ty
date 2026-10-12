@@ -1,0 +1,45 @@
+# `x in y` evaluates `x` before `y`, as Python does, for every haystack: a
+# list, a str, a dict and a set, with `in` and `not in`, alone and as a link
+# of a comparison chain (DESIGN 3.6).
+# milestone: M3
+# expect: True ["n1", "list"]
+# expect: True ["n2", "str"]
+# expect: False ["n3", "dict"]
+# expect: True ["n4", "set"]
+# expect: True ["n0", "n5", "list"]
+
+fn n(log: list<str>, v: int) -> int:
+    log.append(f"n{v}")
+    return v
+
+fn word(log: list<str>, v: str) -> str:
+    log.append("n2")
+    return v
+
+fn h_list(log: list<str>) -> list<int>:
+    log.append("list")
+    return [1, 5]
+
+fn h_str(log: list<str>) -> str:
+    log.append("str")
+    return "abc"
+
+fn h_dict(log: list<str>) -> dict<int, str>:
+    log.append("dict")
+    return {3: "x"}
+
+fn h_set(log: list<str>) -> set<int>:
+    log.append("set")
+    return {4}
+
+fn main():
+    a: list<str> = []
+    print(n(a, 1) in h_list(a), a)
+    b: list<str> = []
+    print(word(b, "b") in h_str(b), b)
+    c: list<str> = []
+    print(n(c, 3) not in h_dict(c), c)
+    d: list<str> = []
+    print(n(d, 4) in h_set(d), d)
+    e: list<str> = []
+    print(n(e, 0) < n(e, 5) in h_list(e), e)

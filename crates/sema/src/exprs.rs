@@ -795,6 +795,54 @@ impl Checker<'_> {
         op_span: Span,
         span: Span,
     ) -> hir::Expr {
+        let test = self.check_in_operands(left, right, negated, op_span, span);
+        self.needle_first(test)
+    }
+
+    /// Makes a membership test evaluate its needle before its haystack, as
+    /// Python does. The checker needs the haystack first (its element type is
+    /// the needle's expected type), so when both operands may have an effect
+    /// the needle is run first, into a hidden temporary.
+    fn needle_first(&mut self, mut test: hir::Expr) -> hir::Expr {
+        let (haystack, needle) = match &mut test.kind {
+            hir::ExprKind::Contains {
+                haystack, needle, ..
+            } => (haystack, needle),
+            hir::ExprKind::HashContains { table, key, .. } => (table, key),
+            _ => return test,
+        };
+        if is_effect_free(haystack) || is_effect_free(needle) {
+            return test;
+        }
+        let (ty, span) = (needle.ty, needle.span);
+        let temp = self.declare_hidden("needle", ty, span);
+        let read = hir::Expr {
+            kind: hir::ExprKind::Local(temp),
+            ty,
+            span,
+        };
+        let value = std::mem::replace(&mut **needle, read);
+        let span = test.span;
+        hir::Expr {
+            kind: hir::ExprKind::Seq {
+                stmts: hir::Block {
+                    stmts: vec![hir::Stmt::Assign { local: temp, value }],
+                },
+                value: Box::new(test),
+            },
+            ty: TypeId::BOOL,
+            span,
+        }
+    }
+
+    fn check_in_operands(
+        &mut self,
+        left: &ast::Expr,
+        right: &ast::Expr,
+        negated: bool,
+        op_span: Span,
+        span: Span,
+    ) -> hir::Expr {
         let haystack = self.check_expr(right);
         match self.types.get(haystack.ty) {
             crate::types::Type::Error => {
@@ -2248,6 +2296,24 @@ impl Checker<'_> {
 
 /// Whether `ty` is one of the four scalars `print` and f-strings render
 /// directly.
+/// Whether evaluating `expr` can have no effect, so that when it runs
+/// relative to its neighbours does not matter.
+fn is_effect_free(expr: &hir::Expr) -> bool {
+    match &expr.kind {
+        hir::ExprKind::OptionalValue(inner) => matches!(inner.kind, hir::ExprKind::Local(_)),
+        kind => matches!(
+            kind,
+            hir::ExprKind::Local(_)
+                | hir::ExprKind::Int(_)
+                | hir::ExprKind::Float(_)
+                | hir::ExprKind::Bool(_)
+                | hir::ExprKind::Str(_)
+                | hir::ExprKind::Unit
+                | hir::ExprKind::NoneRef
+        ),
+    }
+}
+
 fn is_scalar(ty: TypeId) -> bool {
     matches!(ty, TypeId::INT | TypeId::FLOAT | TypeId::BOOL | TypeId::STR)
 }
