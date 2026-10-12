@@ -10,6 +10,7 @@ use typhoon_diag::{Diagnostic, Span};
 
 use crate::check::{Checker, a_type};
 use crate::hir;
+use crate::traits::Builtin;
 use crate::types::{ClassId, Type, TypeId};
 
 /// The result of matching the arguments of a call against a signature.
@@ -678,6 +679,9 @@ impl Checker<'_> {
             }
             crate::types::Type::List(_) | crate::types::Type::Tuple(_) if !ordered => {
                 if !self.ensure_eq(lhs.ty, entry.op_span) {
+                    if self.derive_failed_in(lhs.ty, &[Builtin::Eq]) {
+                        return self.error_expr(span);
+                    }
                     let name = self.types.name(lhs.ty);
                     self.error(
                         Diagnostic::error(format!("`{name}` values cannot be compared"))
@@ -939,6 +943,9 @@ impl Checker<'_> {
                 // Any element with `==` (DESIGN §3.11): a class through its
                 // `__eq__`.
                 if !self.ensure_eq(elem, op_span) {
+                    if self.derive_failed_in(elem, &[Builtin::Eq]) {
+                        return self.error_expr(span);
+                    }
                     let name = self.types.name(haystack.ty);
                     self.error(
                         Diagnostic::error(format!("`in` is not defined for `{name}`"))
@@ -2109,6 +2116,9 @@ impl Checker<'_> {
                         if let Some(call) = self.ordered_min_max(builtin == "max", lhs, rhs, span) {
                             return call;
                         }
+                        if self.derive_failed_in(other, &[Builtin::Ord, Builtin::Eq]) {
+                            return self.error_expr(span);
+                        }
                         let found = self.types.name(other);
                         self.error(
                             Diagnostic::error(format!(
@@ -2233,6 +2243,7 @@ impl Checker<'_> {
                     // A container is its `repr`, what `print` writes for it
                     // (DESIGN §3.11, §4.6): `str([1, "a"])` is `[1, "a"]`.
                     ty if self.ensure_repr(ty, span) => self.repr_value(value, span),
+                    ty if self.derive_failed_in(ty, &[Builtin::Repr]) => self.error_expr(span),
                     _ => {
                         let found = self.types.name(value.ty);
                         self.error(
@@ -2264,12 +2275,7 @@ impl Checker<'_> {
     /// Reports `print(x)` where `x` is, or contains, a class instance.
     fn not_printable(&mut self, value: &hir::Expr) {
         // A failed derivation of `Repr` was already reported (DESIGN §3.11).
-        if let Some(class) = self.types.class_of(value.ty)
-            && self
-                .traits
-                .derive_failed
-                .contains(&(class, crate::traits::Builtin::Repr))
-        {
+        if self.derive_failed_in(value.ty, &[Builtin::Repr]) {
             return;
         }
         let found = self.types.name(value.ty);
@@ -2332,6 +2338,9 @@ impl Checker<'_> {
                     // A container (or a `T | None` of one) renders exactly as
                     // `print` writes it, through `repr` (DESIGN §3.11, §4.6).
                     let container = !scalar && self.ensure_repr(value.ty, value.span);
+                    if !scalar && !container && self.derive_failed_in(value.ty, &[Builtin::Repr]) {
+                        continue;
+                    }
                     if !scalar && !container {
                         let found = self.types.name(value.ty);
                         self.error(

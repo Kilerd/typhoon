@@ -916,6 +916,29 @@ impl Checker<'_> {
             .is_some_and(|list| list.iter().any(|(t, _)| *t == builtin.id()))
     }
 
+    /// Whether `ty` holds a class whose derivation of one of `builtins` failed:
+    /// that was reported, so an operation needing the missing method adds no
+    /// second error (DESIGN §3.11).
+    pub(crate) fn derive_failed_in(&self, ty: TypeId, builtins: &[Builtin]) -> bool {
+        match self.types.get(ty) {
+            Type::Class(class) => builtins
+                .iter()
+                .any(|b| self.traits.derive_failed.contains(&(class, *b))),
+            Type::List(elem) | Type::Set(elem) | Type::Optional(elem) => {
+                self.derive_failed_in(elem, builtins)
+            }
+            Type::Dict(key, value) => {
+                self.derive_failed_in(key, builtins) || self.derive_failed_in(value, builtins)
+            }
+            Type::Tuple(id) => self
+                .types
+                .tuple_members(id)
+                .iter()
+                .any(|m| self.derive_failed_in(*m, builtins)),
+            _ => false,
+        }
+    }
+
     // -- bounds -------------------------------------------------------------
 
     /// Checks that every bound of a type parameter names a trait.

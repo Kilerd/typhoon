@@ -153,11 +153,13 @@ impl Checker<'_> {
     fn cannot_compare(&mut self, ty: TypeId, op: ast::CmpOp, op_span: Span) {
         let name = self.types.name(ty);
         let equality = matches!(op, ast::CmpOp::Eq | ast::CmpOp::Ne);
-        if let Type::Class(class) = self.types.get(ty) {
-            let builtin = if equality { Builtin::Eq } else { Builtin::Ord };
-            if self.traits.derive_failed.contains(&(class, builtin)) {
-                return;
-            }
+        let builtins: &[Builtin] = if equality {
+            &[Builtin::Eq]
+        } else {
+            &[Builtin::Ord, Builtin::Eq]
+        };
+        if self.derive_failed_in(ty, builtins) {
+            return;
         }
         let mut diag = Diagnostic::error(format!(
             "`{name}` values cannot be compared with `{}`",
@@ -425,6 +427,9 @@ impl Checker<'_> {
             return self.error_expr(span);
         }
         if !self.ensure_repr(value.ty, value.span) {
+            if self.derive_failed_in(value.ty, &[Builtin::Repr]) {
+                return self.error_expr(span);
+            }
             let found = self.types.name(value.ty);
             self.error(
                 Diagnostic::error(format!("`repr` is not defined for `{found}`"))
@@ -443,6 +448,9 @@ impl Checker<'_> {
             return self.error_expr(span);
         }
         if !self.ensure_hash(value.ty, value.span) {
+            if self.derive_failed_in(value.ty, &[Builtin::Hash]) {
+                return self.error_expr(span);
+            }
             let found = self.types.name(value.ty);
             let help = match self.types.get(value.ty) {
                 Type::Float => "`float` has no hash: NaN breaks hash consistency",

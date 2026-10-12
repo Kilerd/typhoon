@@ -82,6 +82,9 @@ impl Checker<'_> {
         if ty == TypeId::ERROR || self.is_key_type(ty) {
             return true;
         }
+        if self.derive_failed_in(ty, &[Builtin::Hash, Builtin::Eq]) {
+            return false;
+        }
         let name = self.types.name(ty);
         let what = if container == "set" {
             "a set element"
@@ -789,6 +792,9 @@ impl Checker<'_> {
             if self.ensure_ord(elem, value.span) {
                 let func = self.synth_fn(SynthKind::Sort, elem, span);
                 return self.call_fn(func, vec![value], vec![0], span);
+            }
+            if self.derive_failed_in(elem, &[Builtin::Ord, Builtin::Eq]) {
+                return self.error_expr(span);
             }
             let name = self.types.name(elem);
             self.error(

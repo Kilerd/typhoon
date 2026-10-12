@@ -1,0 +1,25 @@
+# A derivation that fails for a generic instance is reported once per trait
+# (DESIGN 3.11); the operations that needed the missing method — `hash`,
+# `repr`, `str`, f-strings, `print`, `==`, `<`, `in`, `sorted`, `min`, `max`
+# and using the class as a key — add no error of their own.
+# milestone: M3
+# error: cannot derive `Hash` for `Box<Q>`
+# error: cannot derive `Repr` for `Box<Q>`
+# error: cannot derive `Eq` for `Box<Q>`
+# error: cannot derive `Ord` for `Box<Q>`
+# errors: 4
+
+class Q:
+    x: int
+
+class Box<T>(Eq, Ord, Hash, Repr):
+    item: T
+
+fn main():
+    a = Box(item=Q(x=1))
+    print(hash(a))
+    print(repr(a), str(a), f"{a}", [a])
+    print(a == a, a < a, a <= a, a > a, [a] == [a])
+    print(sorted([a]), min(a, a), max(a, a), a in [a])
+    s = {a}
+    print(sorted([(a, 1)]), len(s))

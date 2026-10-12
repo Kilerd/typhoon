@@ -12,6 +12,7 @@
 //! |---|---|
 //! | `# expect: <line>` | one expected line of stdout, in order |
 //! | `# error: <substring>` | a substring the rendered diagnostics must contain |
+//! | `# errors: <n>` | exactly how many errors a `tests/fail/` file reports |
 //! | `# milestone: M0` | the milestone this file starts being enforced at |
 //! | `# exit: <code>` | the expected exit status, `0` when absent |
 //! | `# stderr: <substring>` | a substring the program's stderr must contain |
@@ -89,6 +90,9 @@ struct Directives {
     expect: Vec<String>,
     /// Substrings every rendered diagnostic set must contain.
     errors: Vec<String>,
+    /// How many errors the file must report, when it pins the number — so
+    /// that a cascade of follow-up errors cannot creep back in.
+    error_count: Option<usize>,
     /// The expected exit status; `None` means `0`.
     exit: Option<i32>,
     /// Substrings the program's stderr must contain.
@@ -148,6 +152,10 @@ fn parse_directives(source: &str) -> Directives {
             directives.expect.push(v.to_string());
         } else if let Some(v) = directive(line, "error") {
             directives.errors.push(v.to_string());
+        } else if let Some(v) = directive(line, "errors") {
+            directives.error_count = Some(v.trim().parse().unwrap_or_else(|_| {
+                panic!("`# errors: {v}` is not a number");
+            }));
         } else if let Some(v) = directive(line, "exit") {
             directives.exit = Some(v.trim().parse().unwrap_or_else(|_| {
                 panic!("`# exit: {v}` is not a number");
@@ -338,13 +346,22 @@ fn fail_case(case: &Case) -> Result<(), Failed> {
                 .iter()
                 .filter(|e| !rendered.contains(e.as_str()))
                 .collect();
-            if missing.is_empty() {
-                Ok(())
-            } else {
-                Err(Failed::from(format!(
+            if !missing.is_empty() {
+                return Err(Failed::from(format!(
                     "{}: diagnostics are missing {:?}\nrendered diagnostics:\n{rendered}",
                     case.name, missing
-                )))
+                )));
+            }
+            let count = diagnostics
+                .iter()
+                .filter(|d| d.starts_with("error"))
+                .count();
+            match case.directives.error_count {
+                Some(want) if want != count => Err(Failed::from(format!(
+                    "{}: expected {want} errors, got {count}\nrendered diagnostics:\n{rendered}",
+                    case.name
+                ))),
+                _ => Ok(()),
             }
         }
         Err(other) => Err(Failed::from(format!(
@@ -431,6 +448,7 @@ fn directive_parser_check() -> Result<(), Failed> {
 # expect: 1
 # expect:
 # error: mismatched types
+# errors: 2
 # exit: 101
 # stderr: panic: integer division by zero
 # wasm: skip needs a collector
@@ -454,6 +472,9 @@ fn main():
     }
     if parsed.errors != ["mismatched types"] {
         problems.push(format!("errors parsed as {:?}", parsed.errors));
+    }
+    if parsed.error_count != Some(2) {
+        problems.push(format!("errors count parsed as {:?}", parsed.error_count));
     }
     if parsed.exit != Some(101) || parsed.exit() != 101 {
         problems.push(format!("exit parsed as {:?}, want 101", parsed.exit));
