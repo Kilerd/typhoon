@@ -32,8 +32,11 @@
 //! * generic functions and classes are monomorphized: every instance is
 //!   checked with its type arguments substituted, and lowered to ordinary
 //!   functions and classes (DESIGN §3.9, §4.5);
-//! * features that parse but belong to a later milestone (dicts, sets) are
-//!   rejected with one diagnostic each.
+//! * a dict key or a set element is hashable (`int`, `bool`, `str`, or a flat
+//!   tuple of those), and `{}` / `set()` get their types from the context,
+//!   like `[]` (DESIGN §3.10, §4.1);
+//! * features that parse but belong to a later milestone are rejected with
+//!   one diagnostic each.
 
 #![warn(missing_docs)]
 

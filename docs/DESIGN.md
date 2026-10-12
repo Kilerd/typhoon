@@ -354,11 +354,15 @@ fn main():
         print(r)        # here `r` is narrowed to int
 ```
 
-**M3 已落地的三项语义。**
+**M3 已落地的语义。**
 
 - **`T | None`**：任何 `T` 都可以写成 `T | None`（`T | None | None` 即 `T | None`），除此之外的联合类型一律报错。表示不装箱：引用类型（`str`、`list<T>`、class）用空指针表示 `None`，与 `T` 同一布局；值类型（`int`、`float`、`bool`、tuple）是按值传递的 `{ tag: i8, T }` 对（wasm 上展开为标签加载荷的局部变量）。`T` 隐式加宽为 `T | None`，`None` 可赋给 `T | None`；收窄规则沿用 3.8 节（`if` 内与早返回形式，`and` / `or` 与循环不泄漏，重新赋值即丢弃），推导式的 `if` 子句同样收窄其后的子句与元素。未收窄就当 `T` 用是编译错误；`x == None` 报错并提示改用 `is None`；`T | None` 与 `T` 之间的 `==` 会先加宽 `T`。`print` / f-string 打印值或 `None`。
 - **比较链**：`a < b < c` 即 `a < b and b < c`，但中间操作数只求值一次（必要时存入隐藏临时变量），从左到右短路；每一环按单个比较的规则检查（`==` `!=` `<` `<=` `>` `>=` `is` `is not` `in` `not in`），整条链不收窄。`a < b > (c)` 仍按 3.9 节第 3 条读作泛型调用。
 - **列表推导式**：`[expr for x in it if cond ...]`，`for` / `if` 子句任意多个，可迭代对象与 `for` 语句相同（`range(...)`、`list<T>`、`str`）。推导式变量的作用域限于推导式本身（Python 3 语义）：与外层变量或常量同名时只在推导式内部遮蔽它，外层绑定的值不受影响，推导式结束后名字恢复指向外层变量——这是 3.4 节「不允许遮蔽」唯一的例外，因为推导式变量不会泄漏到函数作用域。降低为普通的循环加 `append`；只有一个 `for` 子句、没有 `if`，且遍历 list、str 或步长为字面量的 `range` 时，结果按最终长度一次分配。
+- **`dict<K, V>` 与 `set<T>`**：key（以及 set 的元素）只能是 `int`、`bool`、`str` 或由它们组成的扁平 tuple；class 作 key 需要 3.11 的 `Hash` / `Eq`，`float` 不实现 `Hash`，两者在 M3 都报错。迭代顺序就是插入顺序（CPython 3.7+ 的紧凑 dict），两个后端逐字节一致：覆盖已有 key 保留原位置，删除后再插入排到末尾。`{}` 是空 dict、`set()` 是空 set，两者都需要期望类型（与 `[]` 相同）；`dict()` 等同 `{}`。`d[k]` 缺 key 时 panic（`key not found: <key 的 repr>`），`k in d`、`len`、`d.get(k, default)`、`d.pop(k)` / `d.pop(k, default)`、`keys()` / `values()` / `items()`（返回新的 `list`）；`d.get(k)` 即 `d.get(k, None)`，默认值只能放进 `V | None` 时结果类型为 `V | None`，需要收窄。`set` 有 `add` / `remove`（缺失 panic）/ `discard`。`for k in d`、`for x in s` 与 `sorted(d)` 遍历 key 的快照，循环体内修改容器是良定义的。`print` 输出 `{"a": 1}`、`{1, 2}`，空 set 输出 `set()`。`==` 与 f-string 插值暂不支持（与 list 一致，等 `Eq` / `Repr`）。**与 Python 的已知差异**：`d[k] = v` 先求值 `d`、`k` 再求值 `v`（与 `xs[i] = v` 相同），Python 是先求值 `v`。
+- **dict / set 推导式**：`{k: v for x in it if cond ...}` 与 `{e for x in it ...}`，子句、作用域与遮蔽规则与列表推导式完全相同；元素 / key 必须满足上面的 key 规则，dict 推导式先求值 key 再求值 value，重复的 key 保留最后一个 value。所有推导式与 `for` 语句一样可以遍历 dict（key）与 set。
+- **`sorted(xs)`**：返回新 list，稳定排序；元素为 `int`、`float`、`bool`、`str` 或它们的扁平 tuple（按成员逐个比较），也接受 set 与 dict（排序其 key）。`float` 按 `<` 排序，NaN 排在最后。
+- **`str` 切片 `s[a:b]`**：见第 9 节第 5 条。
 
 ### 3.11 trait 与运算符重载（M3，2026-10-12 决定）
 
@@ -433,8 +437,8 @@ fn main():
 | `u8` `u16` `u32` `u64` | 定宽无符号整数 | 同上 |
 | `f32` `f64` | 定宽浮点 | `float` 即 `f64` 的别名 |
 | `list<T>` | 动态数组 | 引用类型，连续存储 |
-| `dict<K, V>` | 哈希表 | 引用类型，目标为 swiss-table 布局 |
-| `set<T>` | 哈希集合 | 引用类型 |
+| `dict<K, V>` | 哈希表 | 引用类型，插入有序的紧凑哈希表（runtime 的 `dict.rs`，见 3.10） |
+| `set<T>` | 哈希集合 | 引用类型，同一张表，value 为零字节 |
 | `tuple<A, B, ...>` | 定长异构元组 | **值类型**，按字段展开 |
 | `None` | unit | 唯一值 `None`，零大小 |
 
@@ -479,7 +483,7 @@ fn main():
 
 MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换、`sorted`、`abs`、`min`、`max`、`str`。
 
-容器方法（MVP）：`list` 有 `append` / `pop` / `insert` / `clear`；`str` 有 `upper` / `lower` / `split(sep)` / `join(parts)` / `strip`（`str` 不可变，方法一律返回新串）；`dict` 有 `keys` / `values` / `items` / `get`；`set` 有 `add` / `remove`。
+容器方法（MVP）：`list` 有 `append` / `pop` / `insert` / `clear`；`str` 有 `upper` / `lower` / `split(sep)` / `join(parts)` / `strip`（`str` 不可变，方法一律返回新串）；`dict` 有 `keys` / `values` / `items` / `get` / `pop`；`set` 有 `add` / `remove` / `discard`。
 
 `print` 的输出格式（golden test 依赖它，必须稳定）：
 
@@ -490,7 +494,7 @@ MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换
 | `bool` | `True` / `False` |
 | `str` | 原文，不加引号 |
 | `None` | `None` |
-| 容器 | 类 Python 的 repr：`[1, 2]`、`{"a": 1}`、`(1, "a")`，`str` 元素带引号 |
+| 容器 | 类 Python 的 repr：`[1, 2]`、`{"a": 1}`、`{1, 2}`（空 set 为 `set()`）、`(1, "a")`，`str` 元素带引号；dict / set 按插入顺序输出 |
 
 `print` 接受多个实参时以单个空格分隔，末尾换行。
 
@@ -651,7 +655,7 @@ fn main():
 2. **异常 vs Result**：`try/except/raise` 是 Python 观感的核心，但零成本异常实现复杂、且与「错误必须显式处理」的静态语言直觉冲突。可能的折中：底层用 `Result` + `?` 风格传播，语法层保留 `raise`/`except` 皮肤。**M4 前必须决定。**
 3. **并发模型**：goroutine + channel（需要可增长栈、调度器，与保守 GC 冲突）？async/await（需要状态机变换与运行时）？还是只提供 OS 线程 + 通道？该选择直接约束 GC 与栈设计，**必须与 M5 的 GC 决策一起做**。
 4. ~~**运算符重载**~~ **已决定（2026-10-12）**：允许，dunder 方法、静态分派，见 3.11。反射运算符（`__radd__`）尚未决定。
-5. **`str` 的索引语义**：`s[i]` 是字节、码点还是字素簇？Rust 选择禁止整数索引，Go 返回字节，Python 返回码点。UTF-8 存储下按码点索引是 O(n)，与性能目标冲突。倾向禁止整数索引、只提供切片与迭代器，但未定。**M2 未提供 `s[i]`**：写出来会报错并提示改用迭代或 `find` / `split`，等本条决定后再补。
+5. **`str` 的索引语义**（**部分决定，M3**）：`s[i]` 是字节、码点还是字素簇？Rust 选择禁止整数索引，Go 返回字节，Python 返回码点。UTF-8 存储下按码点索引是 O(n)，与性能目标冲突。倾向禁止整数索引、只提供切片与迭代器。**已决定的部分——切片 `s[a:b]`**：偏移以**码点**为单位，与 `len(s)`、`s.find(sub)` 的单位一致（`s[s.find(x):]` 即字面意思）；沿用 Python 语义：负偏移从末尾数，越界偏移截断到 `[0, len]` 而不是报错，省略的界即开头 / 结尾，空区间得到空串；不支持步长（`s[a:b:c]` 报错），list 切片暂不支持。码点偏移天然落在 UTF-8 边界上，不会切开字符。代价：纯 ASCII 串（`byte_len == char_len`）是 O(b − a) 的拷贝，非 ASCII 串需要一次 O(n) 扫描；单个 ASCII 字符的切片取自 runtime 的静态表，整串切片返回原串，两者都不分配。**仍未决定**：`s[i]` 本身——M3 依旧报错并提示改用迭代、切片或 `find` / `split`。
 6. **debug 模式整数溢出 trap**：release 回绕已定；debug 下是否插入溢出检查并 panic（Rust 模型）？
 7. **`match` / `case`**：是否引入模式匹配，以及是否与 `T | None`、未来的 enum/sum type 统一设计。
 8. **Python 互操作**：是否永远不做？还是将来提供一个「用 CPython 作为外部进程/嵌入解释器」的桥接层，以便复用 numpy 之类的生态？目前立场是不做，但这是最容易被市场压力推翻的一条。
