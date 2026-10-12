@@ -1,0 +1,42 @@
+# List comprehensions and comparison chains inside generic code
+# (DESIGN 3.6, 3.9, 3.10): every instance gets its own monomorphic loop and
+# comparisons, so `T` may be `int`, `float` or `str`.
+# milestone: M3
+# expect: [8, 10] ["abab"] [3.0]
+# expect: [2, 4] [0.5]
+# expect: True False False
+# expect: True True False
+# expect: [2, 3] ["b"]
+# expect: 2
+
+fn double<T>(x: T) -> T:
+    return x + x
+
+# `[f(x) for x in xs]` where `f` is itself generic.
+fn map_double<T>(xs: list<T>) -> list<T>:
+    return [double(x) for x in xs]
+
+fn halves<T>(xs: list<T>, zero: T) -> list<T>:
+    return [x for x in xs if x > zero]
+
+fn between<T>(lo: T, x: T, hi: T) -> bool:
+    return lo <= x < hi
+
+fn inside<T>(xs: list<T>, lo: T, hi: T) -> list<T>:
+    return [x for x in xs if lo < x <= hi]
+
+class Range<T>:
+    lo: T
+    hi: T
+
+    fn count(self, xs: list<T>) -> int:
+        return len([x for x in xs if self.lo <= x < self.hi])
+
+fn main():
+    print(map_double([4, 5]), map_double(["ab"]), map_double([1.5]))
+    print(halves([-1, 2, 4], 0), halves([0.5, -0.5], 0.0))
+    print(between(1, 2, 3), between(1, 3, 3), between(0.5, 0.25, 1.0))
+    print(between(1.0, 1.0, 2.0), between("a", "b", "c"), between("b", "a", "c"))
+    print(inside([1, 2, 3, 4], 1, 3), inside(["a", "b", "c"], "a", "b"))
+    r = Range(lo=1.5, hi=3.0)
+    print(r.count([1.0, 1.5, 2.9, 3.0]))

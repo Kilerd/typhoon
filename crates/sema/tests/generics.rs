@@ -243,6 +243,38 @@ fn an_optional_parameter_binds_the_class() {
 }
 
 #[test]
+fn an_optional_parameter_binds_any_type() {
+    // DESIGN 3.10: every `T` may be optional, so `T` is inferred through
+    // `T | None` from an `int | None`, a `str` or a `list<float | None>`.
+    let src = "fn or_else<T>(x: T | None, fallback: T) -> T:\n    if x is None:\n        return fallback\n    return x\n\n\
+               fn present<T>(xs: list<T | None>) -> list<T>:\n    return [x for x in xs if x is not None]\n\n\
+               fn main():\n    n: int | None = None\n    fs: list<float | None> = [1.5, None]\n    print(or_else(n, 1), or_else(\"s\", \"t\"), present(fs))\n";
+    let dump = ok(src);
+    for signature in [
+        "fn or_else<int>(x: int | None, fallback: int) -> int",
+        "fn or_else<str>(x: str | None, fallback: str) -> str",
+        "fn present<float>(xs: list<float | None>) -> list<float>",
+    ] {
+        assert!(dump.contains(signature), "{signature} missing:\n{dump}");
+    }
+    // An explicit instantiation may name an optional type argument ...
+    let dump = ok("fn keep<T>(x: T) -> T:\n    return x\n\n\
+                   fn main():\n    print(keep<int | None>(None) is None)\n");
+    assert!(
+        dump.contains("fn keep<int | None>(x: int | None) -> int | None"),
+        "{dump}"
+    );
+    // ... and the instance is checked like any other: no ordering of `None`.
+    rejects(
+        &format!("{MAX}fn main():\n    print(max<int | None>(None, 1))\n"),
+        &[
+            "`int | None` may be `None` here",
+            "in instantiation of `max<int | None>`",
+        ],
+    );
+}
+
+#[test]
 fn defaults_of_generic_functions_are_filled_in() {
     let src = "fn repeat<T>(value: T, times: int = 2) -> list<T>:\n    out: list<T> = []\n    for i in range(times):\n        out.append(value)\n    return out\n\n\
                fn main():\n    print(repeat(\"a\"))\n    print(repeat(1, times=3))\n";
