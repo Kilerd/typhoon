@@ -283,7 +283,7 @@ fn main():
 
 - 构造器**只接受关键字实参**，顺序无关，缺一不可（有默认值的字段可省略）。
 - 字段可以带默认值：`count: int = 0`。
-- MVP **没有继承**；`class B(A):` 直接报错 `inheritance is not supported`。`traits` / `protocols` 是开放问题（第 9 节）。
+- **没有继承**（M3 起为既定决定）；`class C(T1, T2):` 括号里只能写 trait（见 3.11），写类名直接报错 `inheritance is not supported`。
 - 没有 `__init__` 自定义钩子（MVP）；需要校验逻辑时写工厂函数 `fn make_point(...) -> Point:`。
 - 实例是引用类型，分配在 GC 堆上；字段全是标量时用 `ty_alloc_atomic` 分配，GC 不扫描该块。
 
@@ -325,7 +325,7 @@ fn main():
 4. **词法与嵌套**：词法器照常产出 `>>`、`>=`、`>>=` 这些复合 token；parser 在关闭嵌套的类型实参列表（如 `dict<str, list<int>>`）时把 `>>` 拆成两个 `>`。这是 C++ / Java / Rust 解析器的标准做法，也是坚持手写 parser 的又一个理由。
 
 - 类型实参可由实参推断，也可显式写 `f<int>(...)`。
-- MVP **没有约束语法**（`T: Comparable`）：对 `T` 使用了某个运算符时，在单态化后检查该具体类型是否支持；错误信息里附带实例化栈。约束语法与 traits 一并在开放问题里。
+- MVP **没有约束语法**（`T: Comparable`）：对 `T` 使用了某个运算符时，在单态化后检查该具体类型是否支持；错误信息里附带实例化栈。这一模板语义在 M3 引入约束语法（`fn f<T: Ord>`，见 3.11）后仍保留给未加约束的 `T`。
 
 ### 3.10 分阶段引入的语法
 
@@ -353,6 +353,63 @@ fn main():
     else:
         print(r)        # here `r` is narrowed to int
 ```
+
+### 3.11 trait 与运算符重载（M3，2026-10-12 决定）
+
+类型抽象采用**名义 trait**：一个类型满足某个 trait，当且仅当它显式声明了这一点，「恰好有同名方法」不算。**不引入继承。** 运算符重载通过 dunder 方法实现，**静态分派**。语法参照 Mojo（同为 Python 风味、名义 trait 的高性能语言）。
+
+```python
+trait Shape:
+    fn area(self) -> float                # required: no body
+    fn describe(self) -> str:             # default implementation, may be overridden
+        return f"area {self.area()}"
+
+class Circle(Shape):                      # the parentheses list traits, never a base class
+    r: float
+
+    fn area(self) -> float:
+        return 3.14159 * self.r * self.r
+
+fn total_area<T: Shape>(xs: list<T>) -> float:
+    s = 0.0
+    for x in xs:
+        s = s + x.area()
+    return s
+
+class Point(Eq, Hash, Repr):              # declared but not defined -> derived field-wise
+    x: int
+    y: int
+
+fn main():
+    print(total_area([Circle(r=1.0), Circle(r=2.0)]))
+    seen: set<Point> = set()
+    seen.add(Point(x=1, y=2))
+    print(Point(x=1, y=2) in seen)        # True
+    print(Point(x=1, y=2))                # Point(x=1, y=2)
+```
+
+**trait 与实现**
+
+1. `trait Name:` 声明一组方法签名：没有方法体的是必需方法，有方法体的是默认实现（类里可以覆盖）。签名里用 `Self` 指代实现类型，如 `fn __eq__(self, other: Self) -> bool`。trait 没有字段。
+2. `class C(T1, T2):` 声明 `C` 实现 `T1`、`T2`；泛型类写作 `class Stack<T>(Sized):`。编译器检查每个必需方法都已定义且签名一致，缺失或不匹配时报错并指出是哪个 trait 的哪个方法。括号里写类名报 `inheritance is not supported`。
+3. **泛型约束**：`fn f<T: Shape>(...)`，多个约束写 `T: Eq + Hash`。被约束的 `T` 在**定义处**按约束检查（只能用约束提供的方法与运算符），调用处检查类型实参是否声明了这些 trait。**未加约束的 `T` 保持模板语义**（单态化之后再检查，见 3.9），已有泛型代码不受影响。两种写法都单态化，零运行时开销。
+4. **只有静态分派**：trait 只能用作泛型约束，不能作为值的类型（不能写 `list<Shape>` 装异构对象）。带虚表的 trait 对象等出现真实需求时再设计。
+5. **M3 不做**：给已有类型补实现（`impl Shape for int` 式的 retroactive impl）、用户 trait 之间的继承（supertrait）、关联类型、泛型 trait（`trait Into<T>`）。
+
+**运算符与内建 trait**
+
+| 内建 trait | 方法 | 启用的语法与能力 |
+|---|---|---|
+| `Eq` | `__eq__(self, other: Self) -> bool` | `==`、`!=`（`!=` 恒为 `__eq__` 取反，不能单独重载）、`list` 的 `in` |
+| `Ord` | `__lt__(self, other: Self) -> bool`，要求同时声明 `Eq` | `<`；`a > b` 即 `b < a`，`a <= b` 即 `not (b < a)`，`a >= b` 即 `not (a < b)`；`sorted`、`min`、`max` |
+| `Hash` | `__hash__(self) -> int`，要求同时声明 `Eq` | 作为 `dict` 的 key、`set` 的元素 |
+| `Repr` | `__repr__(self) -> str` | `print(obj)`、f-string `{obj}`、在容器里显示 |
+| `Add` `Sub` `Mul` `Div` `Mod` `Neg` | `__add__(self, other: Self) -> Self` 等 | 泛型代码里的 `+ - * / % -x` |
+
+- **在具体类型上，运算符只看 dunder 方法是否存在**：`a + b`（`a` 是用户类）直接编译成对 `__add__` 的调用，参数类型按方法签名检查，所以 `fn __mul__(self, k: float) -> Vec` 可以支持 `v * 2.0`。trait 只在泛型约束（以及 `dict` key 等内建能力）里起作用。M3 不支持反射运算符（`__radd__`，即 `2.0 * v`）。
+- **派生**：类在括号里声明了 `Eq` / `Ord` / `Hash` / `Repr` 却没写对应方法时，编译器按字段逐个生成实现，要求每个字段的类型都满足该 trait：`Eq` 逐字段比较；`Ord` 按字段声明顺序做字典序比较；`Hash` 组合各字段哈希；`Repr` 输出 dataclass 风格的 `Point(x=1, y=2)`。不声明就没有默认实现——这正是 M2 拒绝给 `print(obj)` / `obj == obj` 一个隐式默认值的原因，现在改为显式选择加入。
+- **内建类型的实现**：`int` / `bool` / `str` 实现 `Eq`、`Ord`、`Hash`、`Repr`；`float` 实现 `Eq`、`Ord`、`Repr`，不实现 `Hash`（NaN 无法满足哈希一致性）；`tuple` 在所有元素都满足时实现对应 trait；`list` 在元素满足时实现 `Eq`、`Repr`（可变，不实现 `Hash`）；`dict` / `set` 在元素满足时实现 `Eq`、`Repr`；`T | None` 在 `T` 满足时实现 `Eq`、`Hash`、`Repr`。
+- `is` 仍然比较身份，与 `Eq` 无关；没有 `__eq__` 的类写 `==` 仍然报错并提示用 `is`。
 
 ---
 
@@ -571,7 +628,7 @@ fn main():
 | M1 数值核心 | lexer/parser、`fn`、`int`/`float`/`bool`、运算符、`if`/`while`/`for range`、递归、`print`、类型检查 | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go |
 | M2 数据 | `class`、`str`、`list<T>`、`tuple`、`for-in`、Boehm 接入 | binary-trees ≤ 2.0x、fannkuch ≤ 1.0x |
 | W1 wasm 后端 | HIR → wasm、共享 runtime、CLI `--target wasm`、playground 在线执行 | 全部 golden 用例在 wasmtime 下与原生输出一致 |
-| M3 泛型与推断 | 泛型单态化、`dict`/`set`、推导式、`T \| None`、比较链 | k-nucleotide ≤ 1.5x |
+| M3 泛型与推断 | 泛型单态化、`dict`/`set`、推导式、`T \| None`、比较链、名义 trait 与运算符重载 | k-nucleotide ≤ 1.5x |
 | M4 错误与模块 | `try`/`except`/`raise`、`import`、C FFI、字符串运行时优化 | fasta / k-nucleotide ≤ 1.0x |
 | M5 性能与体验 | 逃逸分析、GC 替换评估、JIT `run`、诊断（ariadne / miette 风格）、formatter | binary-trees ≤ 1.0x |
 | M6 并发 | 模型待定（见开放问题） | 待定 |
@@ -584,10 +641,10 @@ fn main():
 
 以下问题尚未决定，标注了希望决策的时点。
 
-1. **继承 vs traits/protocols**：MVP 无继承。之后是引入单继承 + 虚表，还是 Rust trait / Go interface 风格的结构化协议？后者与单态化、泛型约束语法（`fn f<T: Comparable>`）是同一个设计。**M3 前需要定方向。**
+1. ~~**继承 vs traits/protocols**~~ **已决定（2026-10-12）**：名义 trait，不做继承，只有静态分派，见 3.11。仍然开放的子问题：带虚表的 trait 对象、retroactive impl、supertrait。
 2. **异常 vs Result**：`try/except/raise` 是 Python 观感的核心，但零成本异常实现复杂、且与「错误必须显式处理」的静态语言直觉冲突。可能的折中：底层用 `Result` + `?` 风格传播，语法层保留 `raise`/`except` 皮肤。**M4 前必须决定。**
 3. **并发模型**：goroutine + channel（需要可增长栈、调度器，与保守 GC 冲突）？async/await（需要状态机变换与运行时）？还是只提供 OS 线程 + 通道？该选择直接约束 GC 与栈设计，**必须与 M5 的 GC 决策一起做**。
-4. **运算符重载**：是否允许 `__add__` / `__eq__` 风格的用户定义运算符？不允许则用户类型无法参与泛型数值代码；允许则要定义分发与一致性规则。
+4. ~~**运算符重载**~~ **已决定（2026-10-12）**：允许，dunder 方法、静态分派，见 3.11。反射运算符（`__radd__`）尚未决定。
 5. **`str` 的索引语义**：`s[i]` 是字节、码点还是字素簇？Rust 选择禁止整数索引，Go 返回字节，Python 返回码点。UTF-8 存储下按码点索引是 O(n)，与性能目标冲突。倾向禁止整数索引、只提供切片与迭代器，但未定。**M2 未提供 `s[i]`**：写出来会报错并提示改用迭代或 `find` / `split`，等本条决定后再补。
 6. **debug 模式整数溢出 trap**：release 回绕已定；debug 下是否插入溢出检查并 panic（Rust 模型）？
 7. **`match` / `case`**：是否引入模式匹配，以及是否与 `T | None`、未来的 enum/sum type 统一设计。
