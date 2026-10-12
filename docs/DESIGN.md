@@ -289,7 +289,7 @@ fn main():
 
 **M2 提前放开的可空类引用。** 第 3.10 节把 `T | None` 排在 M3，但没有它就写不出自引用的数据结构（binary-trees 的 `Node`），所以 M2 提前实现了它的一个切片：**仅 class 类型**可以写成 `C | None`，可出现在字段、参数、返回值与局部变量上，表示一个可能为空的指针；`None` 字面量可以赋给它，`C` 可以隐式加宽为 `C | None`（两者都是一个指针）。收窄靠 `is None` / `is not None`，且**只在 `if` 内生效**——`if x is None: ... else: ...` 与 `if x is None: return` 之后的早返回形式都能收窄；`and` / `or` 内部与循环条件不收窄，循环体若给该局部重新赋值（含嵌套块，以及把它用作 `for` 的循环变量）也会丢弃收窄结果，而且循环条件、循环体与循环之后三处都按丢弃后的状态检查——条件在每轮之后重新求值，循环体也可能执行零次或多次。未收窄就把 `C | None` 当 `C` 用是编译错误。`int | None` 等其余联合类型仍然留在 M3。
 
-**M2 不提供的两件事。** `print(obj)` 与 `obj == obj` 都报错：前者提示「显式格式化字段」，后者提示「用 `is` 比较身份」。两者都要等 M3 的 repr / eq 协议定下来——一旦定了，容器的 repr 与相等性也要跟着走同一套规则，现在草率给一个 `Point(x=1.0)` 式的默认实现，将来会成为兼容性包袱。`obj is obj` 一直可用。
+**M2 不提供的两件事。** `print(obj)` 与 `obj == obj` 都报错：前者提示「显式格式化字段」，后者提示「用 `is` 比较身份」。两者都要等 M3 的 repr / eq 协议定下来——一旦定了，容器的 repr 与相等性也要跟着走同一套规则，现在草率给一个 `Point(x=1.0)` 式的默认实现，将来会成为兼容性包袱。`obj is obj` 一直可用。M3 用 3.11 的 `Eq` / `Repr`（及其派生）解决了这两件事：类定义了 `__repr__` / `__eq__` 才能打印 / 比较。
 
 ### 3.9 泛型
 
@@ -364,7 +364,7 @@ fn main():
 - **`sorted(xs)`**：返回新 list，稳定排序；元素为 `int`、`float`、`bool`、`str` 或它们的扁平 tuple（按成员逐个比较），也接受 set 与 dict（排序其 key）。`float` 按 `<` 排序，NaN 排在最后。
 - **`str` 切片 `s[a:b]`**：见第 9 节第 5 条。
 
-### 3.11 trait 与运算符重载（M3，2026-10-12 决定）
+### 3.11 trait 与运算符重载（M3，2026-10-12 决定，同日实现）
 
 类型抽象采用**名义 trait**：一个类型满足某个 trait，当且仅当它显式声明了这一点，「恰好有同名方法」不算。**不引入继承。** 运算符重载通过 dunder 方法实现，**静态分派**。语法参照 Mojo（同为 Python 风味、名义 trait 的高性能语言）。
 
@@ -380,46 +380,63 @@ class Circle(Shape):                      # the parentheses list traits, never a
     fn area(self) -> float:
         return 3.14159 * self.r * self.r
 
-fn total_area<T: Shape>(xs: list<T>) -> float:
+fn total_area<T: Shape>(xs: list<T>) -> float:   # checked once, here
     s = 0.0
     for x in xs:
         s = s + x.area()
     return s
 
-class Point(Eq, Hash, Repr):              # declared but not defined -> derived field-wise
+class Point(Eq, Ord, Hash, Repr):         # declared but not defined -> derived field-wise
     x: int
     y: int
 
+class Vec(Repr):
+    x: float
+    y: float
+
+    fn __mul__(self, k: float) -> Vec:    # `v * 2.0`; the operand follows the signature
+        return Vec(x=self.x * k, y=self.y * k)
+
 fn main():
     print(total_area([Circle(r=1.0), Circle(r=2.0)]))
-    seen: set<Point> = set()
-    seen.add(Point(x=1, y=2))
-    print(Point(x=1, y=2) in seen)        # True
-    print(Point(x=1, y=2))                # Point(x=1, y=2)
+    p = Point(x=1, y=2)
+    print(p, p == Point(x=1, y=2), p < Point(x=1, y=3))   # Point(x=1, y=2) True True
+    print([p], Vec(x=1.0, y=2.0) * 2.0)    # [Point(x=1, y=2)] Vec(x=2.0, y=4.0)
 ```
 
 **trait 与实现**
 
-1. `trait Name:` 声明一组方法签名：没有方法体的是必需方法，有方法体的是默认实现（类里可以覆盖）。签名里用 `Self` 指代实现类型，如 `fn __eq__(self, other: Self) -> bool`。trait 没有字段。
-2. `class C(T1, T2):` 声明 `C` 实现 `T1`、`T2`；泛型类写作 `class Stack<T>(Sized):`。编译器检查每个必需方法都已定义且签名一致，缺失或不匹配时报错并指出是哪个 trait 的哪个方法。括号里写类名报 `inheritance is not supported`。
-3. **泛型约束**：`fn f<T: Shape>(...)`，多个约束写 `T: Eq + Hash`。被约束的 `T` 在**定义处**按约束检查（只能用约束提供的方法与运算符），调用处检查类型实参是否声明了这些 trait。**未加约束的 `T` 保持模板语义**（单态化之后再检查，见 3.9），已有泛型代码不受影响。两种写法都单态化，零运行时开销。
-4. **只有静态分派**：trait 只能用作泛型约束，不能作为值的类型（不能写 `list<Shape>` 装异构对象）。带虚表的 trait 对象等出现真实需求时再设计。
-5. **M3 不做**：给已有类型补实现（`impl Shape for int` 式的 retroactive impl）、用户 trait 之间的继承（supertrait）、关联类型、泛型 trait（`trait Into<T>`）。
+1. `trait Name:` 声明一组方法签名：没有方法体的是必需方法，有方法体的是默认实现（类里可以覆盖）。签名里用 `Self` 指代实现类型，如 `fn __eq__(self, other: Self) -> bool`；类自己的方法里同样可以写 `Self`。trait 方法必须以 `self` 开头，trait 没有字段、不能带类型参数。**默认方法在 trait 定义处检查一次**：`Self` 是一个只拥有该 trait 方法的不透明类型；检查通过后，它被复制进每个声明了该 trait 却没有同名方法的类。
+2. `class C(T1, T2):` 声明 `C` 实现 `T1`、`T2`；泛型类写作 `class Stack<T>(Sized):`。编译器检查每个必需方法都已定义且签名一致——把 `Self` 换成 `C` 之后，`self` 之外的参数类型逐个相同、返回类型相同（参数名与默认值不比较）；缺失或不匹配时报错并指出是哪个 trait 的哪个方法。括号里写类名报 `inheritance is not supported`，写未知名字报 `cannot find trait`。声明 `Ord` 或 `Hash` 必须同时声明 `Eq`。不加约束的泛型类在每个实例上检查一致性（模板语义，错误带实例化栈）。
+3. **泛型约束与「检查型」泛型**：`fn f<T: Shape>(...)`、`class Box<T: Repr>`，多个约束写 `T: Eq + Hash`。规则按**整个条目**（一个泛型函数，或一个泛型类连同它的全部方法）划分：
+   - 条目里**至少有一个类型参数带约束**，它就在**定义处检查一次**，此时**所有**类型参数都是不透明类型。带约束的 `T` 恰好支持约束提供的能力：约束 trait 的方法（方法调用语法），以及内建约束对应的运算符与内建函数（`Eq`：`==` `!=` `in`；`Ord`：`<` `<=` `>` `>=`、两参数的 `min` / `max`；`Hash`：`hash(x)`；`Repr`：`print`、f-string、`str`、`repr`；`Add` 等：对应运算符），`Ord` / `Hash` 蕴含 `Eq`。同一条目里**不带约束的 `T`** 只能传参、赋值、返回、放进容器（`list<T>`、`T | None` 等）。对不透明 `T` 写 `is`、对裸 `T` 写 `is None` 都报错（`T` 可能是 `int`，没有身份）。条目内部调用的其他泛型按它们自己的约束检查（调用模板泛型时，用不透明的 `T` 检查其函数体）。这次检查产生的实例全部丢弃，不进入 codegen；条目随后照常单态化。检查出错的条目只在定义处报一次，之后对它的调用不再报错。
+   - **一个约束都没有**的条目保持 3.9 的模板语义（单态化之后再检查），已有泛型代码不受影响。
+   - 调用处与实例化处检查每个类型实参是否实现了对应约束：类必须**声明**了该 trait（只有 dunder 方法不算）；内建类型按下文的表格。两种写法都单态化，零运行时开销。
+4. **只有静态分派**：trait 只能用作泛型约束，不能作为值的类型（`list<Shape>` 报 `the trait Shape cannot be used as a type`）。带虚表的 trait 对象等出现真实需求时再设计。
+5. **M3 不做**：给已有类型补实现（`impl Shape for int` 式的 retroactive impl）、用户 trait 之间的继承（supertrait）、关联类型、泛型 trait（`trait Into<T>`）、泛型方法、反射运算符。
 
 **运算符与内建 trait**
 
 | 内建 trait | 方法 | 启用的语法与能力 |
 |---|---|---|
-| `Eq` | `__eq__(self, other: Self) -> bool` | `==`、`!=`（`!=` 恒为 `__eq__` 取反，不能单独重载）、`list` 的 `in` |
-| `Ord` | `__lt__(self, other: Self) -> bool`，要求同时声明 `Eq` | `<`；`a > b` 即 `b < a`，`a <= b` 即 `not (b < a)`，`a >= b` 即 `not (a < b)`；`sorted`、`min`、`max` |
-| `Hash` | `__hash__(self) -> int`，要求同时声明 `Eq` | 作为 `dict` 的 key、`set` 的元素 |
-| `Repr` | `__repr__(self) -> str` | `print(obj)`、f-string `{obj}`、在容器里显示 |
-| `Add` `Sub` `Mul` `Div` `Mod` `Neg` | `__add__(self, other: Self) -> Self` 等 | 泛型代码里的 `+ - * / % -x` |
+| `Eq` | `__eq__(self, other: Self) -> bool` | `==`、`!=`（恒为 `not __eq__`；定义 `__ne__` 是错误）、`list` 的 `in`、容器的 `==` |
+| `Ord` | `__lt__(self, other: Self) -> bool`，要求同时声明 `Eq` | `<`；`a > b` 即 `b < a`，`a <= b` 即 `not (b < a)`，`a >= b` 即 `not (a < b)`；两参数的 `min` / `max` |
+| `Hash` | `__hash__(self) -> int`，要求同时声明 `Eq` | `hash(x)`；作为 `dict` 的 key、`set` 的元素（见下方「尚未接通」） |
+| `Repr` | `__repr__(self) -> str` | `print(obj)`、f-string `{obj}`、`str(obj)`、`repr(obj)`、在容器里显示 |
+| `Add` / `Sub` / `Mul` | `__add__` / `__sub__` / `__mul__(self, other: Self) -> Self` | `+` / `-` / `*` |
+| `Div` / `FloorDiv` / `Mod` | `__truediv__` / `__floordiv__` / `__mod__(self, other: Self) -> Self` | `/` / `//` / `%` |
+| `Neg` | `__neg__(self) -> Self` | 一元 `-x` |
 
-- **在具体类型上，运算符只看 dunder 方法是否存在**：`a + b`（`a` 是用户类）直接编译成对 `__add__` 的调用，参数类型按方法签名检查，所以 `fn __mul__(self, k: float) -> Vec` 可以支持 `v * 2.0`。trait 只在泛型约束（以及 `dict` key 等内建能力）里起作用。M3 不支持反射运算符（`__radd__`，即 `2.0 * v`）。
-- **派生**：类在括号里声明了 `Eq` / `Ord` / `Hash` / `Repr` 却没写对应方法时，编译器按字段逐个生成实现，要求每个字段的类型都满足该 trait：`Eq` 逐字段比较；`Ord` 按字段声明顺序做字典序比较；`Hash` 组合各字段哈希；`Repr` 输出 dataclass 风格的 `Point(x=1, y=2)`。不声明就没有默认实现——这正是 M2 拒绝给 `print(obj)` / `obj == obj` 一个隐式默认值的原因，现在改为显式选择加入。
-- **内建类型的实现**：`int` / `bool` / `str` 实现 `Eq`、`Ord`、`Hash`、`Repr`；`float` 实现 `Eq`、`Ord`、`Repr`，不实现 `Hash`（NaN 无法满足哈希一致性）；`tuple` 在所有元素都满足时实现对应 trait；`list` 在元素满足时实现 `Eq`、`Repr`（可变，不实现 `Hash`）；`dict` / `set` 在元素满足时实现 `Eq`、`Repr`；`T | None` 在 `T` 满足时实现 `Eq`、`Hash`、`Repr`。
-- `is` 仍然比较身份，与 `Eq` 无关；没有 `__eq__` 的类写 `==` 仍然报错并提示用 `is`。
+- **在具体类型上，运算符只看 dunder 方法是否存在**（声明 trait 与否都行）：`a + b`（`a` 是用户类）直接编译成对 `a.__add__(b)` 的调用，`b` 按方法的参数类型检查，所以 `fn __mul__(self, k: float) -> Vec` 可以支持 `v * 2.0`、`fn __eq__(self, other: float) -> bool` 可以支持 `c == 40.0`。比较的改写保持操作数从左到右求值；比较链 `a < b < c` 照常只求值中间操作数一次。没有反射运算符：`2.0 * v` 是类型错误（不会去找 `__rmul__`）。在内建类型上以方法调用语法写 dunder，`(3).__lt__(4)`、`"a".__hash__()`，等同于对应的运算符 / 内建函数，这样带约束的泛型里 `x.__hash__()` 对每个满足约束的类型都成立。
+- **容器里的类**：`print` / `==` / `in` 穿过 `list`、tuple、`dict` 的值与 `T | None` 到达元素时，使用元素类的 `__repr__` / `__eq__`；这要求方法是标准签名（`__eq__(self, other: C) -> bool`、`__repr__(self) -> str`），声明 trait 与否都行。没有 `__repr__` 的类 `print` 仍报 `cannot print`，没有 `__eq__` 的类写 `==` 仍报错并提示用 `is`。
+- **派生**：类在括号里声明了 `Eq` / `Ord` / `Hash` / `Repr` 却没写对应方法时，编译器按字段逐个生成实现，要求每个字段的类型都**实现**该 trait（类字段须声明它），否则逐个字段报错：`Eq` 逐字段 `==`（没有字段时为 `True`）；`Ord` 与 tuple 相同的字典序，按字段声明顺序取第一个不相等的字段比 `<`；`Hash` 用 FNV 式的乘法混合组合各字段哈希（确定性，但不承诺跨版本稳定）；`Repr` 输出 dataclass 风格的 `Point(x=1, y=2)`，`str` 字段像在容器里一样带引号，泛型类实例用模板名（`Box(item=1)`）。派生出的方法是普通方法，也可以直接调用（`p.__eq__(q)`）。不声明就没有默认实现——这正是 M2 拒绝给 `print(obj)` / `obj == obj` 一个隐式默认值的原因，现在改为显式选择加入。
+- **内建类型的实现**（约束检查用）：`int` 实现 `Eq`、`Ord`、`Hash`、`Repr`、`Add`、`Sub`、`Mul`、`FloorDiv`、`Mod`、`Neg`（不实现 `Div`：`int / int` 是 `float`，不是 `Self`）；`float` 实现 `Eq`、`Ord`、`Repr` 与全部六个算术 trait，不实现 `Hash`（NaN 无法满足哈希一致性）；`bool` 实现 `Eq`、`Ord`（`False < True`）、`Hash`、`Repr`；`str` 实现 `Eq`、`Ord`、`Hash`、`Repr`、`Add`；`tuple` 在所有元素都满足时实现 `Eq`、`Ord`（字典序）、`Hash`、`Repr`；`list` 在元素满足时实现 `Eq`、`Repr`（可变，不实现 `Hash`），并实现 `Add`（拼接）；`dict` / `set` 在元素满足时实现 `Repr`（它们还没有 `==`，见 3.10）；`T | None` 在 `T` 满足时实现 `Eq`、`Hash`、`Repr`。用户 trait 只能由声明它的类实现。
+- `is` 仍然比较身份，与 `Eq` 无关。
+- 新增内建函数 `repr(x)`（`x` 在容器里会被打印成的文本，作为 `str`）与 `hash(x)`（`int`；`int` 的哈希是它自己，`str` 与 dict 的 key 用同一个哈希函数）。
+
+**实现要点**：派生方法与少量辅助函数（tuple 的 `<` 与哈希、`T | None` 的哈希、类上的 `min` / `max`）由 sema 直接写成 HIR，对 codegen 而言只是普通函数。codegen 只多认识四件事：`hir::Program::protocols` 里登记的类 `__eq__` / `__repr__`（在容器元素的比较与打印循环里调用）、`repr(x)`（用运行时的输出捕获 `ty_repr_begin` / `ty_repr_end` 复用打印器）、`str` 与 `bool` 的哈希（`ty_str_hash`），以及 `bool` 的大小比较（无符号比较，`False < True`）。定义处检查的不透明类型参数是 sema 内部的伪类，检查结束后连同其实例整体回滚。
+
+**尚未接通**（后续任务）：类作为 `dict` key / `set` 元素（`Hash` 经运行时回调）与 `sorted` 作用于 `Ord` 类，目前仍报原来的错误。f-string 插值与 `str(x)` 仍不接受容器（M2 的行为不变，写 `{repr(xs)}`），因此 `T: Repr` 的检查型泛型里写 `f"{x}"`、再用容器类型实例化时，错误出现在实例化处而不是定义处。
 
 ---
 
@@ -481,7 +498,7 @@ fn main():
 
 ### 4.6 内建函数与输出格式
 
-MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换、`sorted`、`abs`、`min`、`max`、`str`。
+MVP 提供的内建：`print`、`len`、`range`、`float` / `int` / 定宽转换、`sorted`、`abs`、`min`、`max`、`str`；M3 加入 `repr` 与 `hash`（见 3.11）。
 
 容器方法（MVP）：`list` 有 `append` / `pop` / `insert` / `clear`；`str` 有 `upper` / `lower` / `split(sep)` / `join(parts)` / `strip`（`str` 不可变，方法一律返回新串）；`dict` 有 `keys` / `values` / `items` / `get` / `pop`；`set` 有 `add` / `remove` / `discard`。
 
