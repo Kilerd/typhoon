@@ -52,12 +52,12 @@ tracked by milestone; each one has a measurable exit criterion
 | **M0** Reset | Workspace skeleton, toolchain, runtime + Boehm GC linkage, golden test harness | `hello.ty` compiles and runs in CI | **Done** |
 | **M1** Numeric core | lexer/parser, `fn`, `int`/`float`/`bool`, operators, `if`/`while`/`for range`, recursion, `print`, type checking | fib / nbody / mandelbrot / spectral-norm ≤ 1.0x Go | **Done** — `fib` 0.82x, `nbody` 0.68x, `mandelbrot` 0.99x and `spectral-norm` 0.81x all meet the target. `loops` sits at 1.04x and is accepted as an LLVM-vs-`gc` codegen gap rather than a defect: `clang -O2` on the identical C loop is no faster than the emitted IR |
 | **M2** Data | `class`, `str`, `list<T>`, `tuple`, `for-in`, Boehm GC in anger | binary-trees ≤ 2.0x, fannkuch ≤ 1.0x | **Done** — `binary_trees` 1.06x (target ≤ 2.0x) and `fannkuch` 0.99x. Includes an early slice of M3's `T \| None`: a class reference may be written `C \| None` and is narrowed by `is None` |
-| M3 Generics & inference | Monomorphised generics, `dict`/`set`, comprehensions, `T \| None`, comparison chains | k-nucleotide ≤ 1.5x | Not started |
+| **M3** Generics & inference | Monomorphised generics, `dict`/`set`, comprehensions, `T \| None`, comparison chains, nominal traits and operator overloading | k-nucleotide ≤ 1.5x | **Done** — `k_nucleotide` 0.91x–1.07x across runs, with output byte-identical to Go's |
 | M4 Errors & modules | `try`/`except`/`raise`, `import`, C FFI | fasta / k-nucleotide ≤ 1.0x | Not started |
 | M5 Performance & UX | Escape analysis, GC replacement study, JIT `run`, diagnostics, formatter | binary-trees ≤ 1.0x | Not started |
 | M6 Concurrency | Model undecided | TBD | Not started |
 
-The whole pipeline is in place for the M2 language subset: `lexer` → `parser`
+The whole pipeline is in place for the M3 language subset: `lexer` → `parser`
 → `sema` (name resolution, type checking, definite assignment, `is None`
 narrowing) → `codegen` (textual LLVM IR) → `clang -O2` → native binary. On top
 of M1's numeric core — `int`, `float`, `bool`, functions with default and
@@ -78,6 +78,26 @@ f-strings — M2 adds:
 * **`tuple<A, B, …>`** as a by-value aggregate: literals, constant indexing,
   unpacking (`a, b = t`), parameters and return values, `==` and `print`.
 
+M3 adds:
+
+* **Generics** with `<>` type parameters on functions and classes
+  (`fn max<T>`, `class Stack<T>`), monomorphised, with type arguments inferred
+  from the arguments or the expected type, or written explicitly (`max<float>(…)`).
+* **Nominal traits** (`trait Shape:`, `class Circle(Shape):`) with default
+  methods, `Self`, and bounds (`fn f<T: Eq + Hash>`); bounded generics are
+  checked once at their definition. Everything is statically dispatched.
+* **Operator overloading** through dunder methods (`__add__`, `__lt__`,
+  `__eq__`, …), and `Eq` / `Ord` / `Hash` / `Repr` derived field by field when a
+  class declares them without writing them, which enables `print(obj)`,
+  `obj == obj`, `sorted`, and class keys in `dict` / `set`.
+* **`dict<K, V>` and `set<T>`**: insertion-ordered hash tables with literals,
+  indexing, `in`, `get` / `pop` / `keys` / `values` / `items`, `add` /
+  `remove` / `discard`, iteration, and a Python-style repr.
+* **`T | None` for every `T`**, narrowed by `is None` / `is not None`; a
+  value type such as `int | None` is a tag plus the value, never boxed.
+* **Comprehensions** for lists, dicts and sets, **comparison chains**
+  (`a < b < c`), `sorted`, and **string slicing** (`s[a:b]`, by code point).
+
 The hot paths are emitted inline, never as a runtime call per element: the
 bounds check, element load and store, `len`, the `append` fast path, field
 access and the `str` header reads. The runtime only handles the slow paths
@@ -85,9 +105,8 @@ access and the `str` header reads. The runtime only handles the slow paths
 TBAA metadata so LLVM can keep a list's length and data pointer in registers
 across a loop that stores into its elements.
 
-Everything else (`dict`, `set`, generics, comprehensions, general `T | None`,
-comparison chains, `s[i]`, `print(obj)`, `obj == obj`, `import`, `try`) is
-rejected with a diagnostic naming the milestone it arrives in.
+Everything else (`import`, `try` / `except`, `match`, trait objects,
+`s[i]`) is rejected at compile time with a diagnostic.
 
 ## Building
 
