@@ -264,14 +264,7 @@ impl<'p> Emitter<'p> {
             hir::ExprKind::Repr(value) => {
                 let ty = value.ty;
                 let value = self.expr(func, value);
-                self.decls.insert("declare void @ty_repr_begin() nounwind");
-                self.decls
-                    .insert("declare noalias ptr @ty_repr_end() nounwind");
-                self.emit("call void @ty_repr_begin()");
-                self.print_value(ty, &value, true);
-                let out = self.fresh();
-                self.emit(&format!("{out} = call ptr @ty_repr_end()"));
-                out
+                self.capture_repr(ty, &value)
             }
             hir::ExprKind::Hash(value) => {
                 let ty = value.ty;
@@ -785,12 +778,32 @@ impl<'p> Emitter<'p> {
                 self.decls.insert("declare void @ty_print_sep() nounwind");
                 self.emit("call void @ty_print_sep()");
             }
+            // A container holding class instances is rendered first, so that
+            // what their `__repr__`s print comes before it (DESIGN §3.11).
+            if self.types.prints_with_user_code(*ty) {
+                let text = self.capture_repr(*ty, value);
+                self.print_value(TypeId::STR, &text, false);
+                continue;
+            }
             // Only a top-level `str` prints verbatim; inside a container it
             // prints as its repr (DESIGN §4.6).
             self.print_value(*ty, value, false);
         }
         self.decls.insert("declare void @ty_print_end() nounwind");
         self.emit("call void @ty_print_end()");
+    }
+
+    /// What `print` writes for `value` inside a container, captured into a
+    /// fresh `str`: `repr(x)` (DESIGN §3.11).
+    fn capture_repr(&mut self, ty: TypeId, value: &str) -> String {
+        self.decls.insert("declare void @ty_repr_begin() nounwind");
+        self.decls
+            .insert("declare noalias ptr @ty_repr_end() nounwind");
+        self.emit("call void @ty_repr_begin()");
+        self.print_value(ty, value, true);
+        let out = self.fresh();
+        self.emit(&format!("{out} = call ptr @ty_repr_end()"));
+        out
     }
 
     pub(super) fn concat(&mut self, lhs: &str, rhs: &str) -> String {

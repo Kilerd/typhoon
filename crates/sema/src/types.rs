@@ -490,6 +490,33 @@ impl TypeTable {
         }
     }
 
+    /// Whether `print` writes part of a `ty` value before it runs a class's
+    /// `__repr__`: a container — or a `T | None` of one — holding a class
+    /// instance at any depth (DESIGN §3.11). The backends render such a value
+    /// into a capture buffer first and write it afterwards, so that whatever
+    /// the `__repr__` itself prints comes before the container, as in Python.
+    pub fn prints_with_user_code(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Optional(inner) => self.prints_with_user_code(inner),
+            Type::Class(_) => false,
+            _ => self.contains_class(ty),
+        }
+    }
+
+    /// Whether a value of `ty` may hold a class instance.
+    fn contains_class(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Class(_) => true,
+            Type::List(elem) | Type::Set(elem) | Type::Optional(elem) => self.contains_class(elem),
+            Type::Dict(key, value) => self.contains_class(key) || self.contains_class(value),
+            Type::Tuple(id) => self
+                .tuple_members(id)
+                .iter()
+                .any(|m| self.contains_class(*m)),
+            _ => false,
+        }
+    }
+
     /// Whether `ty` is a reference to a GC object, i.e. an LLVM `ptr`.
     ///
     /// A `T | None` is one exactly when `T` is: it then uses the null niche.

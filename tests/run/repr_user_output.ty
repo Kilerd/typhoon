@@ -1,0 +1,66 @@
+# A `__repr__` that prints while a container is being rendered (DESIGN 3.11):
+# its output goes to stdout before the container's text, never into the
+# `str` that `repr`, an f-string or `str()` returns; captures nest when a
+# `__repr__` itself calls `repr` on a container.
+# milestone: M3
+# expect: leaf 1
+# expect: leaf 2
+# expect: repr 8 [L1, L2]
+# expect: leaf 1
+# expect: leaf 2
+# expect: fstr <[L1, L2]>
+# expect: leaf 1
+# expect: str (1, L1)
+# expect: a leaf 1
+# expect: leaf 2
+# expect: [L1, L2] b
+# expect: leaf 3
+# expect: [L3]
+# expect: node 4
+# expect: leaf 5
+# expect: leaf 6
+# expect: {N4[L5]: L6}
+# expect: node 7
+# expect: leaf 8
+# expect: leaf 9
+# expect: nested [N7[L8, L9]]
+# expect: leaf 10
+# expect: L10 {11}
+
+class Leaf:
+    n: int
+
+    fn __repr__(self) -> str:
+        print("leaf", self.n)
+        return f"L{self.n}"
+
+class Node(Eq, Hash):
+    n: int
+    kids: list<Leaf>
+
+    fn __eq__(self, other: Node) -> bool:
+        return self.n == other.n
+
+    fn __hash__(self) -> int:
+        return self.n
+
+    fn __repr__(self) -> str:
+        print("node", self.n)
+        return f"N{self.n}{repr(self.kids)}"
+
+fn main():
+    xs = [Leaf(n=1), Leaf(n=2)]
+    s = repr(xs)
+    print("repr", len(s), s)
+    t = f"<{xs}>"
+    print("fstr", t)
+    u = str((1, xs[0]))
+    print("str", u)
+    print("a", xs, "b")
+    o: list<Leaf> | None = [Leaf(n=3)]
+    print(o)
+    d = {Node(n=4, kids=[Leaf(n=5)]): Leaf(n=6)}
+    print(d)
+    w = repr([Node(n=7, kids=[Leaf(n=8), Leaf(n=9)])])
+    print("nested", w)
+    print(Leaf(n=10), {Leaf(n=11).n})

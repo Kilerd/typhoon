@@ -446,9 +446,9 @@ fn main():
 
 **`sorted` 作用于 `Ord` 类型**：运行时只排序标量及其扁平 tuple；其他实现 `Ord` 的元素类型（类、含类的 tuple、带 `T: Ord` 约束的 `T` 的实例）由 sema 按元素类型单态化出一份自底向上的归并排序（HIR，两个缓冲区交替），只调用 `__lt__`：右段元素严格小于左段元素时才先取右段，因此是稳定排序，与 Python 一样只依赖 `<`。
 
-**容器的文本**：f-string 的 `{x}` 与 `str(x)` 接受容器（及其 `T | None`），文本就是 `repr(x)`，即 `print` 写出的内容；因此 `T: Repr` 的检查型泛型里写 `f"{x}"`，用容器类型实例化同样成立。
+**容器的文本**：f-string 的 `{x}` 与 `str(x)` 接受容器（及其 `T | None`），文本就是 `repr(x)`，即 `print` 写出的内容；因此 `T: Repr` 的检查型泛型里写 `f"{x}"`，用容器类型实例化同样成立。渲染容器时调用的元素 `__repr__` 是用户代码：它自己的 `print` 照常写到标准输出，不会混进容器的文本（`repr(xs)`、f-string 与 `str(xs)` 返回的恰好是容器的文本）；`print(xs)` 先渲染出整段文本再写出，所以这些输出出现在容器之前，与 Python 一致。`__repr__` 里再对容器调用 `repr` 也照常嵌套。
 
-**实现要点**：派生方法与少量辅助函数（tuple 的 `<` 与哈希、`T | None` 的哈希、类上的 `min` / `max`、类 key 的探测函数、`Ord` 类型的归并排序）由 sema 直接写成 HIR，对 codegen 而言只是普通函数。codegen 多认识的事：`hir::Program::protocols` 里登记的类 `__eq__` / `__repr__`（在容器元素的比较与打印循环里调用）与类 key 的 `__hash__` / 探测函数（每个表操作调用一次）、探测函数里的两个 HIR 节点 `TableProbe` / `TableKey`（各是一次运行时调用）、`repr(x)`（用运行时的输出捕获 `ty_repr_begin` / `ty_repr_end` 复用打印器）、`str` 与 `bool` 的哈希（`ty_str_hash`），以及 `bool` 的大小比较（无符号比较，`False < True`）。定义处检查的不透明类型参数是 sema 内部的伪类，检查结束后连同其实例整体回滚；类 key 的探测函数在所有函数体检查完之后，按类型表里出现过的 `dict<C, V>` / `set<C>` 统一登记。
+**实现要点**：派生方法与少量辅助函数（tuple 的 `<` 与哈希、`T | None` 的哈希、类上的 `min` / `max`、类 key 的探测函数、`Ord` 类型的归并排序）由 sema 直接写成 HIR，对 codegen 而言只是普通函数。codegen 多认识的事：`hir::Program::protocols` 里登记的类 `__eq__` / `__repr__`（在容器元素的比较与打印循环里调用）与类 key 的 `__hash__` / 探测函数（每个表操作调用一次）、探测函数里的两个 HIR 节点 `TableProbe` / `TableKey`（各是一次运行时调用）、`repr(x)`（用运行时的输出捕获 `ty_repr_begin` / `ty_repr_end` 复用打印器；为元素调用 `__repr__` 时用 `ty_repr_suspend` / `ty_repr_resume` 暂停捕获）、`str` 与 `bool` 的哈希（`ty_str_hash`），以及 `bool` 的大小比较（无符号比较，`False < True`）。定义处检查的不透明类型参数是 sema 内部的伪类，检查结束后连同其实例整体回滚；类 key 的探测函数在所有函数体检查完之后，按类型表里出现过的 `dict<C, V>` / `set<C>` 统一登记。
 
 ---
 

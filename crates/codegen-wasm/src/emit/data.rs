@@ -922,10 +922,19 @@ impl<'p> Emitter<'p> {
                 self.print_raw("None");
                 self.end();
             }
-            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11).
+            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11). Inside
+            // a container a capture may be open: the method's own `print`s go
+            // to stdout, not into the container's text.
             Type::Class(class) => {
+                let user = quoted && self.program.protocols.repr.contains_key(&class);
+                if user {
+                    self.call_rt(Rt::ReprSuspend);
+                }
                 self.ins(Instruction::LocalGet(value[0]));
                 self.class_repr(class);
+                if user {
+                    self.call_rt(Rt::ReprResume);
+                }
                 let text = self.scratch(ValType::I32);
                 self.ins(Instruction::LocalSet(text));
                 self.str_parts(text);

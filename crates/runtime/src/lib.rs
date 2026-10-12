@@ -131,19 +131,24 @@ impl Write for HostOut {
 /// Where `print` writes: the buffered stdout, or — between [`ty_repr_begin`]
 /// and [`ty_repr_end`] — the innermost capture buffer, which is how `repr(x)`
 /// reuses the printer to render any value into a `str` (DESIGN §3.11).
+///
+/// User code that runs while a capture is open — a `__repr__` called for an
+/// element — is bracketed by [`ty_repr_suspend`] / [`ty_repr_resume`], which
+/// push a `None` level: its own `print`s go to stdout, as in Python, and a
+/// `repr(x)` inside it opens a fresh capture on top.
 pub struct Output {
     sink: OutSink,
-    captures: Vec<Vec<u8>>,
+    captures: Vec<Option<Vec<u8>>>,
 }
 
 impl Write for Output {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         match self.captures.last_mut() {
-            Some(buf) => {
+            Some(Some(buf)) => {
                 buf.extend_from_slice(data);
                 Ok(data.len())
             }
-            None => self.sink.write(data),
+            Some(None) | None => self.sink.write(data),
         }
     }
 
@@ -1423,15 +1428,31 @@ pub fn write_str_repr(w: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
 /// stdout. Captures nest, so a `__repr__` may itself use `repr`.
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_repr_begin() {
-    out().captures.push(Vec::new());
+    out().captures.push(Some(Vec::new()));
 }
 
 /// Ends the innermost capture started by [`ty_repr_begin`] and returns what
 /// was printed into it as a fresh `str`.
 #[unsafe(no_mangle)]
 pub extern "C" fn ty_repr_end() -> *mut u8 {
-    let captured = out().captures.pop().unwrap_or_default();
+    let captured = out().captures.pop().flatten().unwrap_or_default();
     str_new(&captured)
+}
+
+/// Lets user code write to stdout while a capture is open: the generated
+/// code calls it before a `__repr__` it runs to render an element, so that
+/// the method's own `print`s are not mistaken for the element's text
+/// (DESIGN §3.11). Paired with [`ty_repr_resume`]; nests with captures.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_repr_suspend() {
+    out().captures.push(None);
+}
+
+/// Ends the innermost [`ty_repr_suspend`]: printing goes back to the capture
+/// that was open, if any.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_repr_resume() {
+    out().captures.pop();
 }
 
 /// The hash of a `str`, `hash(s)` (DESIGN §3.11): the same function the

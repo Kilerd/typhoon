@@ -961,9 +961,21 @@ impl<'p> Emitter<'p> {
                 self.br(&end);
                 self.start_block(&end);
             }
-            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11).
+            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11). Inside
+            // a container a capture may be open: the method's own `print`s go
+            // to stdout, not into the container's text.
             Type::Class(class) => {
+                let user = quoted && self.program.protocols.repr.contains_key(&class);
+                if user {
+                    self.decls
+                        .insert("declare void @ty_repr_suspend() nounwind");
+                    self.emit("call void @ty_repr_suspend()");
+                }
                 let text = self.class_repr(ty, class, value);
+                if user {
+                    self.decls.insert("declare void @ty_repr_resume() nounwind");
+                    self.emit("call void @ty_repr_resume()");
+                }
                 self.decls
                     .insert("declare void @ty_print_str(ptr, i64) nounwind");
                 let (bytes, len) = self.str_parts(&text);

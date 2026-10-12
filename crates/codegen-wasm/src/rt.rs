@@ -140,11 +140,16 @@ pub enum Rt {
     DictProbeRemove,
     /// `ty_dict_key_missing(repr)`: the `key not found` panic of a class key.
     DictKeyMissing,
+    /// `ty_repr_suspend()`: let a `__repr__` run for an element print to
+    /// stdout while a capture is open (DESIGN §3.11).
+    ReprSuspend,
+    /// `ty_repr_resume()`: back to the open capture.
+    ReprResume,
 }
 
 impl Rt {
     /// Every runtime function, in import order.
-    pub const ALL: [Rt; 57] = [
+    pub const ALL: [Rt; 59] = [
         Rt::Init,
         Rt::Exit,
         Rt::Panic,
@@ -202,6 +207,8 @@ impl Rt {
         Rt::DictProbeInsert,
         Rt::DictProbeRemove,
         Rt::DictKeyMissing,
+        Rt::ReprSuspend,
+        Rt::ReprResume,
     ];
 
     /// The exported symbol name.
@@ -264,13 +271,20 @@ impl Rt {
             Rt::DictProbeInsert => "ty_dict_probe_insert",
             Rt::DictProbeRemove => "ty_dict_probe_remove",
             Rt::DictKeyMissing => "ty_dict_key_missing",
+            Rt::ReprSuspend => "ty_repr_suspend",
+            Rt::ReprResume => "ty_repr_resume",
         }
     }
 
     /// The wasm signature: `(params, results)`.
     pub fn signature(self) -> (&'static [ValType], &'static [ValType]) {
         match self {
-            Rt::Init | Rt::PrintSep | Rt::PrintEnd | Rt::ReprBegin => (&[], &[]),
+            Rt::Init
+            | Rt::PrintSep
+            | Rt::PrintEnd
+            | Rt::ReprBegin
+            | Rt::ReprSuspend
+            | Rt::ReprResume => (&[], &[]),
             Rt::ReprEnd => (&[], &[I]),
             Rt::StrHash => (&[I], &[L]),
 

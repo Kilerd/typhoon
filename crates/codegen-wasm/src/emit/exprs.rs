@@ -255,9 +255,7 @@ impl<'p> Emitter<'p> {
             hir::ExprKind::Repr(value) => {
                 let ty = value.ty;
                 let slots = self.spill_expr(func, value);
-                self.call_rt(Rt::ReprBegin);
-                self.print_value(ty, &slots, true);
-                self.call_rt(Rt::ReprEnd);
+                self.capture_repr(ty, &slots);
             }
             hir::ExprKind::Hash(value) => {
                 let ty = value.ty;
@@ -793,11 +791,28 @@ impl<'p> Emitter<'p> {
             if index > 0 {
                 self.call_rt(Rt::PrintSep);
             }
+            // A container holding class instances is rendered first, so that
+            // what their `__repr__`s print comes before it (DESIGN §3.11).
+            if self.types.prints_with_user_code(*ty) {
+                self.capture_repr(*ty, slots);
+                let text = self.scratch(ValType::I32);
+                self.ins(Instruction::LocalSet(text));
+                self.print_value(TypeId::STR, &[text], false);
+                continue;
+            }
             // Only a top-level `str` prints verbatim; inside a container it
             // prints as its repr (DESIGN §4.6).
             self.print_value(*ty, slots, false);
         }
         self.call_rt(Rt::PrintEnd);
+    }
+
+    /// Pushes what `print` writes for the spilled `value` inside a container,
+    /// captured into a fresh `str`: `repr(x)` (DESIGN §3.11).
+    fn capture_repr(&mut self, ty: TypeId, value: &[u32]) {
+        self.call_rt(Rt::ReprBegin);
+        self.print_value(ty, value, true);
+        self.call_rt(Rt::ReprEnd);
     }
 
     /// An f-string: every hole is converted to a `str` and the pieces are
