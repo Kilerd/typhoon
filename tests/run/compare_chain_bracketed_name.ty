@@ -1,0 +1,16 @@
+# DESIGN 3.9 rule 3 reads `name < T > (x)` as a generic call. A bracketed
+# name is not an identifier, so `(a) < b > (c)` is the comparison chain
+# `a < b and b > c`; an unbracketed generic call still parses as one.
+# milestone: M3
+# expect: True False
+# expect: 1
+
+fn f<T>(x: T) -> T:
+    return x
+
+fn main():
+    a = 1
+    b = 2
+    c = 1
+    print((a) < b > (c), (a) < b > (b))
+    print(f<int>(c))

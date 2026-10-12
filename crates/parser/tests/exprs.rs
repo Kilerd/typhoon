@@ -114,6 +114,11 @@ fn comparison_chains_are_one_compare_node() {
     assert_eq!(expr("a < b > (c)"), "(call a<b> c)");
     assert_eq!(expr("a < b > c"), "(cmp a < b > c)");
     assert_eq!(expr("0 < b > (c)"), "(cmp 0 < b > c)");
+    // A bracketed name is not an identifier: `(a) < b > (c)` is a chain.
+    assert_eq!(expr("(a) < b > (c)"), "(cmp a < b > c)");
+    assert_eq!(expr("(o.a) < b > (c)"), "(cmp (. o a) < b > c)");
+    // ... but a postfix operation after the brackets ends in one again.
+    assert_eq!(expr("(o).a < b > (c)"), "(call (. o a)<b> c)");
 }
 
 #[test]

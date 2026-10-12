@@ -237,8 +237,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_postfix(&mut self) -> Expr {
+        // `(a)` is a bracketed expression, not the identifier DESIGN 3.9 rule
+        // 3 asks for, even though the brackets leave no node behind: so
+        // `(a) < b > (c)` stays a comparison chain.
+        let mut bracketed = self.at(&TokenKind::LParen);
         let mut expr = self.parse_primary();
         loop {
+            let was_bracketed = std::mem::replace(&mut bracketed, false);
             match self.kind() {
                 TokenKind::Dot => {
                     self.bump();
@@ -291,7 +296,8 @@ impl<'a> Parser<'a> {
                 }
                 // DESIGN 3.9: `Name <` may open an explicit instantiation.
                 TokenKind::Lt
-                    if matches!(expr.kind, ExprKind::Name(_) | ExprKind::Attribute { .. }) =>
+                    if !was_bracketed
+                        && matches!(expr.kind, ExprKind::Name(_) | ExprKind::Attribute { .. }) =>
                 {
                     let Some(type_args) = self.try_type_args() else {
                         break;
