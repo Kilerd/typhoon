@@ -684,7 +684,17 @@ impl Checker<'_> {
     /// deriving the builtin ones it leaves out.
     fn check_class_conformance(&mut self, class: ClassId, list: &[(TraitId, Span)]) {
         let generic = self.generics.origins.contains_key(&class);
-        for &(id, span) in list {
+        // The derivable builtin traits go first, so that a user trait
+        // requiring the same dunder finds the derived method whatever the
+        // order of the header: `class C(MyEq, Eq)` is `class C(Eq, MyEq)`.
+        let derives = |id: &TraitId| Builtin::of_id(*id).is_some_and(Builtin::derivable);
+        let ordered: Vec<(TraitId, Span)> = list
+            .iter()
+            .filter(|(id, _)| derives(id))
+            .chain(list.iter().filter(|(id, _)| !derives(id)))
+            .copied()
+            .collect();
+        for (id, span) in ordered {
             if self.traits.list[id.0].poisoned {
                 continue;
             }

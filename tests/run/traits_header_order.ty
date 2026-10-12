@@ -1,0 +1,30 @@
+# The order of the traits in a class header does not matter (DESIGN 3.11):
+# a user trait that requires a dunder is satisfied by the method a builtin
+# trait derives, whether the builtin trait is listed before or after it.
+# milestone: M3
+# expect: True False C(x=1)
+# expect: True False Box(item="a")
+# expect: True True
+
+trait MyEq:
+    fn __eq__(self, other: Self) -> bool
+
+trait Shown:
+    fn __repr__(self) -> str
+
+class C(MyEq, Shown, Repr, Eq):
+    x: int
+
+class Box<T>(Shown, MyEq, Eq, Repr):
+    item: T
+
+fn same<T: MyEq>(a: T, b: T) -> bool:
+    return a.__eq__(b)
+
+fn show<T: Shown>(x: T) -> str:
+    return x.__repr__()
+
+fn main():
+    print(same(C(x=1), C(x=1)), same(C(x=1), C(x=2)), show(C(x=1)))
+    print(same(Box(item="a"), Box(item="a")), C(x=1) != C(x=1), show(Box(item="a")))
+    print(C(x=3) == C(x=3), [C(x=3)] == [C(x=3)])
