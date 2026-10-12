@@ -332,7 +332,7 @@ impl<'a> Checker<'a> {
                 self.methods.insert((class, decl.name.name.clone()), id);
                 (
                     format!("{class_name}.{}", decl.name.as_str()),
-                    format!("ty_user_{class_name}__{}", decl.name.as_str()),
+                    crate::generics::symbol_safe(&method_symbol(&class_name, decl.name.as_str())),
                 )
             }
             None => {
@@ -570,6 +570,16 @@ impl<'a> Checker<'a> {
         }
         Some(id)
     }
+}
+
+/// The symbol of the method `method` of the class `class` before escaping:
+/// `ty_method_<class>.<method>`. Its own prefix keeps it apart from every free
+/// function (`ty_user_<name>`), and a `.` — which no identifier contains —
+/// separates the class from the method, so that `A.b__c` and `A__b.c` stay
+/// distinct; [`generics::symbol_safe`] escapes the punctuation of a generic
+/// class instance's name (`Stack<int>`).
+pub(crate) fn method_symbol(class: &str, method: &str) -> String {
+    format!("ty_method_{class}.{method}")
 }
 
 /// Mangles a user function name into its symbol (`ty_user_<name>`), so that no

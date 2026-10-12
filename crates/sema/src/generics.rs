@@ -1173,7 +1173,7 @@ impl Checker<'_> {
                     class: Some(class),
                     outer,
                     name: format!("{class_name}.{}", name.as_str()),
-                    symbol: format!("ty_user_{class_name}__{}", name.as_str()),
+                    symbol: crate::method_symbol(&class_name, name.as_str()),
                     poisoned: false,
                     instances: HashMap::new(),
                 });
@@ -1886,8 +1886,8 @@ mod tests {
             "ty_user_f.Llist.Lint.G.Ctuple.Lstr.Cfloat.G.G"
         );
         assert_eq!(
-            symbol_safe("ty_user_Stack<Node | None>__push"),
-            "ty_user_Stack.LNode.UNone.G__push"
+            symbol_safe("ty_method_Stack<Node | None>.push"),
+            "ty_method_Stack.LNode.UNone.G.push"
         );
         // Every character is an LLVM identifier character.
         let symbol = symbol_safe("ty_user_g<tuple<int, list<str>>, Node | None>");

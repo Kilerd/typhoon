@@ -98,8 +98,10 @@ pub struct Protocols {
 pub struct Function {
     /// The name as written in the source.
     pub name: String,
-    /// The mangled symbol name (`ty_user_<name>`), so that user code can never
-    /// collide with a C symbol.
+    /// The mangled symbol name — `ty_user_<name>` for a function,
+    /// `ty_method_<class>.<name>` for a method, `ty_builtin_…` for a helper
+    /// the checker writes — so that user code can never collide with a C
+    /// symbol, and no two user functions collide with each other.
     pub symbol: String,
     /// The parameters, as locals, in declaration order.
     pub params: Vec<LocalId>,

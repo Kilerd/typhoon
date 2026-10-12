@@ -1,0 +1,51 @@
+# Methods and free functions get distinct symbols whatever their names: a
+# method `P.m` and a function `P__m`, the methods `A__b.c` and `A.b__c`, a
+# derived `Q.__eq__` and a function `Q____eq__`, and a generic class's method
+# all link side by side (DESIGN 4.5).
+# milestone: M3
+# expect: method function
+# expect: A__b.c A.b__c
+# expect: True derived-lookalike
+# expect: 7 box-lookalike
+
+class P:
+    x: int
+
+    fn m(self) -> str:
+        return "method"
+
+fn P__m() -> str:
+    return "function"
+
+class A__b:
+    x: int
+
+    fn c(self) -> str:
+        return "A__b.c"
+
+class A:
+    x: int
+
+    fn b__c(self) -> str:
+        return "A.b__c"
+
+class Q(Eq):
+    x: int
+
+fn Q____eq__() -> str:
+    return "derived-lookalike"
+
+class Box<T>:
+    item: T
+
+    fn get(self) -> T:
+        return self.item
+
+fn Box__get() -> str:
+    return "box-lookalike"
+
+fn main():
+    print(P(x=1).m(), P__m())
+    print(A__b(x=1).c(), A(x=1).b__c())
+    print(Q(x=1) == Q(x=1), Q____eq__())
+    print(Box(item=7).get(), Box__get())

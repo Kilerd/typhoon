@@ -22,7 +22,8 @@
 //! # Shape of the generated module
 //!
 //! * every user function becomes one `define internal`, its symbol mangled to
-//!   `ty_user_<name>` so that it can never collide with a C symbol;
+//!   `ty_user_<name>` (a method to `ty_method_<class>.<name>`) so that it can
+//!   never collide with a C symbol or with another user function;
 //! * every local becomes one `alloca` in the entry block plus loads and
 //!   stores — `clang -O2` runs `mem2reg` and puts them back in registers;
 //! * `@main` starts the runtime, calls the user's `main` and exits through

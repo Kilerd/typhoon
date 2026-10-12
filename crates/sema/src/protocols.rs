@@ -446,7 +446,7 @@ impl Checker<'_> {
         let id = hir::FuncId(self.sigs.len() as u32);
         self.sigs.push(FnSig {
             name: format!("{class_name}.{method}"),
-            symbol: symbol_safe(&format!("ty_user_{class_name}__{method}")),
+            symbol: symbol_safe(&crate::method_symbol(&class_name, method)),
             params,
             ret,
             name_span: span,
