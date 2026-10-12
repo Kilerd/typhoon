@@ -257,7 +257,7 @@ fn main():
 ```
 
 - 空 `{}` 是空 dict；空 set 用 `set()`。
-- f-string 支持 `{expr}` 与 `{expr:spec}`，`spec` 采用 Python 格式迷你语言的子集（MVP：`.Nf`、`d`、`s`）。f-string 在编译期展开为拼接/格式化调用，不做运行时解析。
+- f-string 支持 `{expr}` 与 `{expr:spec}`，`spec` 采用 Python 格式迷你语言的子集（MVP：`.Nf`、`d`、`s`）。f-string 在编译期展开为拼接/格式化调用，不做运行时解析。`{expr}` 接受 `print` 能打印的任何值（M3 起包括容器，文本与 `print` 写出的完全一致，即 `repr(x)`；容器里的类要有 `__repr__`），`spec` 只用于标量。
 - 数字字面量支持 `_` 分隔符（`1_000_000`）与 `0x` / `0b` / `0o` 前缀。
 
 ### 3.8 class
@@ -359,9 +359,9 @@ fn main():
 - **`T | None`**：任何 `T` 都可以写成 `T | None`（`T | None | None` 即 `T | None`），除此之外的联合类型一律报错。表示不装箱：引用类型（`str`、`list<T>`、class）用空指针表示 `None`，与 `T` 同一布局；值类型（`int`、`float`、`bool`、tuple）是按值传递的 `{ tag: i8, T }` 对（wasm 上展开为标签加载荷的局部变量）。`T` 隐式加宽为 `T | None`，`None` 可赋给 `T | None`；收窄规则沿用 3.8 节（`if` 内与早返回形式，`and` / `or` 与循环不泄漏，重新赋值即丢弃），推导式的 `if` 子句同样收窄其后的子句与元素。未收窄就当 `T` 用是编译错误；`x == None` 报错并提示改用 `is None`；`T | None` 与 `T` 之间的 `==` 会先加宽 `T`。`print` / f-string 打印值或 `None`。
 - **比较链**：`a < b < c` 即 `a < b and b < c`，但中间操作数只求值一次（必要时存入隐藏临时变量），从左到右短路；每一环按单个比较的规则检查（`==` `!=` `<` `<=` `>` `>=` `is` `is not` `in` `not in`），整条链不收窄。与 Python 一致，`x in y` / `x not in y` 先求值 `x` 再求值 `y`（单独使用或作为链中一环都如此）。`a < b > (c)` 仍按 3.9 节第 3 条读作泛型调用。
 - **列表推导式**：`[expr for x in it if cond ...]`，`for` / `if` 子句任意多个，可迭代对象与 `for` 语句相同（`range(...)`、`list<T>`、`str`）。推导式变量的作用域限于推导式本身（Python 3 语义）：与外层变量或常量同名时只在推导式内部遮蔽它，外层绑定的值不受影响，推导式结束后名字恢复指向外层变量——这是 3.4 节「不允许遮蔽」唯一的例外，因为推导式变量不会泄漏到函数作用域。降低为普通的循环加 `append`；只有一个 `for` 子句、没有 `if`，且遍历 list、str 或步长为字面量的 `range` 时，结果按最终长度一次分配。
-- **`dict<K, V>` 与 `set<T>`**：key（以及 set 的元素）只能是 `int`、`bool`、`str` 或由它们组成的扁平 tuple；class 作 key 需要 3.11 的 `Hash` / `Eq`，`float` 不实现 `Hash`，两者在 M3 都报错。迭代顺序就是插入顺序（CPython 3.7+ 的紧凑 dict），两个后端逐字节一致：覆盖已有 key 保留原位置，删除后再插入排到末尾。`{}` 是空 dict、`set()` 是空 set，两者都需要期望类型（与 `[]` 相同）；`dict()` 等同 `{}`。`d[k]` 缺 key 时 panic（`key not found: <key 的 repr>`），`k in d`、`len`、`d.get(k, default)`、`d.pop(k)` / `d.pop(k, default)`、`keys()` / `values()` / `items()`（返回新的 `list`）；`d.get(k)` 即 `d.get(k, None)`，默认值只能放进 `V | None` 时结果类型为 `V | None`，需要收窄。`set` 有 `add` / `remove`（缺失 panic）/ `discard`。`for k in d`、`for x in s` 与 `sorted(d)` 遍历 key 的快照，循环体内修改容器是良定义的。`print` 输出 `{"a": 1}`、`{1, 2}`，空 set 输出 `set()`。`==` 与 f-string 插值暂不支持（与 list 一致，等 `Eq` / `Repr`）。**与 Python 的已知差异**：`d[k] = v` 先求值 `d`、`k` 再求值 `v`（与 `xs[i] = v` 相同），Python 是先求值 `v`。
+- **`dict<K, V>` 与 `set<T>`**：key（以及 set 的元素）是 `int`、`bool`、`str`、由它们组成的扁平 tuple，或实现了 3.11 的 `Hash`（因而也实现 `Eq`）的类——类必须**声明** `Hash`，只有 dunder 方法不算，泛型实例与带 `T: Hash` 约束的类型参数同样可以。`float` 不实现 `Hash`；含类成员的 tuple 与 `T | None` 作 key 在 M3 报错。迭代顺序就是插入顺序（CPython 3.7+ 的紧凑 dict），两个后端逐字节一致：覆盖已有 key 保留原位置，删除后再插入排到末尾。`{}` 是空 dict、`set()` 是空 set，两者都需要期望类型（与 `[]` 相同）；`dict()` 等同 `{}`。`d[k]` 缺 key 时 panic（`key not found: <key 的 repr>`；没有 `__repr__` 的类 key 写作 `<Point object>`），`k in d`、`len`、`d.get(k, default)`、`d.pop(k)` / `d.pop(k, default)`、`keys()` / `values()` / `items()`（返回新的 `list`）；`d.get(k)` 即 `d.get(k, None)`，默认值只能放进 `V | None` 时结果类型为 `V | None`，需要收窄。`set` 有 `add` / `remove`（缺失 panic）/ `discard`。`for k in d`、`for x in s` 与 `sorted(d)` 遍历 key 的快照，循环体内修改容器是良定义的。`print`、f-string 与 `str(x)` 输出 `{"a": 1}`、`{1, 2}`，空 set 输出 `set()`。dict / set 的 `==` 暂不支持。**与 Python 的已知差异**：`d[k] = v` 先求值 `d`、`k` 再求值 `v`（与 `xs[i] = v` 相同），Python 是先求值 `v`。
 - **dict / set 推导式**：`{k: v for x in it if cond ...}` 与 `{e for x in it ...}`，子句、作用域与遮蔽规则与列表推导式完全相同；元素 / key 必须满足上面的 key 规则，dict 推导式先求值 key 再求值 value，重复的 key 保留最后一个 value。所有推导式与 `for` 语句一样可以遍历 dict（key）与 set。
-- **`sorted(xs)`**：返回新 list，稳定排序；元素为 `int`、`float`、`bool`、`str` 或它们的扁平 tuple（按成员逐个比较），也接受 set 与 dict（排序其 key）。`float` 按 `<` 排序，NaN 排在最后。
+- **`sorted(xs)`**：返回新 list，稳定排序；元素为 `int`、`float`、`bool`、`str` 或它们的扁平 tuple（按成员逐个比较，由运行时排序），或任何其他实现了 `Ord` 的类型——有 `__lt__` / `__eq__` 的类、含这种类的 tuple（见 3.11，单态化的归并排序，只调用 `__lt__`）；也接受 set 与 dict（排序其 key）。`float` 按 `<` 排序，NaN 排在最后。
 - **`str` 切片 `s[a:b]`**：见第 9 节第 5 条。
 
 ### 3.11 trait 与运算符重载（M3，2026-10-12 决定，同日实现）
@@ -402,7 +402,12 @@ fn main():
     p = Point(x=1, y=2)
     print(p, p == Point(x=1, y=2), p < Point(x=1, y=3))   # Point(x=1, y=2) True True
     print([p], Vec(x=1.0, y=2.0) * 2.0)    # [Point(x=1, y=2)] Vec(x=2.0, y=4.0)
+    seen: set<Point> = {p, Point(x=1, y=2), Point(x=0, y=5)}  # a key through Hash + Eq
+    print(len(seen), Point(x=0, y=5) in seen, sorted(seen))  # 2 True [Point(x=0, y=5), Point(x=1, y=2)]
+    print(f"seen = {seen}")               # seen = {Point(x=1, y=2), Point(x=0, y=5)}
 ```
+
+（这个例子原样收在 `tests/run/traits_design_example.ty`，两个后端都跑。）
 
 **trait 与实现**
 
@@ -420,8 +425,8 @@ fn main():
 | 内建 trait | 方法 | 启用的语法与能力 |
 |---|---|---|
 | `Eq` | `__eq__(self, other: Self) -> bool` | `==`、`!=`（恒为 `not __eq__`；定义 `__ne__` 是错误）、`list` 的 `in`、容器的 `==` |
-| `Ord` | `__lt__(self, other: Self) -> bool`，要求同时声明 `Eq` | `<`；`a > b` 即 `b < a`，`a <= b` 即 `not (b < a)`，`a >= b` 即 `not (a < b)`；两参数的 `min` / `max` |
-| `Hash` | `__hash__(self) -> int`，要求同时声明 `Eq` | `hash(x)`；作为 `dict` 的 key、`set` 的元素（见下方「尚未接通」） |
+| `Ord` | `__lt__(self, other: Self) -> bool`，要求同时声明 `Eq` | `<`；`a > b` 即 `b < a`，`a <= b` 即 `not (b < a)`，`a >= b` 即 `not (a < b)`；两参数的 `min` / `max`；`sorted` |
+| `Hash` | `__hash__(self) -> int`，要求同时声明 `Eq` | `hash(x)`；作为 `dict` 的 key、`set` 的元素（须声明，见下方「类作为 key」） |
 | `Repr` | `__repr__(self) -> str` | `print(obj)`、f-string `{obj}`、`str(obj)`、`repr(obj)`、在容器里显示 |
 | `Add` / `Sub` / `Mul` | `__add__` / `__sub__` / `__mul__(self, other: Self) -> Self` | `+` / `-` / `*` |
 | `Div` / `FloorDiv` / `Mod` | `__truediv__` / `__floordiv__` / `__mod__(self, other: Self) -> Self` | `/` / `//` / `%` |
@@ -434,9 +439,16 @@ fn main():
 - `is` 仍然比较身份，与 `Eq` 无关。
 - 新增内建函数 `repr(x)`（`x` 在容器里会被打印成的文本，作为 `str`）与 `hash(x)`（`int`；`int` 的哈希是它自己，`str` 与 dict 的 key 用同一个哈希函数）。
 
-**实现要点**：派生方法与少量辅助函数（tuple 的 `<` 与哈希、`T | None` 的哈希、类上的 `min` / `max`）由 sema 直接写成 HIR，对 codegen 而言只是普通函数。codegen 只多认识四件事：`hir::Program::protocols` 里登记的类 `__eq__` / `__repr__`（在容器元素的比较与打印循环里调用）、`repr(x)`（用运行时的输出捕获 `ty_repr_begin` / `ty_repr_end` 复用打印器）、`str` 与 `bool` 的哈希（`ty_str_hash`），以及 `bool` 的大小比较（无符号比较，`False < True`）。定义处检查的不透明类型参数是 sema 内部的伪类，检查结束后连同其实例整体回滚。
+**类作为 key**（`dict` 的 key、`set` 的元素）：类必须**声明** `Hash`（于是也声明了 `Eq`），派生的与手写的都行；泛型类实例在字段满足时可以，检查型泛型里带 `T: Hash` 约束的 `T` 也可以（如 `class Counter<T: Hash>: counts: dict<T, int>`）。所有 dict / set 操作——`d[k]`、`d[k] = v`、`in`、`get`、`pop`、`add` / `remove` / `discard`、字面量与推导式——都可用，迭代、`keys()` / `values()` / `items()`、`sorted(d)` 与打印照常（打印用 key 类的 `__repr__`）。
+- **不回调**：运行时从不调用用户代码（wasm 上运行时是另一个模块，没有共享函数表）。每个操作由生成代码先调用 key 的 `__hash__`，再调用 sema 为该类写的**探测函数**（HIR，对 codegen 只是普通函数）：它用 `ty_dict_probe(table, hash, after)` 逐个取出 64 位哈希相等的候选位置、用 `ty_dict_probe_key` 取出存着的 key，以 `stored.__eq__(key)` 确认（与 CPython 一样，存着的 key 是接收者），返回命中的位置或 -1；最后一次 `ty_dict_probe_slot` / `_insert` / `_remove` 把位置变成 value 槽位（未命中的 `d[k]` 由生成代码调用 `__repr__` 后 `ty_dict_key_missing` panic）。`__eq__` 是直接调用、可内联；探测状态在调用方的局部变量里，所以 `__eq__` 内对同一张表的查找互不干扰。`int` / `bool` / `str` / tuple key 的快速路径与生成代码完全不变。
+- **哈希的混合**：运行时把 `__hash__` 的结果像 `int` key 一样再混合一次（`hash_int`）再取槽位，所以 `return self.x` 这样的弱哈希也分布均匀，只有 64 位哈希相等的条目才会调用 `__eq__`。
+- **哈希一致性**：`a == b` 必须蕴含 `hash(a) == hash(b)`。派生的 `Hash` 与派生的 `Eq` 逐字段对应——每个字段的哈希都与该字段的 `==` 一致（`int` 是自身、`str` 按内容、类字段用它自己声明的 `Hash` / `Eq`）——所以两者都派生时自动一致；手写 `__hash__` 或 `__eq__` 时由程序员保证。违反这条规则、把 key 放进表之后修改它的字段、或在 `__eq__` 里修改正在查找的表，结果都可能找不到已有的 key 或插入重复的 key，但不会破坏内存安全：运行时在使用前重新校验生成代码交回的每个位置。
 
-**尚未接通**（后续任务）：类作为 `dict` key / `set` 元素（`Hash` 经运行时回调）与 `sorted` 作用于 `Ord` 类，目前仍报原来的错误。f-string 插值与 `str(x)` 仍不接受容器（M2 的行为不变，写 `{repr(xs)}`），因此 `T: Repr` 的检查型泛型里写 `f"{x}"`、再用容器类型实例化时，错误出现在实例化处而不是定义处。
+**`sorted` 作用于 `Ord` 类型**：运行时只排序标量及其扁平 tuple；其他实现 `Ord` 的元素类型（类、含类的 tuple、带 `T: Ord` 约束的 `T` 的实例）由 sema 按元素类型单态化出一份自底向上的归并排序（HIR，两个缓冲区交替），只调用 `__lt__`：右段元素严格小于左段元素时才先取右段，因此是稳定排序，与 Python 一样只依赖 `<`。
+
+**容器的文本**：f-string 的 `{x}` 与 `str(x)` 接受容器（及其 `T | None`），文本就是 `repr(x)`，即 `print` 写出的内容；因此 `T: Repr` 的检查型泛型里写 `f"{x}"`，用容器类型实例化同样成立。
+
+**实现要点**：派生方法与少量辅助函数（tuple 的 `<` 与哈希、`T | None` 的哈希、类上的 `min` / `max`、类 key 的探测函数、`Ord` 类型的归并排序）由 sema 直接写成 HIR，对 codegen 而言只是普通函数。codegen 多认识的事：`hir::Program::protocols` 里登记的类 `__eq__` / `__repr__`（在容器元素的比较与打印循环里调用）与类 key 的 `__hash__` / 探测函数（每个表操作调用一次）、探测函数里的两个 HIR 节点 `TableProbe` / `TableKey`（各是一次运行时调用）、`repr(x)`（用运行时的输出捕获 `ty_repr_begin` / `ty_repr_end` 复用打印器）、`str` 与 `bool` 的哈希（`ty_str_hash`），以及 `bool` 的大小比较（无符号比较，`False < True`）。定义处检查的不透明类型参数是 sema 内部的伪类，检查结束后连同其实例整体回滚；类 key 的探测函数在所有函数体检查完之后，按类型表里出现过的 `dict<C, V>` / `set<C>` 统一登记。
 
 ---
 
