@@ -692,9 +692,10 @@ impl<'p> Emitter<'p> {
             }
             Type::List(elem) => self.lists_equal(elem, lhs, rhs),
             Type::Optional(inner) => self.optionals_equal(ty, inner, lhs, rhs),
-            // A class instance inside a container: its `__eq__` (DESIGN §3.11).
-            Type::Class(class) => match self.program.protocols.eq.get(&class) {
-                Some(func) => self.call_protocol(*func, &[(ty, lhs), (ty, rhs)]),
+            // A class instance inside a container: the same instance, or its
+            // `__eq__` says so — CPython's identity shortcut (DESIGN §3.11).
+            Type::Class(class) => match self.program.protocols.eq.get(&class).copied() {
+                Some(func) => self.same_or_eq(func, ty, lhs, rhs),
                 None => "false".to_string(),
             },
             _ => "false".to_string(),
@@ -716,6 +717,25 @@ impl<'p> Emitter<'p> {
             self.llvm_ty(ret),
             arguments.join(", ")
         ));
+        out
+    }
+
+    /// `lhs is rhs or lhs.__eq__(rhs)` on two class instances, without
+    /// calling `__eq__` when they are the same instance.
+    fn same_or_eq(&mut self, func: hir::FuncId, ty: TypeId, lhs: &str, rhs: &str) -> String {
+        let result = self.scratch("i1", 1);
+        self.emit(&format!("store i1 true, ptr {result}, align 1"));
+        let same = self.binop("icmp eq", "ptr", lhs, rhs);
+        let call = self.fresh_label("cls.eq");
+        let end = self.fresh_label("cls.end");
+        self.cond_br(&same, &end, &call);
+        self.start_block(&call);
+        let eq = self.call_protocol(func, &[(ty, lhs), (ty, rhs)]);
+        self.emit(&format!("store i1 {eq}, ptr {result}, align 1"));
+        self.br(&end);
+        self.start_block(&end);
+        let out = self.fresh();
+        self.emit(&format!("{out} = load i1, ptr {result}, align 1"));
         out
     }
 

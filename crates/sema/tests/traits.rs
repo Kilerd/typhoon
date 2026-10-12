@@ -254,10 +254,15 @@ fn class_keys_register_their_hash_and_probe() {
     let probe = program.function(probe);
     assert_eq!(probe.name, "probe<Point>");
     assert_eq!(probe.params.len(), 3);
-    // The probe confirms each candidate with the class's `__eq__`.
+    // The probe confirms each candidate by identity, then with the class's
+    // `__eq__`, the stored key being the receiver.
     let dump = dump_program(&program);
     assert!(dump.contains("probe(table:set<Point>"), "{dump}");
-    assert!(dump.contains("Point.__eq__(key_at("), "{dump}");
+    assert!(dump.contains("stored = key_at("), "{dump}");
+    assert!(
+        dump.contains("(stored:Point is key:Point):bool or Point.__eq__(stored:Point, key:Point)"),
+        "{dump}"
+    );
 }
 
 #[test]

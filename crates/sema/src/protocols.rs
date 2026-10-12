@@ -613,12 +613,14 @@ impl Checker<'_> {
     /// fn probe(table: set<C>, key: C, hash: int) -> int:
     ///     pos = probe(table, hash, -1)
     ///     while pos >= 0:
-    ///         if key_at(table, pos) == key: return pos
+    ///         stored = key_at(table, pos)
+    ///         if stored is key or stored == key: return pos
     ///         pos = probe(table, hash, pos)
     ///     return -1
     /// ```
     ///
-    /// The stored key is the receiver of `__eq__`, as in CPython.
+    /// The stored key is the receiver of `__eq__`, and the same instance
+    /// matches without calling it, as in CPython.
     fn key_probe_body(
         &mut self,
         class_ty: TypeId,
@@ -628,6 +630,7 @@ impl Checker<'_> {
         let table_ty = locals[0].ty;
         let (table, key, hash) = (hir::LocalId(0), hir::LocalId(1), hir::LocalId(2));
         let pos = push_local(locals, "pos", TypeId::INT, span);
+        let stored = push_local(locals, "stored", class_ty, span);
         let probe = |after: hir::Expr| {
             expr(
                 hir::ExprKind::TableProbe {
@@ -639,7 +642,7 @@ impl Checker<'_> {
                 span,
             )
         };
-        let stored = expr(
+        let key_at = expr(
             hir::ExprKind::TableKey {
                 table: Box::new(local(table, table_ty, span)),
                 pos: Box::new(local(pos, TypeId::INT, span)),
@@ -647,7 +650,21 @@ impl Checker<'_> {
             class_ty,
             span,
         );
-        let equal = self.eq_values(stored, local(key, class_ty, span), span);
+        let same = expr(
+            hir::ExprKind::RefEq {
+                lhs: Box::new(local(stored, class_ty, span)),
+                rhs: Box::new(local(key, class_ty, span)),
+                negated: false,
+            },
+            TypeId::BOOL,
+            span,
+        );
+        let equal = self.eq_values(
+            local(stored, class_ty, span),
+            local(key, class_ty, span),
+            span,
+        );
+        let matches = or(same, equal);
         let found = int_cmp(hir::CmpOp::Ge, local(pos, TypeId::INT, span), int(0, span));
         vec![
             assign(pos, probe(int(-1, span))),
@@ -655,7 +672,8 @@ impl Checker<'_> {
                 cond: found,
                 body: hir::Block {
                     stmts: vec![
-                        when(equal, vec![ret(local(pos, TypeId::INT, span))]),
+                        assign(stored, key_at),
+                        when(matches, vec![ret(local(pos, TypeId::INT, span))]),
                         assign(pos, probe(local(pos, TypeId::INT, span))),
                     ],
                 },

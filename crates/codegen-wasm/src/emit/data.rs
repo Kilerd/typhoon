@@ -677,13 +677,21 @@ impl<'p> Emitter<'p> {
                 self.ins(Instruction::I32Eq);
                 self.end();
             }
-            // A class instance inside a container: its `__eq__` (DESIGN §3.11).
+            // A class instance inside a container: the same instance, or its
+            // `__eq__` says so — CPython's identity shortcut (DESIGN §3.11).
             Type::Class(class) => match self.program.protocols.eq.get(&class) {
                 Some(func) => {
                     let func = *func;
                     self.ins(Instruction::LocalGet(lhs[0]));
                     self.ins(Instruction::LocalGet(rhs[0]));
+                    self.ins(Instruction::I32Eq);
+                    self.open_if(BlockType::Result(ValType::I32));
+                    self.ins(Instruction::I32Const(1));
+                    self.else_();
+                    self.ins(Instruction::LocalGet(lhs[0]));
+                    self.ins(Instruction::LocalGet(rhs[0]));
                     self.call_protocol(func);
+                    self.end();
                 }
                 None => self.ins(Instruction::I32Const(0)),
             },

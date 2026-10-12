@@ -1,0 +1,45 @@
+# Like CPython, membership and key matching treat the same instance as equal
+# without calling `__eq__`: `in` over a list, `==` between lists or tuples, and
+# finding a class key in a dict or a set check `x is y` first (DESIGN 3.11).
+# A plain `a == b` still calls `__eq__`. Every `__eq__` call is traced.
+# milestone: M3
+# expect: eq 2 1
+# expect: eq 2 1
+# expect: eq 1 1
+# expect: True False
+# expect: eq 1 1
+# expect: True False True
+# expect: eq 1 2
+# expect: eq 1 1
+# expect: eq 2 1
+# expect: 2 True False
+# expect: eq 1 1
+# expect: 1 b none
+# expect: eq 1 1
+# expect: False
+
+class N(Eq, Hash):
+    v: int
+
+    fn __eq__(self, other: N) -> bool:
+        print("eq", self.v, other.v)
+        return False
+
+    fn __hash__(self) -> int:
+        return 1
+
+fn main():
+    n = N(v=1)
+    m = N(v=2)
+    xs = [m, n]
+    print(n in xs, N(v=1) in xs)
+    print([n] == [n], [n] == [N(v=1)], (n, 1) == (n, 1))
+    s: set<N> = set()
+    s.add(n)
+    s.add(n)
+    s.add(m)
+    print(len(s), n in s, N(v=1) in s)
+    d = {n: "a"}
+    d[n] = "b"
+    print(len(d), d[n], d.get(N(v=1), "none"))
+    print(n == n)
