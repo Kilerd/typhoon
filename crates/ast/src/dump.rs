@@ -404,6 +404,25 @@ impl Dumper {
                     }
                 });
             }
+            ExprKind::DictComp {
+                key,
+                value,
+                clauses,
+            } => {
+                self.line(label, "DictComp", expr.span);
+                self.nested(|d| {
+                    d.expr("key", key);
+                    d.expr("value", value);
+                    d.comp_clauses(clauses);
+                });
+            }
+            ExprKind::SetComp { elem, clauses } => {
+                self.line(label, "SetComp", expr.span);
+                self.nested(|d| {
+                    d.expr("elem", elem);
+                    d.comp_clauses(clauses);
+                });
+            }
             ExprKind::Set(items) => {
                 self.line(label, "Set", expr.span);
                 self.nested(|d| {
@@ -430,6 +449,22 @@ impl Dumper {
                 });
             }
             ExprKind::Error => self.line(label, "Error", expr.span),
+        }
+    }
+
+    /// The `for` / `if` clauses of a dict or set comprehension.
+    fn comp_clauses(&mut self, clauses: &[CompClause]) {
+        for clause in clauses {
+            match clause {
+                CompClause::For { var, iter, span } => {
+                    self.line("for", &format!("`{}`", var.name), *span);
+                    self.nested(|d| d.expr("in", iter));
+                }
+                CompClause::If { cond, span } => {
+                    self.line("if", "If", *span);
+                    self.nested(|d| d.expr("", cond));
+                }
+            }
         }
     }
 

@@ -260,6 +260,22 @@ fn calls_indexes_and_attributes() {
     assert_eq!(expr("s[-3:]"), "(slice s (- 3) _)");
     assert_eq!(expr("s[:]"), "(slice s _ _)");
     assert_eq!(expr("s[1:][0]"), "(index (slice s 1 _) 0)");
+}
+
+#[test]
+fn dict_and_set_comprehensions() {
+    assert_eq!(expr("{x for x in xs}"), "(setcomp x for x in xs)");
+    assert_eq!(
+        expr("{w: len(w) for w in ws if w != \"\"}"),
+        "(dictcomp w:(call len w) for w in ws if (cmp w != \"\"))"
+    );
+    assert_eq!(
+        expr("{(a, b) for a in xs for b in ys}"),
+        "(setcomp (tuple a b) for a in xs for b in ys)"
+    );
+    // A literal is still a literal.
+    assert_eq!(expr("{1, 2}"), "(set 1 2)");
+    assert_eq!(expr("{1: 2}"), "(dict 1:2)");
     assert_eq!(expr("p.x"), "(. p x)");
     assert_eq!(expr("a.b.c"), "(. (. a b) c)");
     assert_eq!(expr("a.b(c).d"), "(. (call (. a b) c) d)");

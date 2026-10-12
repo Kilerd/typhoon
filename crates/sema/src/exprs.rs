@@ -55,6 +55,14 @@ impl Checker<'_> {
             ast::ExprKind::ListComp { elem, clauses } => {
                 return self.check_list_comp(elem, clauses, literal_hint, span);
             }
+            ast::ExprKind::SetComp { elem, clauses } => {
+                return self.check_set_comp(elem, clauses, literal_hint, span);
+            }
+            ast::ExprKind::DictComp {
+                key,
+                value,
+                clauses,
+            } => return self.check_dict_comp(key, value, clauses, literal_hint, span),
             // DESIGN §3.9, §4.4: a generic call infers from the expected type too.
             ast::ExprKind::Call {
                 callee,
@@ -119,6 +127,8 @@ impl Checker<'_> {
             ast::ExprKind::List(_)
             | ast::ExprKind::Tuple(_)
             | ast::ExprKind::ListComp { .. }
+            | ast::ExprKind::SetComp { .. }
+            | ast::ExprKind::DictComp { .. }
             | ast::ExprKind::Dict(_)
             | ast::ExprKind::Set(_) => self.error_expr(span),
         }

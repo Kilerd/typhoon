@@ -456,6 +456,24 @@ pub enum ExprKind {
     Dict(Vec<(Expr, Expr)>),
     /// `{a, b}`.
     Set(Vec<Expr>),
+    /// `{key: value for x in xs if cond ...}`: a dict comprehension
+    /// (DESIGN 3.10). The first clause is always a `for`.
+    DictComp {
+        /// The key expression.
+        key: Box<Expr>,
+        /// The value expression.
+        value: Box<Expr>,
+        /// The `for` / `if` clauses, in source order.
+        clauses: Vec<CompClause>,
+    },
+    /// `{elem for x in xs if cond ...}`: a set comprehension (DESIGN 3.10).
+    /// The first clause is always a `for`.
+    SetComp {
+        /// The element expression.
+        elem: Box<Expr>,
+        /// The `for` / `if` clauses, in source order.
+        clauses: Vec<CompClause>,
+    },
     /// `(a, b)`.
     Tuple(Vec<Expr>),
     /// A placeholder produced by parser error recovery. A diagnostic has

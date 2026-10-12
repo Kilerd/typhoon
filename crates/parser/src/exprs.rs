@@ -593,8 +593,33 @@ impl<'a> Parser<'a> {
             return Expr::new(ExprKind::Dict(Vec::new()), self.span_from(start));
         }
         let first = self.parse_expr();
+        // `{x for ...}` and `{k: v for ...}` are comprehensions (DESIGN 3.10),
+        // told apart from a literal by the `for` after the first element.
+        if self.at(&TokenKind::For) {
+            let clauses = self.parse_comp_clauses();
+            self.expect(&TokenKind::RBrace, "`}`");
+            return Expr::new(
+                ExprKind::SetComp {
+                    elem: Box::new(first),
+                    clauses,
+                },
+                self.span_from(start),
+            );
+        }
         if self.eat(&TokenKind::Colon) {
             let value = self.parse_expr();
+            if self.at(&TokenKind::For) {
+                let clauses = self.parse_comp_clauses();
+                self.expect(&TokenKind::RBrace, "`}`");
+                return Expr::new(
+                    ExprKind::DictComp {
+                        key: Box::new(first),
+                        value: Box::new(value),
+                        clauses,
+                    },
+                    self.span_from(start),
+                );
+            }
             let mut entries = vec![(first, value)];
             while self.eat(&TokenKind::Comma) {
                 if self.at(&TokenKind::RBrace) || self.at_eof() {

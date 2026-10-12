@@ -1,0 +1,8 @@
+# A set comprehension's elements must be hashable, as in a literal.
+# milestone: M3
+# error: `list<int>` cannot be a set element
+
+fn main():
+    xs = [1, 2]
+    s = {[x] for x in xs}
+    print(len(s))

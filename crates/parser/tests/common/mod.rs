@@ -81,6 +81,20 @@ pub fn expr_dump(src: &str) -> String {
 
 /// A compact, parenthesised rendering of an expression, so that precedence
 /// tests read like a table.
+/// ` for x in xs if c` for the clauses of a comprehension.
+fn clauses_str(clauses: &[CompClause]) -> String {
+    let mut out = String::new();
+    for clause in clauses {
+        match clause {
+            CompClause::For { var, iter, .. } => {
+                out.push_str(&format!(" for {} in {}", var.name, sexpr(iter)));
+            }
+            CompClause::If { cond, .. } => out.push_str(&format!(" if {}", sexpr(cond))),
+        }
+    }
+    out
+}
+
 pub fn sexpr(e: &Expr) -> String {
     match &e.kind {
         ExprKind::Int(v) => v.to_string(),
@@ -145,6 +159,19 @@ pub fn sexpr(e: &Expr) -> String {
             out.push(')');
             out
         }
+        ExprKind::SetComp { elem, clauses } => {
+            format!("(setcomp {}{})", sexpr(elem), clauses_str(clauses))
+        }
+        ExprKind::DictComp {
+            key,
+            value,
+            clauses,
+        } => format!(
+            "(dictcomp {}:{}{})",
+            sexpr(key),
+            sexpr(value),
+            clauses_str(clauses)
+        ),
         ExprKind::Set(items) => format!("(set{})", items_str(items)),
         ExprKind::Tuple(items) => format!("(tuple{})", items_str(items)),
         ExprKind::Dict(entries) => {

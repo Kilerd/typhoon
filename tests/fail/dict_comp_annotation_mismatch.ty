@@ -1,0 +1,8 @@
+# A dict comprehension is checked against its annotation, key and value.
+# milestone: M3
+# error: mismatched types: expected `str`, found `int`
+
+fn main():
+    xs = [1, 2]
+    d: dict<int, str> = {x: x * 2 for x in xs}
+    print(len(d))

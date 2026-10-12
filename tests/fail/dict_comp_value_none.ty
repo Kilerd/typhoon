@@ -1,0 +1,8 @@
+# A dict comprehension's value must produce a value.
+# milestone: M3
+# error: a dict value cannot have type `None`
+
+fn main():
+    xs = [1, 2]
+    d = {x: print(x) for x in xs}
+    print(len(d))
