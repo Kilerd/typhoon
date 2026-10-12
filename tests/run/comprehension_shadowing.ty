@@ -1,0 +1,34 @@
+# A comprehension variable may reuse the name of a variable in scope: it is
+# scoped to the comprehension (Python 3), so the outer binding — its type,
+# its value and what narrowing proved about it — is unchanged afterwards
+# (DESIGN 3.4, 3.10).
+# milestone: M3
+# expect: [0, 2, 4] outer
+# expect: 7 [10, 20]
+# expect: [[2], [4, 6]] 5
+# expect: 3 ["a", "b"] 4
+# expect: 9
+
+LIMIT: int = 3
+
+fn main():
+    x = "outer"
+    doubled = [x * 2 for x in range(3)]
+    print(doubled, x)
+
+    n: int | None = 7
+    if n is not None:
+        tens = [n * 10 for n in [1, 2]]
+        print(n, tens)
+
+    i = 5
+    m = [[1], [2, 3]]
+    print([[i * 2 for i in i] for i in m], i)
+
+    print(LIMIT, [LIMIT for LIMIT in ["a", "b"]], LIMIT + 1)
+
+    total = 0
+    for v in [1, 2]:
+        squares = [v * v for v in range(3)]
+        total = total + v + len(squares)
+    print(total)

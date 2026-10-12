@@ -17,9 +17,11 @@
 //! statement, for the clauses after it and the element, so
 //! `[x for x in xs if x is not None]` is a `list<T>` (DESIGN §3.8).
 //!
-//! The comprehension variables are scoped to the comprehension: they are gone
-//! once it ends. Like every other binding they may not shadow a variable that
-//! is already in scope (DESIGN §3.4).
+//! The comprehension variables are scoped to the comprehension, as in
+//! Python 3: they are gone once it ends, and one that reuses the name of a
+//! variable (or a constant) in scope hides it only inside the comprehension —
+//! the outer binding is untouched, so this is the one place a name may be
+//! bound twice in a function (DESIGN §3.4, §3.10).
 //!
 //! When the final length is known before the loop runs — a single `for`
 //! clause and no `if`, over a `list`, a `str` or a `range` with a literal
@@ -42,9 +44,8 @@ struct Comp {
     hint: Option<TypeId>,
     /// The element type, once the element has been checked.
     elem: Option<TypeId>,
-    /// Every comprehension variable bound so far, with the binding it hid
-    /// (only ever `None`: shadowing is rejected, but the scope is restored
-    /// exactly either way).
+    /// Every comprehension variable bound so far, with the binding it hides
+    /// until the comprehension ends.
     bound: Vec<(String, Option<hir::LocalId>)>,
     /// Statements run before the list is allocated: the temporaries a
     /// pre-sized loop evaluates its iterable into.
@@ -255,10 +256,12 @@ impl Checker<'_> {
         }))
     }
 
-    /// Binds a comprehension variable for the rest of the comprehension.
+    /// Binds a comprehension variable for the rest of the comprehension,
+    /// hiding any variable of the same name until the comprehension ends.
     ///
-    /// The HIR local is named `<name>.<index>`, because the same name may be
-    /// bound again by a later comprehension of the same function.
+    /// The HIR local is a fresh one named `<name>.<index>`: the outer variable
+    /// keeps its own slot and value, and the same name may be bound again by a
+    /// later comprehension of the same function.
     fn bind_comp_var(
         &mut self,
         var: &ast::Ident,
@@ -266,31 +269,10 @@ impl Checker<'_> {
         comp: &mut Comp,
     ) -> Option<hir::LocalId> {
         let name = var.as_str();
-        let mut ok = ty != TypeId::ERROR;
-        if let Some(existing) = self.scope.get(name).copied() {
-            let decl = self.locals[existing.index()].span;
-            self.error(
-                Diagnostic::error(format!(
-                    "the comprehension variable `{name}` shadows the variable `{name}`"
-                ))
-                .with_label(var.span, "declared again here")
-                .with_secondary(decl, "first declared here")
-                .with_help("rename the comprehension variable")
-                .with_note("typhoon has no shadowing, see DESIGN.md section 3.4"),
-            );
-            ok = false;
-        } else if self.consts.contains_key(name) {
-            self.error(
-                Diagnostic::error(format!("cannot assign to the constant `{name}`"))
-                    .with_label(var.span, "constants are immutable")
-                    .with_help("rename the comprehension variable"),
-            );
-            ok = false;
-        }
         let id = self.declare_hidden(name, ty, var.span);
         let previous = self.scope.insert(name.to_string(), id);
         comp.bound.push((name.to_string(), previous));
-        ok.then_some(id)
+        (ty != TypeId::ERROR).then_some(id)
     }
 
     /// Records the capacity of a lone `for` over a list or a `str`, which is

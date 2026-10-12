@@ -1,8 +1,0 @@
-# A comprehension variable may not shadow a variable in scope
-# (DESIGN 3.4, 3.10).
-# milestone: M3
-# error: the comprehension variable `x` shadows the variable `x`
-
-fn main():
-    x = 10
-    print([x * 2 for x in range(3)])

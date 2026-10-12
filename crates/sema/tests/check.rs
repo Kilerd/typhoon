@@ -1626,11 +1626,19 @@ fn comprehension_variables_are_scoped_to_the_comprehension() {
         "ys = [x for x in range(3)]\nprint(x)",
         ["cannot find value `x` in this scope"].as_slice(),
     );
-    // No shadowing (DESIGN 3.4), not even by a comprehension variable.
-    rejects_main(
-        "x = 1\nys = [x for x in range(3)]",
-        ["the comprehension variable `x` shadows the variable `x`"].as_slice(),
+    // A comprehension variable may reuse an outer name (Python 3 scoping):
+    // it is a fresh local, and the outer one reads as before afterwards.
+    let dump = ok_main("x = \"outer\"\nys = [x * 2 for x in range(3)]\nprint(x, ys)");
+    assert!(dump.contains("local x: str"), "{dump}");
+    assert!(dump.contains("local x.2: int"), "{dump}");
+    assert!(dump.contains("print(x:str, ys:list<int>)"), "{dump}");
+    // ... a narrowed outer variable stays narrowed ...
+    ok_main(
+        "n: int | None = 1\nif n is not None:\n    ys = [n for n in [\"a\"]]\n    print(n + 1, ys)",
     );
+    // ... and so may a constant's name or another comprehension's variable.
+    ok("K: int = 3\n\nfn main():\n    print([K for K in [\"k\"]], K + 1)\n");
+    ok_main("m = [[1], [2]]\nprint([[x * 2 for x in x] for x in m])");
     // A later clause sees an earlier variable.
     ok_main("m = [[1], [2, 3]]\nprint([y for row in m for y in row])");
 }
@@ -1937,10 +1945,6 @@ snapshot_error!(
 snapshot_error!(
     snapshot_unnarrowed_optional,
     "fn main():\n    n: int | None = 1\n    print(n + 1)\n"
-);
-snapshot_error!(
-    snapshot_comprehension_shadows_a_local,
-    "fn main():\n    x = 1\n    print([x * 2 for x in range(3)])\n"
 );
 snapshot_error!(
     snapshot_str_has_no_positional_indexing,
