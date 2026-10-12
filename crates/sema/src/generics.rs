@@ -1587,7 +1587,10 @@ impl Checker<'_> {
                     }
                     return;
                 }
-                match (text, self.types.get(ty)) {
+                // A `list<int> | None` (an expected type, say) still says what
+                // `list<T>` binds, the way the `| None` of a class instance does.
+                let shape = self.types.as_optional(ty).unwrap_or(ty);
+                match (text, self.types.get(shape)) {
                     ("list", Type::List(elem)) | ("set", Type::Set(elem)) if args.len() == 1 => {
                         self.unify(&args[0], elem, generics, bindings);
                     }

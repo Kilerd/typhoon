@@ -1,0 +1,40 @@
+# Inference from the expected type sees through `| None` (DESIGN 4.4): a
+# `list<int> | None`, `set<str> | None`, `dict<str, int> | None` or
+# `tuple<int, str> | None` annotation binds the type parameters of a call
+# returning `list<T>`, `set<T>`, `dict<K, V>` or `tuple<A, B>`, exactly as
+# `Box<int> | None` binds those of a call returning `Box<T>`.
+# milestone: M3
+# expect: [] set() {} (0, "")
+# expect: 0
+# expect: [1] 1
+
+class Box<T>:
+    items: list<T>
+
+fn empty_list<T>() -> list<T>:
+    return []
+
+fn empty_set<T>() -> set<T>:
+    return set()
+
+fn empty_dict<K, V>() -> dict<K, V>:
+    return {}
+
+fn pair<A, B>(a: A, b: B) -> tuple<A, B>:
+    return (a, b)
+
+fn make_box<T>() -> Box<T>:
+    return Box(items=[])
+
+fn main():
+    a: list<int> | None = empty_list()
+    s: set<str> | None = empty_set()
+    d: dict<str, int> | None = empty_dict()
+    t: tuple<int, str> | None = pair(0, "")
+    print(a, s, d, t)
+    b: Box<int> | None = make_box()
+    if b is not None:
+        print(len(b.items))
+    if a is not None:
+        a.append(1)
+        print(a, len(a))
