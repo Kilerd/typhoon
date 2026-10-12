@@ -10,8 +10,9 @@
 //! To reuse those rules unchanged, the middle operands are memoised by node
 //! address in [`Checker::chain_operands`]: the first link to lower one stores
 //! its value into a hidden temporary and yields it (a [`hir::ExprKind::Seq`]),
-//! the next link reads the temporary back. A literal or a local needs no
-//! temporary; reading it twice is free and has no effect.
+//! the next link reads the temporary back. A literal or a local (or the
+//! payload of a narrowed local) needs no temporary; reading it twice is free
+//! and has no effect.
 //!
 //! `a < b > (c)` never reaches this module: the parser reads it as the generic
 //! call `a<b>(c)` (DESIGN §3.9 rule 3), and `(a < b) > c` is the comparison.
@@ -89,16 +90,22 @@ impl Checker<'_> {
 
     /// `(first use, later reads)` of a middle operand.
     fn stash_chain_operand(&mut self, value: hir::Expr) -> (hir::Expr, hir::Expr) {
-        let pure = matches!(
-            value.kind,
-            hir::ExprKind::Local(_)
-                | hir::ExprKind::Int(_)
-                | hir::ExprKind::Float(_)
-                | hir::ExprKind::Bool(_)
-                | hir::ExprKind::Str(_)
-                | hir::ExprKind::Unit
-                | hir::ExprKind::NoneRef
-        );
+        // The payload of a narrowed local is as free to read twice as the
+        // local itself, and keeping the read lets a later `is None` link see
+        // the local behind it, as it does outside a chain.
+        let pure = match &value.kind {
+            hir::ExprKind::OptionalValue(inner) => matches!(inner.kind, hir::ExprKind::Local(_)),
+            kind => matches!(
+                kind,
+                hir::ExprKind::Local(_)
+                    | hir::ExprKind::Int(_)
+                    | hir::ExprKind::Float(_)
+                    | hir::ExprKind::Bool(_)
+                    | hir::ExprKind::Str(_)
+                    | hir::ExprKind::Unit
+                    | hir::ExprKind::NoneRef
+            ),
+        };
         // A unit operand is an error in every link, so it needs no slot.
         if pure || value.ty == TypeId::ERROR || value.ty == TypeId::UNIT {
             return (value.clone(), value);

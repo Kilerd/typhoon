@@ -1,0 +1,21 @@
+# A comparison chain over narrowed locals (DESIGN 3.6, 3.8): a narrowed
+# `int | None`, `float | None` or `bool | None` reads as its payload in every
+# link, and a later `is None` / `is not None` link tests the local itself,
+# exactly as a narrowed `str | None` does.
+# milestone: M3
+# expect: True True
+# expect: True False
+# expect: False True False
+
+fn main():
+    y: int | None = 3
+    s: str | None = "b"
+    if y is not None:
+        if s is not None:
+            print(0 < y is not None, "a" < s is not None)
+            print(1 <= y < 5 != y + 1, 5 < y is None)
+    f: float | None = 2.5
+    b: bool | None = False
+    if f is not None:
+        if b is not None:
+            print(3.0 < f is not None, False == b is not None, True == b is None)
