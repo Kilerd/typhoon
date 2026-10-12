@@ -1,0 +1,27 @@
+# A call through a bounded type parameter is positional-only: the bound
+# promises the trait's parameter types, but an implementation may name its
+# parameters differently, so `x.sub(a=10, b=1)` could bind differently per
+# type, and `int` has no parameter names at all (DESIGN 3.11).
+# milestone: M3
+# error: a call through the type parameter `T` takes positional arguments only
+# error: `other=` names a parameter of `__eq__`
+# error: `a=` names a parameter of `sub`
+# error: pass it positionally
+
+trait Sub2:
+    fn sub(self, a: int, b: int) -> int
+
+class C(Sub2):
+    k: int
+
+    fn sub(self, b: int, a: int) -> int:
+        return a - b
+
+fn same<T: Eq>(a: T, b: T) -> bool:
+    return a.__eq__(other=b)
+
+fn go<T: Sub2>(x: T) -> int:
+    return x.sub(a=10, b=1)
+
+fn main():
+    print(same(1, 1), go(C(k=0)))

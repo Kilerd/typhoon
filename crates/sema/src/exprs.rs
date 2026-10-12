@@ -1499,6 +1499,12 @@ impl Checker<'_> {
                 // The methods of a generic class are instantiated on first call.
                 .or_else(|| self.instantiate_method(class, name))
             {
+                // A bounded type parameter only promises its traits' parameter
+                // types, not their names (DESIGN §3.11).
+                Some(_) if self.is_opaque(class) && args.iter().any(|a| a.name.is_some()) => {
+                    self.keyword_through_bound(class, name, args);
+                    self.error_expr(span)
+                }
                 Some(func) => self.check_user_call(func, name.span, args, span, Some(recv)),
                 // It exists but could not be instantiated; that was reported.
                 None if self.is_generic_method(class, name.as_str()) => {

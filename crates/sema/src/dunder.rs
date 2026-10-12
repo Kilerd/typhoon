@@ -386,6 +386,38 @@ impl Checker<'_> {
         }
     }
 
+    /// Reports a keyword argument in a method call on a bounded type
+    /// parameter: such calls are positional-only, since an implementation may
+    /// name its parameters differently from the trait (DESIGN §3.11).
+    pub(crate) fn keyword_through_bound(
+        &mut self,
+        class: ClassId,
+        name: &ast::Ident,
+        args: &[ast::Arg],
+    ) {
+        for arg in args {
+            self.check_expr(&arg.value);
+        }
+        let param = self.types.class(class).name.clone();
+        let method = name.as_str();
+        if let Some(keyword) = args.iter().find_map(|a| a.name.as_ref()) {
+            self.error(
+                Diagnostic::error(format!(
+                    "a call through the type parameter `{param}` takes positional arguments only"
+                ))
+                .with_label(
+                    keyword.span,
+                    format!("`{}=` names a parameter of `{method}`", keyword.as_str()),
+                )
+                .with_help(format!(
+                    "pass it positionally; an implementation of `{method}` may name its \
+                     parameters differently from the trait"
+                ))
+                .with_note("see DESIGN.md section 3.11"),
+            );
+        }
+    }
+
     /// `repr(x)` (DESIGN §3.11): the text `print` writes for `x` inside a
     /// container, as a `str`.
     pub(crate) fn check_repr_builtin(&mut self, value: hir::Expr, span: Span) -> hir::Expr {
