@@ -74,6 +74,9 @@ pub(crate) struct FnSig {
     pub(crate) params: Vec<ParamSig>,
     pub(crate) ret: TypeId,
     pub(crate) name_span: Span,
+    /// The class a method belongs to, which `Self` names inside it
+    /// (DESIGN §3.11); `None` for a free function.
+    pub(crate) self_ty: Option<TypeId>,
 }
 
 /// One parameter of a [`FnSig`].
@@ -141,6 +144,9 @@ pub(crate) struct Checker<'a> {
     /// Greater than zero while a constant expression is checked that a
     /// short-circuit means is never evaluated (DESIGN §3.6).
     pub(crate) const_unreached: u32,
+    /// Traits, bounds, derived methods and the protocol tables codegen reads
+    /// (DESIGN §3.11).
+    pub(crate) traits: crate::traits::Traits,
 }
 
 /// Whether control can fall out of the bottom of a block.
@@ -179,6 +185,7 @@ impl<'a> Checker<'a> {
             generics: crate::generics::Generics::default(),
             chain_operands: HashMap::new(),
             const_unreached: 0,
+            traits: crate::traits::Traits::default(),
         }
     }
 
@@ -383,6 +390,9 @@ impl<'a> Checker<'a> {
                 Some(entry) => entry.ty,
                 None => {
                     if self.poisoned.contains(text) {
+                        return TypeId::ERROR;
+                    }
+                    if self.trait_as_type(text, span) {
                         return TypeId::ERROR;
                     }
                     self.error(

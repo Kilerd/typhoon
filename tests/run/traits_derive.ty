@@ -1,0 +1,51 @@
+# A class that declares `Eq` / `Ord` / `Hash` / `Repr` without writing the
+# method gets a field-wise one (DESIGN 3.11): `Eq` compares every field,
+# `Ord` is lexicographic in declaration order, `Hash` combines the field
+# hashes, `Repr` is dataclass-style with `str` fields quoted.
+# milestone: M3
+# expect: Person(name="Ada", age=36, tags=["math", "code"], boss=None)
+# expect: Person(name="Bob", age=40, tags=[], boss=Person(name="Ada", age=36, tags=["math", "code"], boss=None))
+# expect: True False True
+# expect: True False
+# expect: Key(a=1, b="x") Key(a=1, b="y") Key(a=2, b="a")
+# expect: True True False False True
+# expect: True False
+# expect: Empty() True False
+# expect: Pair(first=1, second=2) Pair(first="a", second="b") True False
+# expect: Pair(first=Key(a=1, b="x"), second=Key(a=2, b="a")) True
+
+class Person(Eq, Repr):
+    name: str
+    age: int
+    tags: list<str>
+    boss: Person | None
+
+class Key(Eq, Ord, Hash, Repr):
+    a: int
+    b: str
+
+class Empty(Eq, Ord, Hash, Repr):
+    pass
+
+class Pair<T>(Eq, Repr):
+    first: T
+    second: T
+
+fn main():
+    ada = Person(name="Ada", age=36, tags=["math", "code"], boss=None)
+    bob = Person(name="Bob", age=40, tags=[], boss=ada)
+    print(ada)
+    print(bob)
+    ada2 = Person(name="Ada", age=36, tags=["math", "code"], boss=None)
+    print(ada == ada2, ada == bob, ada != bob)
+    print(bob == Person(name="Bob", age=40, tags=[], boss=ada2), ada is ada2)
+    k1 = Key(a=1, b="x")
+    k2 = Key(a=1, b="y")
+    k3 = Key(a=2, b="a")
+    print(k1, k2, k3)
+    print(k1 < k2, k2 < k3, k3 < k1, k1 < k1, k1 <= k1)
+    print(hash(k1) == hash(Key(a=1, b="x")), hash(k1) == hash(k2))
+    print(Empty(), Empty() == Empty(), Empty() < Empty())
+    print(Pair(first=1, second=2), Pair(first="a", second="b"), Pair(first=1, second=2) == Pair(first=1, second=2), Pair(first=1, second=2) == Pair(first=2, second=1))
+    p = Pair(first=k1, second=k3)
+    print(p, p == Pair(first=Key(a=1, b="x"), second=k3))

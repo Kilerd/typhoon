@@ -1,0 +1,85 @@
+# Bounded generics are checked once at their definition and accept every type
+# that implements the bounds: user classes that declare the trait, and the
+# builtin types per the table of DESIGN 3.11.
+# milestone: M3
+# expect: <1> <"x"> <Dog(n="d")> <[1, 2]>
+# expect: 2 1
+# expect: True True False
+# expect: 6 4.0 ab
+# expect: Money(cents=12)
+# expect: 9 z (2, "a") True
+# expect: Money(cents=30)
+# expect: True True True True
+# expect: hello fido Dog(n="fido")
+# expect: True True True 5 -2.5
+# expect: Money(cents=1)
+
+trait Named:
+    fn name(self) -> str
+    fn greet(self) -> str:
+        return "hello " + self.name()
+
+class Dog(Named, Eq, Repr):
+    n: str
+
+    fn name(self) -> str:
+        return self.n
+
+class Money(Add, Eq, Ord, Hash, Repr):
+    cents: int
+
+    fn __add__(self, other: Money) -> Money:
+        return Money(cents=self.cents + other.cents)
+
+fn show<T: Repr>(x: T) -> str:
+    return "<" + repr(x) + ">"
+
+fn count_eq<T: Eq>(xs: list<T>, x: T) -> int:
+    n = 0
+    for y in xs:
+        if y == x:
+            n = n + 1
+    return n
+
+fn has<T: Eq>(xs: list<T>, x: T) -> bool:
+    return x in xs
+
+fn sum_all<T: Add>(xs: list<T>, zero: T) -> T:
+    s = zero
+    for x in xs:
+        s = s + x
+    return s
+
+fn largest<T: Ord>(xs: list<T>) -> T:
+    best = xs[0]
+    for x in xs:
+        if x > best:
+            best = x
+    return best
+
+# `hash(x)` and `x.__hash__()` are the same call for every `Hash` type.
+fn same_hash<T: Hash>(x: T) -> bool:
+    return hash(x) == x.__hash__()
+
+fn describe<T: Named + Repr>(x: T) -> str:
+    return x.greet() + " " + repr(x)
+
+# An unbounded parameter in a checked item may only be moved around.
+fn first_or<T: Repr, U>(xs: list<U>, d: U, tag: T) -> U:
+    if len(xs) > 0:
+        return xs[0]
+    return d
+
+fn main():
+    print(show(1), show("x"), show(Dog(n="d")), show([1, 2]))
+    print(count_eq([1, 2, 1], 1), count_eq([Dog(n="a"), Dog(n="b")], Dog(n="a")))
+    print(has(["a"], "a"), has([(1, 2)], (1, 2)), has([Dog(n="q")], Dog(n="z")))
+    print(sum_all([1, 2, 3], 0), sum_all([1.5, 2.5], 0.0), sum_all(["a", "b"], ""))
+    print(sum_all([Money(cents=5), Money(cents=7)], Money(cents=0)))
+    print(largest([3, 9, 2]), largest(["b", "z", "a"]), largest([(1, "b"), (2, "a")]), largest([True, False]))
+    print(largest([Money(cents=3), Money(cents=30), Money(cents=4)]))
+    o: int | None = 3
+    print(same_hash(5), same_hash("ab"), same_hash((1, "x")), same_hash(o))
+    print(describe(Dog(n="fido")))
+    print((1).__eq__(1), "a".__lt__("b"), (2).__hash__() == hash(2), (2).__add__(3), (2.5).__neg__())
+    print(first_or([Money(cents=1)], Money(cents=2), 0))

@@ -16,6 +16,8 @@
 
 use typhoon_diag::Span;
 
+use std::collections::HashMap;
+
 use crate::types::{ClassId, TypeId};
 
 /// Index of a function in [`Program::functions`].
@@ -49,6 +51,9 @@ pub struct Program {
     pub functions: Vec<Function>,
     /// The `main` function (DESIGN §3.3).
     pub main: FuncId,
+    /// The `__eq__` / `__repr__` of the classes whose instances are compared
+    /// or printed *inside* a container, an optional or a tuple (DESIGN §3.11).
+    pub protocols: Protocols,
 }
 
 impl Program {
@@ -56,6 +61,23 @@ impl Program {
     pub fn function(&self, id: FuncId) -> &Function {
         &self.functions[id.index()]
     }
+}
+
+/// The protocol methods codegen calls on its own (DESIGN §3.11).
+///
+/// A class instance compared or printed directly is lowered to an ordinary
+/// [`ExprKind::Call`] of its dunder method. Inside a `list`, a tuple or a
+/// `T | None`, though, codegen walks the structure itself — the element loop
+/// of `xs == ys`, `v in xs`, `print(xs)` — and reaches the class there; these
+/// tables tell it which function to call for one element. Every method listed
+/// has the canonical signature: `__eq__(self, other: C) -> bool` and
+/// `__repr__(self) -> str`.
+#[derive(Debug, Clone, Default)]
+pub struct Protocols {
+    /// `__eq__` per class.
+    pub eq: HashMap<ClassId, FuncId>,
+    /// `__repr__` per class.
+    pub repr: HashMap<ClassId, FuncId>,
 }
 
 /// One user function.
@@ -479,8 +501,18 @@ pub enum ExprKind {
         /// The arguments, already checked against the method's signature.
         args: Vec<Expr>,
     },
-    /// `str(x)` on an `int`, `float` or `bool`.
+    /// `str(x)` on an `int`, `float` or `bool` (or a `T | None` of one), and
+    /// on a class instance with a `__repr__` (DESIGN §3.11), which codegen
+    /// finds in [`Program::protocols`].
     StrFrom(Box<Expr>),
+    /// `repr(x)`: the text `print` writes for `x` inside a container — a `str`
+    /// quoted, a class through its `__repr__` — as a fresh `str`
+    /// (DESIGN §3.11, §4.6).
+    Repr(Box<Expr>),
+    /// The hash of a `bool` or a `str` (an `int` hashes to itself and needs no
+    /// node; tuples, optionals and classes are lowered by the checker),
+    /// DESIGN §3.11.
+    Hash(Box<Expr>),
 
     // -- list --------------------------------------------------------------
     /// A list literal; `elem` is the element type even when `items` is empty.

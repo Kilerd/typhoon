@@ -1,0 +1,14 @@
+# Traits are dispatched statically: a trait is a bound, never the type of a
+# value (DESIGN 3.11 rule 4).
+# milestone: M3
+# error: the trait `Shape` cannot be used as a type
+# error: `fn f<T: Shape>(x: T)`
+
+trait Shape:
+    fn area(self) -> float
+
+fn total(xs: list<Shape>) -> float:
+    return 0.0
+
+fn main():
+    print(1)

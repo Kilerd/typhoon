@@ -1,0 +1,46 @@
+# In an unbounded (template) generic, an operator on a class type argument
+# resolves to its dunder once the instance is checked: `max<Point>` uses
+# `__lt__` (DESIGN 3.9, 3.11). The builtins `min` / `max` take any `Ord` type.
+# milestone: M3
+# expect: Point(x=2, y=0) 7 b
+# expect: Point(x=1, y=5) Point(x=2, y=0)
+# expect: Point(x=1, y=5) Point(x=2, y=0) (1, "z") False
+# expect: Money(9) Money(2)
+
+class Point(Eq, Ord, Repr):
+    x: int
+    y: int
+
+class Money:
+    cents: int
+
+    fn __lt__(self, other: Money) -> bool:
+        return self.cents < other.cents
+
+    fn __eq__(self, other: Money) -> bool:
+        return self.cents == other.cents
+
+    fn __add__(self, other: Money) -> Money:
+        return Money(cents=self.cents + other.cents)
+
+    fn __repr__(self) -> str:
+        return f"Money({self.cents})"
+
+fn max<T>(a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+fn total<T>(xs: list<T>, zero: T) -> T:
+    s = zero
+    for x in xs:
+        s = s + x
+    return s
+
+fn main():
+    p = Point(x=1, y=5)
+    q = Point(x=2, y=0)
+    print(max<Point>(p, q), max(3, 7), max("a", "b"))
+    print(min(p, q), max(p, q))
+    print(min(q, p), max(q, p), min((1, "z"), (2, "a")), min(True, False))
+    print(total([Money(cents=4), Money(cents=5)], Money(cents=0)), min(Money(cents=2), Money(cents=3)))

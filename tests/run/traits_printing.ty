@@ -1,0 +1,54 @@
+# `print`, f-strings, `str` and `repr` render a class through `__repr__`, also
+# inside lists, tuples, dicts and `T | None`; `==` and `in` reach a class's
+# `__eq__` through containers and optionals (DESIGN 3.11).
+# milestone: M3
+# expect: [P(1), P(2)] (P(1), "one") {"a": P(1)}
+# expect: [[P(1)], []] [P(1), None]
+# expect: P(1) | P(2) | P(1) | "P(1)"
+# expect: None P(2) | m=None m=P(2) | str: P(2)
+# expect: True False True True
+# expect: True False True False
+# expect: True True False
+# expect: 1 2 True
+# expect: needle 1
+# expect: haystack
+# expect: True
+
+class P:
+    v: int
+
+    fn __repr__(self) -> str:
+        return f"P({self.v})"
+
+    fn __eq__(self, other: P) -> bool:
+        return self.v == other.v
+
+    fn __hash__(self) -> int:
+        return self.v
+
+# `in` over a list of classes still evaluates the needle first.
+fn needle(v: int) -> P:
+    print("needle", v)
+    return P(v=v)
+
+fn haystack() -> list<P>:
+    print("haystack")
+    return [P(v=2), P(v=1)]
+
+fn main():
+    a = P(v=1)
+    b = P(v=2)
+    d: dict<str, P> = {"a": a}
+    print([a, b], (a, "one"), d)
+    empty: list<P> = []
+    maybes: list<P | None> = [a, None]
+    print([[a], empty], maybes)
+    print(f"{a} | {b} | {str(a)} | {repr(repr(a))}")
+    n: P | None = None
+    m: P | None = b
+    print(n, m, "|", f"m={n}", f"m={m}", "|", "str: " + str(m))
+    print(m == b, n == m, n is None, m != a)
+    print([a, b] == [P(v=1), P(v=2)], [a] == [b], (a, 1) == (P(v=1), 1), P(v=1) in [b])
+    print(P(v=2) in [a, b], None in maybes, b in maybes)
+    print(hash(a), hash(m), hash(n) == hash(n))
+    print(needle(1) in haystack())

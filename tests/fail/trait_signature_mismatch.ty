@@ -1,0 +1,18 @@
+# A method that implements a trait must have the trait's signature, with
+# `Self` standing for the class (DESIGN 3.11).
+# milestone: M3
+# error: the method `same` of `Tag` does not match the trait `Same`
+# error: expected `fn same(self, other: Tag) -> bool`
+# error: found `fn same(self, other: int) -> bool`
+
+trait Same:
+    fn same(self, other: Self) -> bool
+
+class Tag(Same):
+    v: int
+
+    fn same(self, other: int) -> bool:
+        return self.v == other
+
+fn main():
+    print(Tag(v=1).same(1))

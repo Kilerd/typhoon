@@ -113,7 +113,9 @@ impl<'p> Emitter<'p> {
             hir::ExprKind::BoolCmp { op, lhs, rhs } => {
                 let lhs = self.expr(func, lhs);
                 let rhs = self.expr(func, rhs);
-                let pred = int_predicate(*op);
+                // Unsigned, so that `False < True` (an `i1` `true` is -1
+                // when read as signed).
+                let pred = bool_predicate(*op);
                 self.binop(&format!("icmp {pred}"), "i1", &lhs, &rhs)
             }
             hir::ExprKind::FloatCmp { op, lhs, rhs } => {
@@ -256,6 +258,34 @@ impl<'p> Emitter<'p> {
                 let ty = value.ty;
                 let value = self.expr(func, value);
                 self.format_value(ty, &value, hir::FormatSpec::Display)
+            }
+            // `repr(x)`: the printer, writing into a capture buffer
+            // (DESIGN §3.11).
+            hir::ExprKind::Repr(value) => {
+                let ty = value.ty;
+                let value = self.expr(func, value);
+                self.decls.insert("declare void @ty_repr_begin() nounwind");
+                self.decls
+                    .insert("declare noalias ptr @ty_repr_end() nounwind");
+                self.emit("call void @ty_repr_begin()");
+                self.print_value(ty, &value, true);
+                let out = self.fresh();
+                self.emit(&format!("{out} = call ptr @ty_repr_end()"));
+                out
+            }
+            hir::ExprKind::Hash(value) => {
+                let ty = value.ty;
+                let value = self.expr(func, value);
+                if ty == TypeId::BOOL {
+                    let out = self.fresh();
+                    self.emit(&format!("{out} = zext i1 {value} to i64"));
+                    return out;
+                }
+                self.decls
+                    .insert("declare i64 @ty_str_hash(ptr nocapture readonly) nounwind willreturn");
+                let out = self.fresh();
+                self.emit(&format!("{out} = call i64 @ty_str_hash(ptr {value})"));
+                out
             }
 
             // -- list -----------------------------------------------------
@@ -851,8 +881,22 @@ impl<'p> Emitter<'p> {
                 self.emit(&format!("{out} = call ptr @ty_str_from_bool(i8 {byte})"));
                 out
             }
+            // `str(obj)` and `{obj}`: its `__repr__` (DESIGN §3.11).
+            Type::Class(class) => self.class_repr(ty, class, value),
             _ => self.string_literal(""),
         }
+    }
+}
+
+/// Predicates for `bool`, compared as unsigned so that `False < True`.
+fn bool_predicate(op: hir::CmpOp) -> &'static str {
+    match op {
+        hir::CmpOp::Eq => "eq",
+        hir::CmpOp::Ne => "ne",
+        hir::CmpOp::Lt => "ult",
+        hir::CmpOp::Le => "ule",
+        hir::CmpOp::Gt => "ugt",
+        hir::CmpOp::Ge => "uge",
     }
 }
 

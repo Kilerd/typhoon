@@ -47,6 +47,8 @@ pub enum Item {
     Class(ClassDecl),
     /// `NAME: T = value`
     Const(ConstDecl),
+    /// `trait Name:` (DESIGN 3.11)
+    Trait(TraitDecl),
 }
 
 impl Item {
@@ -56,6 +58,7 @@ impl Item {
             Item::Fn(d) => d.span,
             Item::Class(d) => d.span,
             Item::Const(d) => d.span,
+            Item::Trait(d) => d.span,
         }
     }
 
@@ -65,18 +68,20 @@ impl Item {
             Item::Fn(d) => &d.name,
             Item::Class(d) => &d.name,
             Item::Const(d) => &d.name,
+            Item::Trait(d) => &d.name,
         }
     }
 }
 
-/// One generic parameter, e.g. the `T` of `fn max<T>(...)`.
-///
-/// MVP has no bounds (DESIGN 3.9), so a parameter is just a name.
+/// One generic parameter, e.g. the `T` of `fn max<T>(...)` or the
+/// `T: Eq + Hash` of `fn f<T: Eq + Hash>(...)` (DESIGN 3.9, 3.11).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenericParam {
     /// The parameter name.
     pub name: Ident,
-    /// Span of the parameter.
+    /// The trait bounds after `:`, empty for an unbounded parameter.
+    pub bounds: Vec<Ident>,
+    /// Span of the parameter, including its bounds.
     pub span: Span,
 }
 
@@ -144,11 +149,36 @@ pub struct ClassDecl {
     pub name: Ident,
     /// Generic parameters, empty for a non-generic class.
     pub generics: Vec<GenericParam>,
+    /// The traits listed in parentheses after the name, `class C(T1, T2):`
+    /// (DESIGN 3.11). Empty when there are none.
+    pub traits: Vec<Ident>,
     /// Fields, in declaration order.
     pub fields: Vec<Field>,
     /// Methods, in declaration order.
     pub methods: Vec<FnDecl>,
     /// Span from the `class` keyword to the end of the body.
+    pub span: Span,
+}
+
+/// One method of a trait: a signature, plus a default body when one was
+/// written (DESIGN 3.11).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitMethod {
+    /// The signature; `decl.body` is empty when there is no default body.
+    pub decl: FnDecl,
+    /// Whether a default body was written. A method without one is required.
+    pub has_body: bool,
+}
+
+/// A `trait` declaration (DESIGN 3.11): a set of method signatures, some with
+/// default bodies. Traits have no fields.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDecl {
+    /// The trait name.
+    pub name: Ident,
+    /// The methods, in declaration order.
+    pub methods: Vec<TraitMethod>,
+    /// Span from the `trait` keyword to the end of the body.
     pub span: Span,
 }
 
@@ -590,6 +620,7 @@ mod tests {
         let c = Item::Class(ClassDecl {
             name: ident("Point"),
             generics: vec![],
+            traits: vec![],
             fields: vec![],
             methods: vec![],
             span: sp(3, 20),

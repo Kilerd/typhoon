@@ -1,0 +1,18 @@
+# A class that declares a trait must define every required method; the error
+# names the trait and the method (DESIGN 3.11).
+# milestone: M3
+# error: `Square` does not implement the method `name` required by the trait `Shape`
+# error: add `fn name(self) -> str` to `Square`
+
+trait Shape:
+    fn area(self) -> float
+    fn name(self) -> str
+
+class Square(Shape):
+    side: float
+
+    fn area(self) -> float:
+        return self.side * self.side
+
+fn main():
+    print(Square(side=2.0).area())

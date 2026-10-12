@@ -11,7 +11,7 @@ const EXAMPLES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples");
 
 /// How many `.ty` files `examples/` is expected to contain; a guard against a
 /// silently empty test.
-const EXPECTED_COUNT: usize = 11;
+const EXPECTED_COUNT: usize = 12;
 
 /// Every example, as `(file stem, text)`, sorted by name.
 fn examples() -> Vec<(String, String)> {

@@ -1,0 +1,20 @@
+# A call site must pass type arguments that declare the bounds; having a
+# `__lt__` is not enough, traits are nominal (DESIGN 3.11).
+# milestone: M3
+# error: the type `Point` does not implement the trait `Ord`
+# error: required by the bound `T: Ord` of `largest`
+# error: `class Point(Eq, Ord):`
+
+class Point:
+    x: int
+
+    fn __lt__(self, other: Point) -> bool:
+        return self.x < other.x
+
+fn largest<T: Ord>(a: T, b: T) -> T:
+    if a < b:
+        return b
+    return a
+
+fn main():
+    print(largest(Point(x=1), Point(x=2)).x)

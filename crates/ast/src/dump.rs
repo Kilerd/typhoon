@@ -109,15 +109,35 @@ impl Dumper {
             Item::Fn(decl) => self.fn_decl("", decl),
             Item::Class(decl) => self.class_decl(decl),
             Item::Const(decl) => self.const_decl(decl),
+            Item::Trait(decl) => self.trait_decl(decl),
         }
+    }
+
+    fn generic_params(&mut self, generics: &[GenericParam]) {
+        for g in generics {
+            self.line("generic", &format!("`{}`", g.name.name), g.span);
+            self.nested(|d| {
+                for bound in &g.bounds {
+                    d.line("bound", &format!("`{}`", bound.name), bound.span);
+                }
+            });
+        }
+    }
+
+    fn trait_decl(&mut self, decl: &TraitDecl) {
+        self.line("", &format!("TraitDecl `{}`", decl.name.name), decl.span);
+        self.nested(|d| {
+            for m in &decl.methods {
+                let label = if m.has_body { "default" } else { "required" };
+                d.fn_decl(label, &m.decl);
+            }
+        });
     }
 
     fn fn_decl(&mut self, label: &str, decl: &FnDecl) {
         self.line(label, &format!("FnDecl `{}`", decl.name.name), decl.span);
         self.nested(|d| {
-            for g in &decl.generics {
-                d.line("generic", &format!("`{}`", g.name.name), g.span);
-            }
+            d.generic_params(&decl.generics);
             for p in &decl.params {
                 let flag = if p.is_self { " (self)" } else { "" };
                 d.line("param", &format!("`{}`{}", p.name.name, flag), p.span);
@@ -140,8 +160,9 @@ impl Dumper {
     fn class_decl(&mut self, decl: &ClassDecl) {
         self.line("", &format!("ClassDecl `{}`", decl.name.name), decl.span);
         self.nested(|d| {
-            for g in &decl.generics {
-                d.line("generic", &format!("`{}`", g.name.name), g.span);
+            d.generic_params(&decl.generics);
+            for t in &decl.traits {
+                d.line("trait", &format!("`{}`", t.name), t.span);
             }
             for f in &decl.fields {
                 d.line("field", &format!("`{}`", f.name.name), f.span);

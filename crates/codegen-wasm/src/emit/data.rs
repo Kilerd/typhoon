@@ -25,7 +25,7 @@ use typhoon_sema::hir;
 use typhoon_sema::types::{ClassId, Type, TypeId};
 use wasm_encoder::{BlockType, Instruction, MemArg, ValType};
 
-use super::Emitter;
+use super::{Emitter, USER_CALL_BASE};
 use crate::layout::{
     LIST_CAP_OFFSET, LIST_DATA_OFFSET, LIST_LEN_OFFSET, STR_CHAR_LEN_OFFSET, STR_HEADER,
 };
@@ -677,7 +677,39 @@ impl<'p> Emitter<'p> {
                 self.ins(Instruction::I32Eq);
                 self.end();
             }
+            // A class instance inside a container: its `__eq__` (DESIGN §3.11).
+            Type::Class(class) => match self.program.protocols.eq.get(&class) {
+                Some(func) => {
+                    let func = *func;
+                    self.ins(Instruction::LocalGet(lhs[0]));
+                    self.ins(Instruction::LocalGet(rhs[0]));
+                    self.call_protocol(func);
+                }
+                None => self.ins(Instruction::I32Const(0)),
+            },
             _ => self.ins(Instruction::I32Const(0)),
+        }
+    }
+
+    /// Calls the protocol method `func` (DESIGN §3.11) on the arguments
+    /// already on the operand stack.
+    pub(crate) fn call_protocol(&mut self, func: hir::FuncId) {
+        self.ins(Instruction::Call(USER_CALL_BASE + func.index() as u32));
+    }
+
+    /// Replaces the class instance on top of the stack with the `str` its
+    /// `__repr__` returns (DESIGN §3.11).
+    pub(crate) fn class_repr(&mut self, class: ClassId) {
+        match self.program.protocols.repr.get(&class) {
+            Some(func) => {
+                let func = *func;
+                self.call_protocol(func);
+            }
+            None => {
+                self.ins(Instruction::Drop);
+                let empty = self.string_literal("");
+                self.ins(Instruction::GlobalGet(empty));
+            }
         }
     }
 
@@ -889,6 +921,15 @@ impl<'p> Emitter<'p> {
                 self.else_();
                 self.print_raw("None");
                 self.end();
+            }
+            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11).
+            Type::Class(class) => {
+                self.ins(Instruction::LocalGet(value[0]));
+                self.class_repr(class);
+                let text = self.scratch(ValType::I32);
+                self.ins(Instruction::LocalSet(text));
+                self.str_parts(text);
+                self.call_rt(Rt::PrintStr);
             }
             _ => {}
         }

@@ -1,0 +1,15 @@
+# `v * 2.0` calls `v.__mul__(2.0)`; there are no reflected operators, so
+# `2.0 * v` has no meaning (DESIGN 3.11).
+# milestone: M3
+# error: mismatched types: expected `float`, found `Vec`
+
+class Vec:
+    x: float
+
+    fn __mul__(self, k: float) -> Vec:
+        return Vec(x=self.x * k)
+
+fn main():
+    v = Vec(x=1.0)
+    print((v * 2.0).x)
+    print((2.0 * v).x)

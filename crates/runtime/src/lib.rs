@@ -128,21 +128,51 @@ impl Write for HostOut {
     }
 }
 
-static OUT: OnceLock<Mutex<OutSink>> = OnceLock::new();
+/// Where `print` writes: the buffered stdout, or — between [`ty_repr_begin`]
+/// and [`ty_repr_end`] — the innermost capture buffer, which is how `repr(x)`
+/// reuses the printer to render any value into a `str` (DESIGN §3.11).
+pub struct Output {
+    sink: OutSink,
+    captures: Vec<Vec<u8>>,
+}
+
+impl Write for Output {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        match self.captures.last_mut() {
+            Some(buf) => {
+                buf.extend_from_slice(data);
+                Ok(data.len())
+            }
+            None => self.sink.write(data),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.sink.flush()
+    }
+}
+
+static OUT: OnceLock<Mutex<Output>> = OnceLock::new();
 
 /// A fresh buffered stdout.
 #[cfg(not(target_arch = "wasm32"))]
-fn new_out() -> Mutex<OutSink> {
-    Mutex::new(BufWriter::with_capacity(64 * 1024, io::stdout()))
+fn new_out() -> Mutex<Output> {
+    Mutex::new(Output {
+        sink: BufWriter::with_capacity(64 * 1024, io::stdout()),
+        captures: Vec::new(),
+    })
 }
 
 #[cfg(target_arch = "wasm32")]
-fn new_out() -> Mutex<OutSink> {
-    Mutex::new(HostOut::new(1))
+fn new_out() -> Mutex<Output> {
+    Mutex::new(Output {
+        sink: HostOut::new(1),
+        captures: Vec::new(),
+    })
 }
 
 /// Locks the process-global buffered stdout, recovering from poisoning.
-fn out() -> MutexGuard<'static, OutSink> {
+fn out() -> MutexGuard<'static, Output> {
     OUT.get_or_init(new_out)
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -1386,6 +1416,33 @@ pub fn write_str_repr(w: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
     }
     w.write_all(&bytes[verbatim..])?;
     w.write_all(b"\"")
+}
+
+/// Starts capturing `print` output for `repr(x)`: until the matching
+/// [`ty_repr_end`], everything printed goes into a fresh buffer instead of
+/// stdout. Captures nest, so a `__repr__` may itself use `repr`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_repr_begin() {
+    out().captures.push(Vec::new());
+}
+
+/// Ends the innermost capture started by [`ty_repr_begin`] and returns what
+/// was printed into it as a fresh `str`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ty_repr_end() -> *mut u8 {
+    let captured = out().captures.pop().unwrap_or_default();
+    str_new(&captured)
+}
+
+/// The hash of a `str`, `hash(s)` (DESIGN §3.11): the same function the
+/// dict uses for its `str` keys.
+///
+/// # Safety
+///
+/// `s` must point at a well-formed string header.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_str_hash(s: *const u8) -> i64 {
+    dict::hash_bytes(unsafe { str_bytes(s) }) as i64
 }
 
 /// Prints a `str` in its container form: quoted and escaped (DESIGN §4.6).

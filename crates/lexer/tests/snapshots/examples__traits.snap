@@ -1,0 +1,499 @@
+---
+source: crates/lexer/tests/examples.rs
+expression: dump_tokens(&tokens)
+---
+Trait @332..337
+Ident `Shape` @338..343
+Colon @343..344
+Newline @344..345
+Indent @349..349
+Fn @349..351
+Ident `area` @352..356
+LParen @356..357
+Ident `self` @357..361
+RParen @361..362
+Arrow @363..365
+Ident `float` @366..371
+Newline @371..372
+Fn @376..378
+Ident `name` @379..383
+LParen @383..384
+Ident `self` @384..388
+RParen @388..389
+Arrow @390..392
+Ident `str` @393..396
+Newline @396..397
+Fn @401..403
+Ident `describe` @404..412
+LParen @412..413
+Ident `self` @413..417
+RParen @417..418
+Arrow @419..421
+Ident `str` @422..425
+Colon @425..426
+Newline @426..427
+Indent @435..435
+Return @435..441
+FString @442..480
+    Expr "self.name()" @445..456 full @444..457
+    Literal " of area " @457..466
+    Expr "self.area()" @467..478 full @466..479
+Newline @480..481
+Dedent @482..482
+Dedent @482..482
+Class @482..487
+Ident `Circle` @488..494
+LParen @494..495
+Ident `Shape` @495..500
+RParen @500..501
+Colon @501..502
+Newline @502..503
+Indent @507..507
+Ident `r` @507..508
+Colon @508..509
+Ident `float` @510..515
+Newline @515..516
+Fn @521..523
+Ident `area` @524..528
+LParen @528..529
+Ident `self` @529..533
+RParen @533..534
+Arrow @535..537
+Ident `float` @538..543
+Colon @543..544
+Newline @544..545
+Indent @553..553
+Return @553..559
+Float 3.14159 @560..567
+Star @568..569
+Ident `self` @570..574
+Dot @574..575
+Ident `r` @575..576
+Star @577..578
+Ident `self` @579..583
+Dot @583..584
+Ident `r` @584..585
+Newline @585..586
+Dedent @591..591
+Fn @591..593
+Ident `name` @594..598
+LParen @598..599
+Ident `self` @599..603
+RParen @603..604
+Arrow @605..607
+Ident `str` @608..611
+Colon @611..612
+Newline @612..613
+Indent @621..621
+Return @621..627
+Str "circle" @628..636
+Newline @636..637
+Dedent @638..638
+Dedent @638..638
+Class @638..643
+Ident `Square` @644..650
+LParen @650..651
+Ident `Shape` @651..656
+RParen @656..657
+Colon @657..658
+Newline @658..659
+Indent @663..663
+Ident `side` @663..667
+Colon @667..668
+Ident `float` @669..674
+Newline @674..675
+Fn @680..682
+Ident `area` @683..687
+LParen @687..688
+Ident `self` @688..692
+RParen @692..693
+Arrow @694..696
+Ident `float` @697..702
+Colon @702..703
+Newline @703..704
+Indent @712..712
+Return @712..718
+Ident `self` @719..723
+Dot @723..724
+Ident `side` @724..728
+Star @729..730
+Ident `self` @731..735
+Dot @735..736
+Ident `side` @736..740
+Newline @740..741
+Dedent @746..746
+Fn @746..748
+Ident `name` @749..753
+LParen @753..754
+Ident `self` @754..758
+RParen @758..759
+Arrow @760..762
+Ident `str` @763..766
+Colon @766..767
+Newline @767..768
+Indent @776..776
+Return @776..782
+Str "square" @783..791
+Newline @791..792
+Dedent @797..797
+Fn @797..799
+Ident `describe` @800..808
+LParen @808..809
+Ident `self` @809..813
+RParen @813..814
+Arrow @815..817
+Ident `str` @818..821
+Colon @821..822
+Newline @822..823
+Indent @831..831
+Return @831..837
+FString @838..869
+    Literal "square of area " @840..855
+    Expr "self.area()" @856..867 full @855..868
+Newline @869..870
+Dedent @930..930
+Dedent @930..930
+Fn @930..932
+Ident `total_area` @933..943
+Lt @943..944
+Ident `T` @944..945
+Colon @945..946
+Ident `Shape` @947..952
+Gt @952..953
+LParen @953..954
+Ident `xs` @954..956
+Colon @956..957
+Ident `list` @958..962
+Lt @962..963
+Ident `T` @963..964
+Gt @964..965
+RParen @965..966
+Arrow @967..969
+Ident `float` @970..975
+Colon @975..976
+Newline @976..977
+Indent @981..981
+Ident `s` @981..982
+Eq @983..984
+Float 0.0 @985..988
+Newline @988..989
+For @993..996
+Ident `x` @997..998
+In @999..1001
+Ident `xs` @1002..1004
+Colon @1004..1005
+Newline @1005..1006
+Indent @1014..1014
+Ident `s` @1014..1015
+Eq @1016..1017
+Ident `s` @1018..1019
+Plus @1020..1021
+Ident `x` @1022..1023
+Dot @1023..1024
+Ident `area` @1024..1028
+LParen @1028..1029
+RParen @1029..1030
+Newline @1030..1031
+Dedent @1035..1035
+Return @1035..1041
+Ident `s` @1042..1043
+Newline @1043..1044
+Dedent @1097..1097
+Class @1097..1102
+Ident `Point` @1103..1108
+LParen @1108..1109
+Ident `Eq` @1109..1111
+Comma @1111..1112
+Ident `Ord` @1113..1116
+Comma @1116..1117
+Ident `Hash` @1118..1122
+Comma @1122..1123
+Ident `Repr` @1124..1128
+RParen @1128..1129
+Colon @1129..1130
+Newline @1130..1131
+Indent @1135..1135
+Ident `x` @1135..1136
+Colon @1136..1137
+Ident `int` @1138..1141
+Newline @1141..1142
+Ident `y` @1146..1147
+Colon @1147..1148
+Ident `int` @1149..1152
+Newline @1152..1153
+Dedent @1154..1154
+Class @1154..1159
+Ident `Vec` @1160..1163
+LParen @1163..1164
+Ident `Repr` @1164..1168
+RParen @1168..1169
+Colon @1169..1170
+Newline @1170..1171
+Indent @1175..1175
+Ident `x` @1175..1176
+Colon @1176..1177
+Ident `float` @1178..1183
+Newline @1183..1184
+Ident `y` @1188..1189
+Colon @1189..1190
+Ident `float` @1191..1196
+Newline @1196..1197
+Fn @1202..1204
+Ident `__add__` @1205..1212
+LParen @1212..1213
+Ident `self` @1213..1217
+Comma @1217..1218
+Ident `other` @1219..1224
+Colon @1224..1225
+Ident `Vec` @1226..1229
+RParen @1229..1230
+Arrow @1231..1233
+Ident `Vec` @1234..1237
+Colon @1237..1238
+Newline @1238..1239
+Indent @1247..1247
+Return @1247..1253
+Ident `Vec` @1254..1257
+LParen @1257..1258
+Ident `x` @1258..1259
+Eq @1259..1260
+Ident `self` @1260..1264
+Dot @1264..1265
+Ident `x` @1265..1266
+Plus @1267..1268
+Ident `other` @1269..1274
+Dot @1274..1275
+Ident `x` @1275..1276
+Comma @1276..1277
+Ident `y` @1278..1279
+Eq @1279..1280
+Ident `self` @1280..1284
+Dot @1284..1285
+Ident `y` @1285..1286
+Plus @1287..1288
+Ident `other` @1289..1294
+Dot @1294..1295
+Ident `y` @1295..1296
+RParen @1296..1297
+Newline @1297..1298
+Dedent @1303..1303
+Fn @1303..1305
+Ident `__mul__` @1306..1313
+LParen @1313..1314
+Ident `self` @1314..1318
+Comma @1318..1319
+Ident `k` @1320..1321
+Colon @1321..1322
+Ident `float` @1323..1328
+RParen @1328..1329
+Arrow @1330..1332
+Ident `Vec` @1333..1336
+Colon @1336..1337
+Newline @1337..1338
+Indent @1346..1346
+Return @1346..1352
+Ident `Vec` @1353..1356
+LParen @1356..1357
+Ident `x` @1357..1358
+Eq @1358..1359
+Ident `self` @1359..1363
+Dot @1363..1364
+Ident `x` @1364..1365
+Star @1366..1367
+Ident `k` @1368..1369
+Comma @1369..1370
+Ident `y` @1371..1372
+Eq @1372..1373
+Ident `self` @1373..1377
+Dot @1377..1378
+Ident `y` @1378..1379
+Star @1380..1381
+Ident `k` @1382..1383
+RParen @1383..1384
+Newline @1384..1385
+Dedent @1386..1386
+Dedent @1386..1386
+Fn @1386..1388
+Ident `main` @1389..1393
+LParen @1393..1394
+RParen @1394..1395
+Colon @1395..1396
+Newline @1396..1397
+Indent @1401..1401
+Ident `print` @1401..1406
+LParen @1406..1407
+Ident `total_area` @1407..1417
+LParen @1417..1418
+LBracket @1418..1419
+Ident `Circle` @1419..1425
+LParen @1425..1426
+Ident `r` @1426..1427
+Eq @1427..1428
+Float 1.0 @1428..1431
+RParen @1431..1432
+Comma @1432..1433
+Ident `Circle` @1434..1440
+LParen @1440..1441
+Ident `r` @1441..1442
+Eq @1442..1443
+Float 2.0 @1443..1446
+RParen @1446..1447
+RBracket @1447..1448
+RParen @1448..1449
+RParen @1449..1450
+Newline @1450..1451
+Ident `print` @1455..1460
+LParen @1460..1461
+Ident `Circle` @1461..1467
+LParen @1467..1468
+Ident `r` @1468..1469
+Eq @1469..1470
+Float 1.0 @1470..1473
+RParen @1473..1474
+Dot @1474..1475
+Ident `describe` @1475..1483
+LParen @1483..1484
+RParen @1484..1485
+RParen @1485..1486
+Newline @1486..1487
+Ident `print` @1491..1496
+LParen @1496..1497
+Ident `Square` @1497..1503
+LParen @1503..1504
+Ident `side` @1504..1508
+Eq @1508..1509
+Float 2.0 @1509..1512
+RParen @1512..1513
+Dot @1513..1514
+Ident `describe` @1514..1522
+LParen @1522..1523
+RParen @1523..1524
+RParen @1524..1525
+Newline @1525..1526
+Ident `p` @1530..1531
+Eq @1532..1533
+Ident `Point` @1534..1539
+LParen @1539..1540
+Ident `x` @1540..1541
+Eq @1541..1542
+Int 1 @1542..1543
+Comma @1543..1544
+Ident `y` @1545..1546
+Eq @1546..1547
+Int 2 @1547..1548
+RParen @1548..1549
+Newline @1549..1550
+Ident `print` @1554..1559
+LParen @1559..1560
+Ident `p` @1560..1561
+RParen @1561..1562
+Newline @1562..1563
+Ident `print` @1567..1572
+LParen @1572..1573
+Ident `p` @1573..1574
+EqEq @1575..1577
+Ident `Point` @1578..1583
+LParen @1583..1584
+Ident `x` @1584..1585
+Eq @1585..1586
+Int 1 @1586..1587
+Comma @1587..1588
+Ident `y` @1589..1590
+Eq @1590..1591
+Int 2 @1591..1592
+RParen @1592..1593
+Comma @1593..1594
+Ident `p` @1595..1596
+Lt @1597..1598
+Ident `Point` @1599..1604
+LParen @1604..1605
+Ident `x` @1605..1606
+Eq @1606..1607
+Int 0 @1607..1608
+Comma @1608..1609
+Ident `y` @1610..1611
+Eq @1611..1612
+Int 9 @1612..1613
+RParen @1613..1614
+Comma @1614..1615
+Ident `hash` @1616..1620
+LParen @1620..1621
+Ident `p` @1621..1622
+RParen @1622..1623
+EqEq @1624..1626
+Ident `hash` @1627..1631
+LParen @1631..1632
+Ident `Point` @1632..1637
+LParen @1637..1638
+Ident `x` @1638..1639
+Eq @1639..1640
+Int 1 @1640..1641
+Comma @1641..1642
+Ident `y` @1643..1644
+Eq @1644..1645
+Int 2 @1645..1646
+RParen @1646..1647
+RParen @1647..1648
+RParen @1648..1649
+Newline @1649..1650
+Ident `print` @1654..1659
+LParen @1659..1660
+LBracket @1660..1661
+Ident `Point` @1661..1666
+LParen @1666..1667
+Ident `x` @1667..1668
+Eq @1668..1669
+Int 3 @1669..1670
+Comma @1670..1671
+Ident `y` @1672..1673
+Eq @1673..1674
+Int 0 @1674..1675
+RParen @1675..1676
+Comma @1676..1677
+Ident `p` @1678..1679
+RBracket @1679..1680
+RParen @1680..1681
+Newline @1681..1682
+Ident `print` @1686..1691
+LParen @1691..1692
+Ident `max` @1692..1695
+LParen @1695..1696
+Ident `p` @1696..1697
+Comma @1697..1698
+Ident `Point` @1699..1704
+LParen @1704..1705
+Ident `x` @1705..1706
+Eq @1706..1707
+Int 3 @1707..1708
+Comma @1708..1709
+Ident `y` @1710..1711
+Eq @1711..1712
+Int 0 @1712..1713
+RParen @1713..1714
+RParen @1714..1715
+RParen @1715..1716
+Newline @1716..1717
+Ident `v` @1721..1722
+Eq @1723..1724
+Ident `Vec` @1725..1728
+LParen @1728..1729
+Ident `x` @1729..1730
+Eq @1730..1731
+Float 2.0 @1731..1734
+Comma @1734..1735
+Ident `y` @1736..1737
+Eq @1737..1738
+Float 3.0 @1738..1741
+RParen @1741..1742
+Newline @1742..1743
+Ident `print` @1747..1752
+LParen @1752..1753
+Ident `v` @1753..1754
+Star @1755..1756
+Float 2.0 @1757..1760
+Comma @1760..1761
+Ident `v` @1762..1763
+RParen @1763..1764
+Newline @1764..1765
+Dedent @1765..1765
+Eof @1765..1765

@@ -127,8 +127,21 @@ impl Parser<'_> {
             let before = self.pos();
             match self.expect_ident("a generic parameter name") {
                 Some(name) => {
-                    let span = name.span;
-                    generics.push(typhoon_ast::GenericParam { name, span });
+                    // `T: A + B` (DESIGN 3.11).
+                    let mut bounds = Vec::new();
+                    if self.eat(&TokenKind::Colon) {
+                        while let Some(bound) = self.expect_ident("a trait name") {
+                            bounds.push(bound);
+                            if !self.eat(&TokenKind::Plus) {
+                                break;
+                            }
+                        }
+                    }
+                    let span = match bounds.last() {
+                        Some(last) => name.span.merge(last.span),
+                        None => name.span,
+                    };
+                    generics.push(typhoon_ast::GenericParam { name, bounds, span });
                 }
                 None => {
                     if self.pos() == before {

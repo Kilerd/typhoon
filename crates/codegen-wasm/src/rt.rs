@@ -121,11 +121,17 @@ pub enum Rt {
     ListSorted,
     /// `ty_str_slice(s, start, stop) -> str`.
     StrSlice,
+    /// `ty_repr_begin()`: start capturing `print` output for `repr(x)`.
+    ReprBegin,
+    /// `ty_repr_end() -> str`: the captured output.
+    ReprEnd,
+    /// `ty_str_hash(s) -> int`: `hash(s)`.
+    StrHash,
 }
 
 impl Rt {
     /// Every runtime function, in import order.
-    pub const ALL: [Rt; 48] = [
+    pub const ALL: [Rt; 51] = [
         Rt::Init,
         Rt::Exit,
         Rt::Panic,
@@ -174,6 +180,9 @@ impl Rt {
         Rt::KeyBuf,
         Rt::ListSorted,
         Rt::StrSlice,
+        Rt::ReprBegin,
+        Rt::ReprEnd,
+        Rt::StrHash,
     ];
 
     /// The exported symbol name.
@@ -227,13 +236,19 @@ impl Rt {
             Rt::KeyBuf => "ty_key_buf",
             Rt::ListSorted => "ty_list_sorted",
             Rt::StrSlice => "ty_str_slice",
+            Rt::ReprBegin => "ty_repr_begin",
+            Rt::ReprEnd => "ty_repr_end",
+            Rt::StrHash => "ty_str_hash",
         }
     }
 
     /// The wasm signature: `(params, results)`.
     pub fn signature(self) -> (&'static [ValType], &'static [ValType]) {
         match self {
-            Rt::Init | Rt::PrintSep | Rt::PrintEnd => (&[], &[]),
+            Rt::Init | Rt::PrintSep | Rt::PrintEnd | Rt::ReprBegin => (&[], &[]),
+            Rt::ReprEnd => (&[], &[I]),
+            Rt::StrHash => (&[I], &[L]),
+
             Rt::Exit | Rt::PrintBool | Rt::PrintStrRepr => (&[I], &[]),
             Rt::Panic | Rt::PrintStr => (&[I, I], &[]),
             Rt::Alloc | Rt::AllocAtomic => (&[I], &[I]),

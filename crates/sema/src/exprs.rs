@@ -117,7 +117,10 @@ impl Checker<'_> {
                 callee,
                 type_args,
                 args,
-            } => self.check_call(callee, type_args.as_deref(), args, span),
+            } => {
+                debug_assert!(type_args.is_none(), "handled by `check_generic_call`");
+                self.check_call(callee, args, span)
+            }
             ast::ExprKind::Attribute { base, attr } => self.check_attribute(base, attr, span),
             ast::ExprKind::Index { base, index } => self.check_index(base, index, span),
             ast::ExprKind::Slice { base, start, stop } => {
@@ -234,8 +237,23 @@ impl Checker<'_> {
         span: Span,
     ) -> hir::Expr {
         let value = self.check_expr(operand);
+        self.unary_value(op, op_span, value, span)
+    }
+
+    /// A prefix operator applied to an already-checked operand.
+    pub(crate) fn unary_value(
+        &mut self,
+        op: ast::UnaryOp,
+        op_span: Span,
+        value: hir::Expr,
+        span: Span,
+    ) -> hir::Expr {
         if value.ty == TypeId::ERROR {
             return self.error_expr(span);
+        }
+        // DESIGN §3.11: `-x` on a class instance calls `x.__neg__()`.
+        if matches!(self.types.get(value.ty), Type::Class(_)) {
+            return self.class_unary(op, op_span, value, span);
         }
         // `-1` is a negated literal, not a negative literal (Python has no
         // negative literals); folding it here keeps `range(10, 0, -2)` and
@@ -313,7 +331,24 @@ impl Checker<'_> {
         span: Span,
     ) -> hir::Expr {
         let lhs = self.check_expr(lhs);
+        // DESIGN §3.11: on a class instance the operator is its dunder, whose
+        // parameter types the right operand is checked against.
+        if matches!(self.types.get(lhs.ty), Type::Class(_)) {
+            return self.class_binary(op, op_span, lhs, rhs, span);
+        }
         let rhs = self.check_expr_hint(rhs, Some(lhs.ty));
+        self.binary_values(op, op_span, lhs, rhs, span)
+    }
+
+    /// An arithmetic or bitwise operator on two already-checked operands.
+    pub(crate) fn binary_values(
+        &mut self,
+        op: ast::BinOp,
+        op_span: Span,
+        lhs: hir::Expr,
+        rhs: hir::Expr,
+        span: Span,
+    ) -> hir::Expr {
         if lhs.ty == TypeId::ERROR || rhs.ty == TypeId::ERROR {
             return self.error_expr(span);
         }
@@ -573,9 +608,20 @@ impl Checker<'_> {
         };
 
         let lhs = self.check_expr(left);
+        // DESIGN §3.11: on a class instance a comparison calls `__eq__` or
+        // `__lt__`.
+        if matches!(self.types.get(lhs.ty), Type::Class(_)) {
+            return self.class_compare(entry.op, op, entry.op_span, lhs, &entry.rhs, span);
+        }
         let rhs = self.check_expr_hint(&entry.rhs, Some(lhs.ty));
         if lhs.ty == TypeId::ERROR || rhs.ty == TypeId::ERROR {
             return self.error_expr(span);
+        }
+        // `3 > p` is `p < 3`.
+        if matches!(op, hir::CmpOp::Gt | hir::CmpOp::Le)
+            && matches!(self.types.get(rhs.ty), Type::Class(_))
+        {
+            return self.reversed_compare(entry.op, op, entry.op_span, lhs, rhs, span);
         }
         let ordered = !matches!(op, hir::CmpOp::Eq | hir::CmpOp::Ne);
         // `==` between a `T | None` and a `T` widens the `T`, as in Python;
@@ -614,7 +660,8 @@ impl Checker<'_> {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             },
-            crate::types::Type::Bool if !ordered => hir::ExprKind::BoolCmp {
+            // `False < True`, as in Python (DESIGN §3.11: `bool` is `Ord`).
+            crate::types::Type::Bool => hir::ExprKind::BoolCmp {
                 op,
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
@@ -625,15 +672,19 @@ impl Checker<'_> {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             },
+            // Tuples order lexicographically (DESIGN §3.11).
+            crate::types::Type::Tuple(_) if ordered && self.ensure_ord(lhs.ty, entry.op_span) => {
+                return self.tuple_ordering(op, lhs, rhs, span);
+            }
             crate::types::Type::List(_) | crate::types::Type::Tuple(_) if !ordered => {
-                if !self.types.is_printable(lhs.ty) {
+                if !self.ensure_eq(lhs.ty, entry.op_span) {
                     let name = self.types.name(lhs.ty);
                     self.error(
                         Diagnostic::error(format!("`{name}` values cannot be compared"))
                             .with_label(entry.op_span, "no `==` for this type")
                             .with_help(
-                                "a container of class instances has no equality until the \
-                                 repr/eq protocols arrive in M3",
+                                "a class element needs `__eq__(self, other: C) -> bool` \
+                                 (or to declare `Eq`), see DESIGN.md section 3.11",
                             ),
                     );
                     return self.error_expr(span);
@@ -645,8 +696,8 @@ impl Checker<'_> {
                 }
             }
             // `T | None` compares as `None == None`, else the payloads.
-            crate::types::Type::Optional(inner)
-                if self.types.class_of(inner).is_none() && self.types.is_printable(inner) =>
+            crate::types::Type::Optional(_)
+                if !ordered && self.ensure_eq(lhs.ty, entry.op_span) =>
             {
                 hir::ExprKind::StructEq {
                     op,
@@ -674,10 +725,11 @@ impl Checker<'_> {
                         entry.op.as_str()
                     ))
                     .with_label(entry.op_span, "no equality for class instances")
-                    .with_help("use `is` to compare identity")
-                    .with_note(
-                        "an eq protocol for classes arrives in M3, see DESIGN.md section 3.8",
-                    ),
+                    .with_help(
+                        "define `__eq__` on the class (or declare `Eq`), or use `is` to \
+                         compare identity",
+                    )
+                    .with_note("see DESIGN.md section 3.11"),
                 );
                 return self.error_expr(span);
             }
@@ -739,6 +791,19 @@ impl Checker<'_> {
             // Testing a local the flow has already narrowed tests the local
             // itself, not its narrowed reading.
             let value = self.unnarrowed(value);
+            // A type parameter may stand for `int`: only `T | None` may be
+            // absent (DESIGN §3.11).
+            if let Type::Class(class) = self.types.get(value.ty)
+                && self.is_opaque(class)
+            {
+                let found = self.types.name(value.ty);
+                self.error(
+                    Diagnostic::error(format!("`{found}` can never be `None`"))
+                        .with_label(value.span, format!("`{found}` is a type parameter"))
+                        .with_help(format!("declare it `{found} | None` if it may be absent")),
+                );
+                return self.error_expr(span);
+            }
             if !matches!(self.types.get(value.ty), Type::Optional(_) | Type::Class(_)) {
                 let found = self.types.name(value.ty);
                 self.error(
@@ -764,6 +829,23 @@ impl Checker<'_> {
             return self.error_expr(span);
         }
         match (self.types.class_of(lhs.ty), self.types.class_of(rhs.ty)) {
+            // A type parameter may stand for a value type, which has no
+            // identity (DESIGN §3.11).
+            (Some(a), _) | (_, Some(a)) if self.is_opaque(a) => {
+                let name = self.types.class(a).name.clone();
+                self.error(
+                    Diagnostic::error(format!(
+                        "`is` cannot compare values of the type parameter `{name}`"
+                    ))
+                    .with_label(op_span, "`is` compares class references")
+                    .with_help(format!(
+                        "`{name}` may stand for a value type such as `int`; compare with `==` \
+                         and the bound `{name}: Eq`"
+                    ))
+                    .with_note("see DESIGN.md section 3.11"),
+                );
+                self.error_expr(span)
+            }
             (Some(a), Some(b)) if a == b => hir::Expr {
                 kind: hir::ExprKind::RefEq {
                     lhs: Box::new(lhs),
@@ -854,24 +936,27 @@ impl Checker<'_> {
                 if needle.ty == TypeId::ERROR {
                     return self.error_expr(span);
                 }
-                if !matches!(
-                    elem,
-                    TypeId::INT | TypeId::FLOAT | TypeId::BOOL | TypeId::STR
-                ) {
+                // Any element with `==` (DESIGN §3.11): a class through its
+                // `__eq__`.
+                if !self.ensure_eq(elem, op_span) {
                     let name = self.types.name(haystack.ty);
                     self.error(
                         Diagnostic::error(format!("`in` is not defined for `{name}`"))
                             .with_label(op_span, "no membership test for this element type")
                             .with_help(
-                                "`in` over a list needs `int`, `float`, `bool` or `str` elements",
-                            ),
+                                "`in` over a list needs `int`, `float`, `bool` or `str` elements, \
+                                 or elements with `__eq__`",
+                            )
+                            .with_note("see DESIGN.md section 3.11"),
                     );
                     return self.error_expr(span);
                 }
-                if needle.ty != elem {
+                if !self.assignable(elem, needle.ty) {
                     self.mismatch(needle.span, elem, needle.ty);
                     return self.error_expr(span);
                 }
+                // `v in xs` over a `list<T | None>` looks for the widened `v`.
+                let needle = self.coerce(needle, elem);
                 hir::Expr {
                     kind: hir::ExprKind::Contains {
                         haystack: Box::new(haystack),
@@ -1394,6 +1479,12 @@ impl Checker<'_> {
         span: Span,
     ) -> hir::Expr {
         let recv = self.check_expr(base);
+        // `(3).__lt__(4)` is `3 < 4` (DESIGN §3.11).
+        if let Some(builtin) = crate::traits::Builtin::from_method(name.as_str())
+            && !matches!(self.types.get(recv.ty), Type::Class(_) | Type::Error)
+        {
+            return self.builtin_dunder_call(builtin, recv, name, args, span);
+        }
         match self.types.get(recv.ty) {
             Type::Error => {
                 for arg in args {
@@ -1429,6 +1520,15 @@ impl Checker<'_> {
                     if self.types.field_index(class, name.as_str()).is_some() {
                         diag = diag
                             .with_help(format!("`{}` is a field; drop the `()`", name.as_str()));
+                    }
+                    if self.is_opaque(class) {
+                        diag = diag
+                            .with_help(format!(
+                                "a bounded `{class_name}` has exactly the methods of its bounds; \
+                                 add a trait bound that declares `{}`",
+                                name.as_str()
+                            ))
+                            .with_note("see DESIGN.md section 3.11");
                     }
                     self.error(diag);
                     self.error_expr(span)
@@ -1644,20 +1744,9 @@ impl Checker<'_> {
 
     // -- calls ------------------------------------------------------------
 
-    fn check_call(
-        &mut self,
-        callee: &ast::Expr,
-        type_args: Option<&[ast::TypeExpr]>,
-        args: &[ast::Arg],
-        span: Span,
-    ) -> hir::Expr {
-        if type_args.is_some() {
-            for arg in args {
-                self.check_expr(&arg.value);
-            }
-            self.unsupported(span, "a generic call", "M3");
-            return self.error_expr(span);
-        }
+    /// A call without type arguments of something that is not generic; every
+    /// call with `<...>` goes through `check_generic_call` (DESIGN §3.9).
+    fn check_call(&mut self, callee: &ast::Expr, args: &[ast::Arg], span: Span) -> hir::Expr {
         let name = match &callee.kind {
             ast::ExprKind::Name(name) => name,
             ast::ExprKind::Attribute { base, attr } => {
@@ -1918,7 +2007,8 @@ impl Checker<'_> {
                     if value.ty == TypeId::ERROR {
                         continue;
                     }
-                    if !self.types.is_printable(value.ty) {
+                    // DESIGN §3.11: a class prints through `__repr__`.
+                    if !self.ensure_repr(value.ty, value.span) {
                         self.not_printable(&value);
                         continue;
                     }
@@ -2009,12 +2099,17 @@ impl Checker<'_> {
                         rhs: Box::new(rhs),
                     },
                     other => {
+                        // DESIGN §3.11: any other `Ord` type, through `__lt__`.
+                        if let Some(call) = self.ordered_min_max(builtin == "max", lhs, rhs, span) {
+                            return call;
+                        }
                         let found = self.types.name(other);
                         self.error(
                             Diagnostic::error(format!(
                                 "`{builtin}` cannot be applied to values of type `{found}`"
                             ))
-                            .with_label(span, "expected `int` or `float`"),
+                            .with_label(span, "expected an `Ord` type such as `int` or `float`")
+                            .with_help("a class needs `__lt__` and `__eq__` (or to declare `Ord`)"),
                         );
                         return self.error_expr(span);
                     }
@@ -2025,6 +2120,16 @@ impl Checker<'_> {
                     TypeId::INT
                 };
                 hir::Expr { kind, ty, span }
+            }
+            "repr" | "hash" => {
+                let Some(value) = self.one_arg(builtin, args, span) else {
+                    return self.error_expr(span);
+                };
+                if builtin == "repr" {
+                    self.check_repr_builtin(value, span)
+                } else {
+                    self.check_hash_builtin(value, span)
+                }
             }
             "range" => {
                 for arg in args {
@@ -2111,6 +2216,14 @@ impl Checker<'_> {
                         ty: TypeId::STR,
                         span,
                     },
+                    // A class instance through its `__repr__` (DESIGN §3.11).
+                    ty if self.types.class_of(ty).is_some() && self.ensure_repr(ty, span) => {
+                        hir::Expr {
+                            kind: hir::ExprKind::StrFrom(Box::new(value)),
+                            ty: TypeId::STR,
+                            span,
+                        }
+                    }
                     _ => {
                         let found = self.types.name(value.ty);
                         self.error(
@@ -2118,7 +2231,8 @@ impl Checker<'_> {
                                 .with_label(value.span, format!("this is {}", a_type(&found)))
                                 .with_help("`str` takes an `int`, a `float`, a `bool` or a `str`")
                                 .with_note(
-                                    "a repr protocol for containers and classes arrives in M3",
+                                    "a class needs `__repr__` (or to declare `Repr`); \
+                                     write `repr(x)` for a container, see DESIGN.md section 3.11",
                                 ),
                         );
                         self.error_expr(span)
@@ -2140,11 +2254,20 @@ impl Checker<'_> {
 
     /// Reports `print(x)` where `x` is, or contains, a class instance.
     fn not_printable(&mut self, value: &hir::Expr) {
+        // A failed derivation of `Repr` was already reported (DESIGN §3.11).
+        if let Some(class) = self.types.class_of(value.ty)
+            && self
+                .traits
+                .derive_failed
+                .contains(&(class, crate::traits::Builtin::Repr))
+        {
+            return;
+        }
         let found = self.types.name(value.ty);
         self.error(
             Diagnostic::error(format!("cannot print {}", a_type(&found)))
                 .with_label(value.span, format!("this is {}", a_type(&found)))
-                .with_help("format the fields explicitly; a repr protocol arrives in M3")
+                .with_help("define `__repr__` on the class (or declare `Repr`)")
                 .with_note("see DESIGN.md section 3.8"),
         );
     }
@@ -2191,20 +2314,23 @@ impl Checker<'_> {
                         );
                         continue;
                     }
-                    // A `T | None` renders as its value or `None`, like Python.
+                    // A `T | None` renders as its value or `None`, like Python;
+                    // a class instance through its `__repr__` (DESIGN §3.11).
                     let scalar = is_scalar(value.ty)
-                        || self.types.as_optional(value.ty).is_some_and(is_scalar);
+                        || self.types.as_optional(value.ty).is_some_and(is_scalar)
+                        || (self.types.class_of(value.ty).is_some()
+                            && self.ensure_repr(value.ty, value.span));
                     if !scalar {
                         let found = self.types.name(value.ty);
                         self.error(
                             Diagnostic::error(format!("cannot interpolate {}", a_type(&found)))
                                 .with_label(value.span, format!("this is {}", a_type(&found)))
                                 .with_help(
-                                    "an f-string hole takes an `int`, `float`, `bool` or `str`",
+                                    "an f-string hole takes an `int`, `float`, `bool`, `str` \
+                                     or a class with `__repr__`; write `{repr(x)}` for a \
+                                     container",
                                 )
-                                .with_note(
-                                    "a repr protocol for containers and classes arrives in M3",
-                                ),
+                                .with_note("see DESIGN.md sections 3.7 and 3.11"),
                         );
                         continue;
                     }
@@ -2337,6 +2463,8 @@ pub(crate) fn is_builtin(name: &str) -> bool {
             | "abs"
             | "min"
             | "max"
+            | "repr"
+            | "hash"
             | "set"
             | "list"
             | "dict"

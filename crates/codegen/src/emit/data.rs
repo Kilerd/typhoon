@@ -692,7 +692,38 @@ impl<'p> Emitter<'p> {
             }
             Type::List(elem) => self.lists_equal(elem, lhs, rhs),
             Type::Optional(inner) => self.optionals_equal(ty, inner, lhs, rhs),
+            // A class instance inside a container: its `__eq__` (DESIGN §3.11).
+            Type::Class(class) => match self.program.protocols.eq.get(&class) {
+                Some(func) => self.call_protocol(*func, &[(ty, lhs), (ty, rhs)]),
+                None => "false".to_string(),
+            },
             _ => "false".to_string(),
+        }
+    }
+
+    /// Calls the protocol method `func` (DESIGN §3.11) on already-evaluated
+    /// arguments, returning its result.
+    pub(super) fn call_protocol(&mut self, func: hir::FuncId, args: &[(TypeId, &str)]) -> String {
+        let target = self.program.function(func);
+        let (symbol, ret) = (target.symbol.clone(), target.ret);
+        let arguments: Vec<String> = args
+            .iter()
+            .map(|(ty, value)| format!("{} {value}", self.llvm_ty(*ty)))
+            .collect();
+        let out = self.fresh();
+        self.emit(&format!(
+            "{out} = call {} @{symbol}({})",
+            self.llvm_ty(ret),
+            arguments.join(", ")
+        ));
+        out
+    }
+
+    /// The `str` a class instance's `__repr__` returns (DESIGN §3.11).
+    pub(super) fn class_repr(&mut self, ty: TypeId, class: ClassId, value: &str) -> String {
+        match self.program.protocols.repr.get(&class) {
+            Some(func) => self.call_protocol(*func, &[(ty, value)]),
+            None => self.string_literal(""),
         }
     }
 
@@ -929,6 +960,14 @@ impl<'p> Emitter<'p> {
                 self.print_raw("None");
                 self.br(&end);
                 self.start_block(&end);
+            }
+            // Whatever its `__repr__` returns, verbatim (DESIGN §3.11).
+            Type::Class(class) => {
+                let text = self.class_repr(ty, class, value);
+                self.decls
+                    .insert("declare void @ty_print_str(ptr, i64) nounwind");
+                let (bytes, len) = self.str_parts(&text);
+                self.emit(&format!("call void @ty_print_str(ptr {bytes}, i64 {len})"));
             }
             _ => {}
         }

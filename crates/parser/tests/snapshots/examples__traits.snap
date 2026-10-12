@@ -1,0 +1,303 @@
+---
+source: crates/parser/tests/examples.rs
+expression: "typhoon_ast::dump(&module)"
+---
+Module @0..1765
+  TraitDecl `Shape` @332..480
+    required FnDecl `area` @349..371
+      param `self` (self) @357..361
+      ret Named `float` @366..371
+      body Block @349..371
+    required FnDecl `name` @376..396
+      param `self` (self) @384..388
+      ret Named `str` @393..396
+      body Block @376..396
+    default FnDecl `describe` @401..480
+      param `self` (self) @413..417
+      ret Named `str` @422..425
+      body Block @435..480
+        Return @435..480
+          FString @442..480
+            hole Hole @444..457
+              Call @445..456
+                callee Attribute `name` @445..454
+                  base Name `self` @445..449
+            literal " of area " @457..466
+            hole Hole @466..479
+              Call @467..478
+                callee Attribute `area` @467..476
+                  base Name `self` @467..471
+  ClassDecl `Circle` @482..636
+    trait `Shape` @495..500
+    field `r` @507..515
+      type Named `float` @510..515
+    method FnDecl `area` @521..585
+      param `self` (self) @529..533
+      ret Named `float` @538..543
+      body Block @553..585
+        Return @553..585
+          Binary * @560..585
+            op Op @577..578
+            lhs Binary * @560..576
+              op Op @568..569
+              lhs Float 3.14159 @560..567
+              rhs Attribute `r` @570..576
+                base Name `self` @570..574
+            rhs Attribute `r` @579..585
+              base Name `self` @579..583
+    method FnDecl `name` @591..636
+      param `self` (self) @599..603
+      ret Named `str` @608..611
+      body Block @621..636
+        Return @621..636
+          Str "circle" @628..636
+  ClassDecl `Square` @638..869
+    trait `Shape` @651..656
+    field `side` @663..674
+      type Named `float` @669..674
+    method FnDecl `area` @680..740
+      param `self` (self) @688..692
+      ret Named `float` @697..702
+      body Block @712..740
+        Return @712..740
+          Binary * @719..740
+            op Op @729..730
+            lhs Attribute `side` @719..728
+              base Name `self` @719..723
+            rhs Attribute `side` @731..740
+              base Name `self` @731..735
+    method FnDecl `name` @746..791
+      param `self` (self) @754..758
+      ret Named `str` @763..766
+      body Block @776..791
+        Return @776..791
+          Str "square" @783..791
+    method FnDecl `describe` @797..869
+      param `self` (self) @809..813
+      ret Named `str` @818..821
+      body Block @831..869
+        Return @831..869
+          FString @838..869
+            literal "square of area " @840..855
+            hole Hole @855..868
+              Call @856..867
+                callee Attribute `area` @856..865
+                  base Name `self` @856..860
+  FnDecl `total_area` @930..1043
+    generic `T` @944..952
+      bound `Shape` @947..952
+    param `xs` @954..965
+      type Named `list` @958..965
+        arg Named `T` @963..964
+    ret Named `float` @970..975
+    body Block @981..1043
+      Assign @981..988
+        target Name `s` @981..982
+        value Float 0.0 @985..988
+      For `x` @993..1030
+        iter Name `xs` @1002..1004
+        body Block @1014..1030
+          Assign @1014..1030
+            target Name `s` @1014..1015
+            value Binary + @1018..1030
+              op Op @1020..1021
+              lhs Name `s` @1018..1019
+              rhs Call @1022..1030
+                callee Attribute `area` @1022..1028
+                  base Name `x` @1022..1023
+      Return @1035..1043
+        Name `s` @1042..1043
+  ClassDecl `Point` @1097..1152
+    trait `Eq` @1109..1111
+    trait `Ord` @1113..1116
+    trait `Hash` @1118..1122
+    trait `Repr` @1124..1128
+    field `x` @1135..1141
+      type Named `int` @1138..1141
+    field `y` @1146..1152
+      type Named `int` @1149..1152
+  ClassDecl `Vec` @1154..1384
+    trait `Repr` @1164..1168
+    field `x` @1175..1183
+      type Named `float` @1178..1183
+    field `y` @1188..1196
+      type Named `float` @1191..1196
+    method FnDecl `__add__` @1202..1297
+      param `self` (self) @1213..1217
+      param `other` @1219..1229
+        type Named `Vec` @1226..1229
+      ret Named `Vec` @1234..1237
+      body Block @1247..1297
+        Return @1247..1297
+          Call @1254..1297
+            callee Name `Vec` @1254..1257
+            arg `x`= @1258..1276
+              Binary + @1260..1276
+                op Op @1267..1268
+                lhs Attribute `x` @1260..1266
+                  base Name `self` @1260..1264
+                rhs Attribute `x` @1269..1276
+                  base Name `other` @1269..1274
+            arg `y`= @1278..1296
+              Binary + @1280..1296
+                op Op @1287..1288
+                lhs Attribute `y` @1280..1286
+                  base Name `self` @1280..1284
+                rhs Attribute `y` @1289..1296
+                  base Name `other` @1289..1294
+    method FnDecl `__mul__` @1303..1384
+      param `self` (self) @1314..1318
+      param `k` @1320..1328
+        type Named `float` @1323..1328
+      ret Named `Vec` @1333..1336
+      body Block @1346..1384
+        Return @1346..1384
+          Call @1353..1384
+            callee Name `Vec` @1353..1356
+            arg `x`= @1357..1369
+              Binary * @1359..1369
+                op Op @1366..1367
+                lhs Attribute `x` @1359..1365
+                  base Name `self` @1359..1363
+                rhs Name `k` @1368..1369
+            arg `y`= @1371..1383
+              Binary * @1373..1383
+                op Op @1380..1381
+                lhs Attribute `y` @1373..1379
+                  base Name `self` @1373..1377
+                rhs Name `k` @1382..1383
+  FnDecl `main` @1386..1764
+    body Block @1401..1764
+      ExprStmt @1401..1450
+        Call @1401..1450
+          callee Name `print` @1401..1406
+          arg positional @1407..1449
+            Call @1407..1449
+              callee Name `total_area` @1407..1417
+              arg positional @1418..1448
+                List @1418..1448
+                  Call @1419..1432
+                    callee Name `Circle` @1419..1425
+                    arg `r`= @1426..1431
+                      Float 1.0 @1428..1431
+                  Call @1434..1447
+                    callee Name `Circle` @1434..1440
+                    arg `r`= @1441..1446
+                      Float 2.0 @1443..1446
+      ExprStmt @1455..1486
+        Call @1455..1486
+          callee Name `print` @1455..1460
+          arg positional @1461..1485
+            Call @1461..1485
+              callee Attribute `describe` @1461..1483
+                base Call @1461..1474
+                  callee Name `Circle` @1461..1467
+                  arg `r`= @1468..1473
+                    Float 1.0 @1470..1473
+      ExprStmt @1491..1525
+        Call @1491..1525
+          callee Name `print` @1491..1496
+          arg positional @1497..1524
+            Call @1497..1524
+              callee Attribute `describe` @1497..1522
+                base Call @1497..1513
+                  callee Name `Square` @1497..1503
+                  arg `side`= @1504..1512
+                    Float 2.0 @1509..1512
+      Assign @1530..1549
+        target Name `p` @1530..1531
+        value Call @1534..1549
+          callee Name `Point` @1534..1539
+          arg `x`= @1540..1543
+            Int 1 @1542..1543
+          arg `y`= @1545..1548
+            Int 2 @1547..1548
+      ExprStmt @1554..1562
+        Call @1554..1562
+          callee Name `print` @1554..1559
+          arg positional @1560..1561
+            Name `p` @1560..1561
+      ExprStmt @1567..1649
+        Call @1567..1649
+          callee Name `print` @1567..1572
+          arg positional @1573..1593
+            Compare @1573..1593
+              left Name `p` @1573..1574
+              cmp `==` @1575..1577
+                Call @1578..1593
+                  callee Name `Point` @1578..1583
+                  arg `x`= @1584..1587
+                    Int 1 @1586..1587
+                  arg `y`= @1589..1592
+                    Int 2 @1591..1592
+          arg positional @1595..1614
+            Compare @1595..1614
+              left Name `p` @1595..1596
+              cmp `<` @1597..1598
+                Call @1599..1614
+                  callee Name `Point` @1599..1604
+                  arg `x`= @1605..1608
+                    Int 0 @1607..1608
+                  arg `y`= @1610..1613
+                    Int 9 @1612..1613
+          arg positional @1616..1648
+            Compare @1616..1648
+              left Call @1616..1623
+                callee Name `hash` @1616..1620
+                arg positional @1621..1622
+                  Name `p` @1621..1622
+              cmp `==` @1624..1626
+                Call @1627..1648
+                  callee Name `hash` @1627..1631
+                  arg positional @1632..1647
+                    Call @1632..1647
+                      callee Name `Point` @1632..1637
+                      arg `x`= @1638..1641
+                        Int 1 @1640..1641
+                      arg `y`= @1643..1646
+                        Int 2 @1645..1646
+      ExprStmt @1654..1681
+        Call @1654..1681
+          callee Name `print` @1654..1659
+          arg positional @1660..1680
+            List @1660..1680
+              Call @1661..1676
+                callee Name `Point` @1661..1666
+                arg `x`= @1667..1670
+                  Int 3 @1669..1670
+                arg `y`= @1672..1675
+                  Int 0 @1674..1675
+              Name `p` @1678..1679
+      ExprStmt @1686..1716
+        Call @1686..1716
+          callee Name `print` @1686..1691
+          arg positional @1692..1715
+            Call @1692..1715
+              callee Name `max` @1692..1695
+              arg positional @1696..1697
+                Name `p` @1696..1697
+              arg positional @1699..1714
+                Call @1699..1714
+                  callee Name `Point` @1699..1704
+                  arg `x`= @1705..1708
+                    Int 3 @1707..1708
+                  arg `y`= @1710..1713
+                    Int 0 @1712..1713
+      Assign @1721..1742
+        target Name `v` @1721..1722
+        value Call @1725..1742
+          callee Name `Vec` @1725..1728
+          arg `x`= @1729..1734
+            Float 2.0 @1731..1734
+          arg `y`= @1736..1741
+            Float 3.0 @1738..1741
+      ExprStmt @1747..1764
+        Call @1747..1764
+          callee Name `print` @1747..1752
+          arg positional @1753..1760
+            Binary * @1753..1760
+              op Op @1755..1756
+              lhs Name `v` @1753..1754
+              rhs Float 2.0 @1757..1760
+          arg positional @1762..1763
+            Name `v` @1762..1763

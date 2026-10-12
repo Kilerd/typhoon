@@ -1,0 +1,86 @@
+# Operators on class instances call their dunder methods, statically
+# (DESIGN 3.11): the operand types follow the method's signature, `!=` is
+# `not __eq__`, `a > b` is `b < a`, and comparison chains evaluate a middle
+# operand once.
+# milestone: M3
+# expect: Vec(4.0, 6.0) Vec(0.0, 0.0) Vec(2.0, 3.0)
+# expect: Vec(1.0, 1.5) Vec(-2.0, -3.0) Vec(1.0, 1.0) Vec(0.5, 0.0)
+# expect: 13.0
+# expect: True False True
+# expect: True False False True
+# expect: True True
+# expect: eval a
+# expect: eval b
+# expect: eval c
+# expect: True
+# expect: eval c
+# expect: eval b
+# expect: False
+# expect: Celsius(-3.5) Celsius(40.0)
+
+class Vec:
+    x: float
+    y: float
+
+    fn __add__(self, other: Vec) -> Vec:
+        return Vec(x=self.x + other.x, y=self.y + other.y)
+
+    fn __sub__(self, other: Vec) -> Vec:
+        return Vec(x=self.x - other.x, y=self.y - other.y)
+
+    # A mixed signature: `v * 2.0` works; `2.0 * v` would need `__rmul__`.
+    fn __mul__(self, k: float) -> Vec:
+        return Vec(x=self.x * k, y=self.y * k)
+
+    fn __truediv__(self, k: float) -> Vec:
+        return Vec(x=self.x / k, y=self.y / k)
+
+    fn __floordiv__(self, k: float) -> Vec:
+        return Vec(x=self.x // k, y=self.y // k)
+
+    fn __mod__(self, k: float) -> Vec:
+        return Vec(x=self.x % k, y=self.y % k)
+
+    fn __neg__(self) -> Vec:
+        return Vec(x=-self.x, y=-self.y)
+
+    fn __eq__(self, other: Vec) -> bool:
+        return self.x == other.x and self.y == other.y
+
+    fn __repr__(self) -> str:
+        return f"Vec({self.x}, {self.y})"
+
+    fn dot(self, other: Vec) -> float:
+        return self.x * other.x + self.y * other.y
+
+class Celsius:
+    deg: float
+
+    fn __lt__(self, other: Celsius) -> bool:
+        return self.deg < other.deg
+
+    # `==` against a plain number.
+    fn __eq__(self, other: float) -> bool:
+        return self.deg == other
+
+    fn __repr__(self) -> str:
+        return f"Celsius({self.deg})"
+
+fn noisy(c: Celsius, label: str) -> Celsius:
+    print("eval", label)
+    return c
+
+fn main():
+    v = Vec(x=2.0, y=3.0)
+    w = Vec(x=2.0, y=3.0)
+    print(v + w, v - w, v)
+    print(v / 2.0, -v, v // 2.0, v % 1.5)
+    print(v.dot(v * 1.0))
+    print(v == w, v != w, v * 2.0 == v + w)
+    cold = Celsius(deg=-3.5)
+    hot = Celsius(deg=40.0)
+    print(cold < hot, cold > hot, cold >= hot, cold <= hot)
+    print(hot == 40.0, cold != 40.0)
+    print(noisy(cold, "a") < noisy(Celsius(deg=1.0), "b") < noisy(hot, "c"))
+    print(noisy(hot, "c") < noisy(cold, "b") < noisy(hot, "never"))
+    print(cold, hot)

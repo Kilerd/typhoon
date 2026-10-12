@@ -71,6 +71,8 @@ pub enum TokenKind {
     Fn,
     /// `class`
     Class,
+    /// `trait` (M3, DESIGN 3.11)
+    Trait,
     /// `if`
     If,
     /// `elif`
@@ -223,6 +225,7 @@ impl TokenKind {
         let kind = match text {
             "fn" => TokenKind::Fn,
             "class" => TokenKind::Class,
+            "trait" => TokenKind::Trait,
             "if" => TokenKind::If,
             "elif" => TokenKind::Elif,
             "else" => TokenKind::Else,
@@ -261,6 +264,7 @@ impl TokenKind {
         let text = match self {
             TokenKind::Fn => "fn",
             TokenKind::Class => "class",
+            TokenKind::Trait => "trait",
             TokenKind::If => "if",
             TokenKind::Elif => "elif",
             TokenKind::Else => "else",
@@ -333,6 +337,7 @@ impl TokenKind {
             self,
             TokenKind::Fn
                 | TokenKind::Class
+                | TokenKind::Trait
                 | TokenKind::If
                 | TokenKind::Elif
                 | TokenKind::Else
@@ -404,7 +409,7 @@ mod tests {
     #[test]
     fn keywords_round_trip() {
         for text in [
-            "fn", "class", "if", "elif", "else", "while", "for", "in", "not", "and", "or",
+            "fn", "class", "trait", "if", "elif", "else", "while", "for", "in", "not", "and", "or",
             "return", "break", "continue", "pass", "True", "False", "None", "is", "import", "from",
             "try", "except", "finally", "raise", "match", "case", "as",
         ] {

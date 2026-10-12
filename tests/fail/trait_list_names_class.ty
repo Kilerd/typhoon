@@ -1,0 +1,14 @@
+# The parentheses after a class name list traits; a class there would be a
+# base class, and typhoon has no inheritance (DESIGN 3.8, 3.11).
+# milestone: M3
+# error: inheritance is not supported
+# error: `Animal` is a class, not a trait
+
+class Animal:
+    legs: int
+
+class Dog(Eq, Animal):
+    name: str
+
+fn main():
+    print(Dog(name="rex").name)

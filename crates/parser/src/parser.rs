@@ -361,7 +361,11 @@ impl<'a> Parser<'a> {
                     depth -= 1;
                     self.bump();
                 }
-                TokenKind::Fn | TokenKind::Class if depth <= 0 && self.at_line_start() => return,
+                TokenKind::Fn | TokenKind::Class | TokenKind::Trait
+                    if depth <= 0 && self.at_line_start() =>
+                {
+                    return;
+                }
                 TokenKind::Ident(_)
                     if depth <= 0
                         && self.at_line_start()

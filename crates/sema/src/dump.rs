@@ -244,6 +244,8 @@ fn dump_expr(program: &Program, func: &Function, expr: &Expr) -> String {
             format!("{}.{}({})", e(recv), op.as_str(), args.join(", "))
         }
         ExprKind::StrFrom(v) => format!("str({})", e(v)),
+        ExprKind::Repr(v) => format!("repr({})", e(v)),
+        ExprKind::Hash(v) => format!("hash({})", e(v)),
         ExprKind::ListNew { items, .. } => {
             let items: Vec<String> = items.iter().map(&e).collect();
             format!("[{}]", items.join(", "))

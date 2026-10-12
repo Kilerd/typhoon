@@ -1,0 +1,10 @@
+# `Ord` and `Hash` require `Eq` to be declared too (DESIGN 3.11).
+# milestone: M3
+# error: the trait `Ord` requires `Eq`
+# error: declare both: `class Rank(Eq, Ord):`
+
+class Rank(Ord):
+    n: int
+
+fn main():
+    print(Rank(n=1).n)

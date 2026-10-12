@@ -10,9 +10,12 @@
 //! generics exist.
 //!
 //! * Instances are memoized per `(template, type arguments)`.
-//! * There are no constraints in M3: an operator applied to a `T` is checked
-//!   once `T` is known, inside the instance, and every diagnostic raised there
-//!   carries the instantiation stack (`in instantiation of `max<Point>``).
+//! * An item without trait bounds is a template: an operator applied to a
+//!   `T` is checked once `T` is known, inside the instance, and every
+//!   diagnostic raised there carries the instantiation stack
+//!   (`in instantiation of `max<Point>``). An item with a bound is also
+//!   checked once at its definition (DESIGN §3.11, see `traits.rs`), and its
+//!   instances must satisfy the bounds.
 //! * The methods of a generic class are instantiated lazily, on first call, so
 //!   a method nobody calls costs nothing.
 //! * Polymorphic recursion (`f<T>` calling `f<list<T>>`) cannot be
@@ -51,10 +54,10 @@ const MAX_NOTES: usize = 8;
 const MAX_LABELS: usize = 3;
 
 /// A generic function, or a method of one instance of a generic class.
-struct FnTemplate {
-    decl: Rc<ast::FnDecl>,
+pub(crate) struct FnTemplate {
+    pub(crate) decl: Rc<ast::FnDecl>,
     /// The class instance a method belongs to; `None` for a free function.
-    class: Option<ClassId>,
+    pub(crate) class: Option<ClassId>,
     /// The bindings of the enclosing class's type parameters.
     outer: Vec<(String, TypeId)>,
     /// The display name before type arguments: `max`, `Stack<int>.push`.
@@ -62,26 +65,26 @@ struct FnTemplate {
     /// The symbol before type arguments: `ty_user_max`.
     symbol: String,
     /// The signature was rejected; every use is silently an error.
-    poisoned: bool,
+    pub(crate) poisoned: bool,
     instances: HashMap<Vec<TypeId>, hir::FuncId>,
 }
 
 /// A generic class.
-struct ClassTemplate {
-    decl: Rc<ast::ClassDecl>,
-    methods: Vec<Rc<ast::FnDecl>>,
+pub(crate) struct ClassTemplate {
+    pub(crate) decl: Rc<ast::ClassDecl>,
+    pub(crate) methods: Vec<Rc<ast::FnDecl>>,
     /// The declaration was rejected; every use is silently an error.
-    poisoned: bool,
+    pub(crate) poisoned: bool,
     instances: HashMap<Vec<TypeId>, ClassId>,
 }
 
 /// One frame of the instantiation stack.
 #[derive(Debug, Clone)]
-struct Frame {
+pub(crate) struct Frame {
     /// The instance, e.g. `max<Point>`.
-    what: String,
+    pub(crate) what: String,
     /// The use that required it.
-    at: Span,
+    pub(crate) at: Span,
 }
 
 /// An instance whose body still has to be checked.
@@ -97,28 +100,68 @@ struct Pending {
 pub(crate) struct Generics {
     /// Generic free functions by name, as indices into `templates`.
     fns: HashMap<String, usize>,
-    templates: Vec<FnTemplate>,
+    pub(crate) templates: Vec<FnTemplate>,
     /// Method templates of generic class instances, created on first call.
     methods: HashMap<(ClassId, String), usize>,
-    classes: HashMap<String, ClassTemplate>,
+    pub(crate) classes: HashMap<String, ClassTemplate>,
     /// Generic classes in declaration order, so diagnostics are stable.
-    class_order: Vec<String>,
+    pub(crate) class_order: Vec<String>,
     /// The template and type arguments every class instance came from.
-    origins: HashMap<ClassId, (String, Vec<TypeId>)>,
+    pub(crate) origins: HashMap<ClassId, (String, Vec<TypeId>)>,
     /// The type parameters in scope and what they stand for.
-    env: Vec<(String, TypeId)>,
+    pub(crate) env: Vec<(String, TypeId)>,
     /// The instantiation stack of the code being checked.
-    stack: Vec<Frame>,
+    pub(crate) stack: Vec<Frame>,
     pending: VecDeque<Pending>,
     /// Diagnostics already reported from generic code, so that a mistake in a
     /// template is reported once, not once per instance.
     seen: HashSet<(String, Option<Span>)>,
-    /// Set while a template is validated at its declaration.
-    validating: bool,
+    /// Set while a template is validated at its declaration, and while a
+    /// bounded item is checked at its definition (DESIGN §3.11).
+    pub(crate) validating: bool,
     /// Every error reported so far, including suppressed duplicates.
-    errors: usize,
+    pub(crate) errors: usize,
     /// Instances created so far.
     count: usize,
+}
+
+/// What [`Generics::snapshot`] records, so that the definition-time check of
+/// a bounded item leaves no instance behind (DESIGN §3.11).
+pub(crate) struct GenericsMark {
+    templates: usize,
+    /// The queued bodies, set aside so that the check only drains its own.
+    pending: VecDeque<Pending>,
+    count: usize,
+}
+
+impl Generics {
+    /// Records the current extent of the instance tables and sets the queued
+    /// bodies aside.
+    pub(crate) fn snapshot(&mut self) -> GenericsMark {
+        GenericsMark {
+            templates: self.templates.len(),
+            pending: std::mem::take(&mut self.pending),
+            count: self.count,
+        }
+    }
+
+    /// Forgets every instance, method template and queued body created since
+    /// `mark`; `sigs` and `classes` are the sizes of the signature and class
+    /// tables at that point.
+    pub(crate) fn restore(&mut self, mark: GenericsMark, sigs: usize, classes: usize) {
+        self.templates.truncate(mark.templates);
+        for template in &mut self.templates {
+            template.instances.retain(|_, id| id.index() < sigs);
+        }
+        self.methods
+            .retain(|(class, _), index| class.index() < classes && *index < mark.templates);
+        for template in self.classes.values_mut() {
+            template.instances.retain(|_, id| id.index() < classes);
+        }
+        self.origins.retain(|class, _| class.index() < classes);
+        self.pending = mark.pending;
+        self.count = mark.count;
+    }
 }
 
 impl Generics {
@@ -249,7 +292,9 @@ impl Checker<'_> {
             let decl = Rc::clone(&template.decl);
             let methods = template.methods.clone();
             let before = self.generics.errors;
-            let env = unknown_env(&decl.generics);
+            let mut env = unknown_env(&decl.generics);
+            // `Self` is the instance, unknown until there is one.
+            env.push(("Self".to_string(), TypeId::ERROR));
             self.with_validation(env, |checker| {
                 checker.resolve_fields(&decl);
                 let mut seen: Vec<&str> = Vec::new();
@@ -318,6 +363,7 @@ impl Checker<'_> {
                 );
                 ok = false;
             }
+            ok &= self.check_bound_names(param);
         }
         ok
     }
@@ -524,7 +570,12 @@ impl Checker<'_> {
 
     /// The instance of the generic class `template` for `args`, created on
     /// first use (DESIGN §4.5).
-    fn instantiate_class(&mut self, template: &str, args: Vec<TypeId>, at: Span) -> TypeId {
+    pub(crate) fn instantiate_class(
+        &mut self,
+        template: &str,
+        args: Vec<TypeId>,
+        at: Span,
+    ) -> TypeId {
         if args.contains(&TypeId::ERROR) {
             return TypeId::ERROR;
         }
@@ -540,6 +591,11 @@ impl Checker<'_> {
         let decl = Rc::clone(&entry.decl);
         let what = self.instance_name(template, &args);
         if !self.check_type_args(&what, &args, at) {
+            return TypeId::ERROR;
+        }
+        // DESIGN §3.11: every type argument declares the bounds of its
+        // parameter.
+        if !self.check_type_bounds(&what, &decl.generics, &args, at) {
             return TypeId::ERROR;
         }
         if !self.within_limits(&what, at) {
@@ -567,6 +623,9 @@ impl Checker<'_> {
             at,
         });
         let (fields, defaults) = self.resolve_fields(&decl);
+        // The instance's trait conformance is checked once checking bodies
+        // is safe, since it may instantiate methods (DESIGN §3.11).
+        self.queue_conformance(id, template);
         self.generics.stack.pop();
         self.generics.env = saved_env;
 
@@ -612,12 +671,19 @@ impl Checker<'_> {
         if !self.check_type_args(&what, &args, at) {
             return None;
         }
+        if !self.check_type_bounds(&what, &decl.generics, &args, at) {
+            return None;
+        }
         if !self.within_limits(&what, at) {
             self.generics.templates[index].poisoned = true;
             return None;
         }
 
         env.extend(bind(&decl.generics, &args));
+        // Inside a method, `Self` is the class instance (DESIGN §3.11).
+        if let Some(class) = class {
+            env.push(("Self".to_string(), self.types.class_ty(class)));
+        }
         let saved_env = std::mem::replace(&mut self.generics.env, env.clone());
         self.generics.stack.push(Frame {
             what: what.clone(),
@@ -643,7 +709,7 @@ impl Checker<'_> {
     }
 
     /// The signature of one instance, under the current bindings.
-    fn instance_sig(
+    pub(crate) fn instance_sig(
         &mut self,
         decl: &ast::FnDecl,
         class: Option<ClassId>,
@@ -684,6 +750,7 @@ impl Checker<'_> {
             params,
             ret,
             name_span: decl.name.span,
+            self_ty: class.map(|class| self.types.class_ty(class)),
         }
     }
 
@@ -723,17 +790,46 @@ impl Checker<'_> {
         false
     }
 
-    /// Checks the bodies of every queued instance, including the ones those
-    /// bodies instantiate in turn. Instances are numbered in creation order and
-    /// checked in the same order, so `functions[id]` stays the function `id`.
+    /// Checks the bodies of every queued instance and builds every queued
+    /// synthesized function, including the ones those request in turn, and
+    /// appends them to `functions`. Every signature registered after the
+    /// collection pass has exactly one queued body, so after sorting by id
+    /// `functions[id]` is the function `id`.
     pub(crate) fn check_instances(&mut self, functions: &mut Vec<hir::Function>) {
-        while let Some(pending) = self.generics.pending.pop_front() {
-            debug_assert_eq!(functions.len(), pending.id.index());
-            let saved_env = std::mem::replace(&mut self.generics.env, pending.env);
-            let saved_stack = std::mem::replace(&mut self.generics.stack, pending.stack);
-            functions.push(self.check_function(&pending.decl, pending.id));
-            self.generics.stack = saved_stack;
-            self.generics.env = saved_env;
+        let mut done = self.drain_queues();
+        // Instance bodies and synthesized functions are numbered when they
+        // are requested, so putting them in id order makes `functions[id]`
+        // the function `id` again.
+        done.sort_by_key(|(id, _)| *id);
+        for (id, function) in done {
+            debug_assert_eq!(functions.len(), id.index());
+            functions.push(function);
+        }
+    }
+
+    /// Checks every queued instance body and builds every queued synthesized
+    /// function (DESIGN §3.11), including the ones those request in turn, and
+    /// runs the pending conformance checks of class instances.
+    pub(crate) fn drain_queues(&mut self) -> Vec<(hir::FuncId, hir::Function)> {
+        let mut done = Vec::new();
+        loop {
+            self.run_conformance_queue();
+            if let Some(pending) = self.generics.pending.pop_front() {
+                let saved_env = std::mem::replace(&mut self.generics.env, pending.env);
+                let saved_stack = std::mem::replace(&mut self.generics.stack, pending.stack);
+                done.push((pending.id, self.check_function(&pending.decl, pending.id)));
+                self.generics.stack = saved_stack;
+                self.generics.env = saved_env;
+                continue;
+            }
+            if let Some(job) = self.traits.pending.pop_front() {
+                let id = job.id;
+                done.push((id, self.build_synth(job)));
+                continue;
+            }
+            if !self.has_queued_conformance() {
+                return done;
+            }
         }
     }
 
@@ -1059,10 +1155,15 @@ impl Checker<'_> {
             None => {
                 let (template, args) = self.generics.origins.get(&class)?.clone();
                 let entry = self.generics.classes.get(&template)?;
-                let method = entry
+                let Some(method) = entry
                     .methods
                     .iter()
-                    .find(|m| m.name.name == name.name && m.generics.is_empty())?;
+                    .find(|m| m.name.name == name.name && m.generics.is_empty())
+                else {
+                    // `class Box<T>(Eq)` without an `__eq__` derives one per
+                    // instance (DESIGN §3.11).
+                    return self.derive_for_instance(class, &template, name);
+                };
                 let method = Rc::clone(method);
                 let outer = bind(&entry.decl.generics, &args);
                 let class_name = self.types.class(class).name.clone();
@@ -1088,11 +1189,14 @@ impl Checker<'_> {
     /// Whether `name` is a method of the generic class `class` is an instance
     /// of, whether or not it has been instantiated yet.
     pub(crate) fn is_generic_method(&self, class: ClassId, name: &str) -> bool {
+        let Some((template, _)) = self.generics.origins.get(&class) else {
+            return false;
+        };
         self.generics
-            .origins
-            .get(&class)
-            .and_then(|(template, _)| self.generics.classes.get(template))
+            .classes
+            .get(template)
             .is_some_and(|t| t.methods.iter().any(|m| m.name.name == name))
+            || self.template_derives(template, name)
     }
 
     /// Resolves explicitly written type arguments, checking their number.
@@ -1554,6 +1658,12 @@ impl Checker<'_> {
                         for arg in args {
                             targs.push(self.subst(arg, generics, bindings)?);
                         }
+                        // Only a hint: an argument that breaks a bound is
+                        // reported where the instance is really requested.
+                        let params = self.generics.classes[text].decl.generics.clone();
+                        if !self.bounds_hold(&params, &targs) {
+                            return None;
+                        }
                         let ty = self.instantiate_class(text, targs, te.span);
                         (ty != TypeId::ERROR).then_some(ty)
                     }
@@ -1668,7 +1778,7 @@ fn mentions(te: &ast::TypeExpr, name: &str) -> bool {
 }
 
 /// Binds each type parameter to "unknown", for declaration-time validation.
-fn unknown_env(params: &[ast::GenericParam]) -> Vec<(String, TypeId)> {
+pub(crate) fn unknown_env(params: &[ast::GenericParam]) -> Vec<(String, TypeId)> {
     params
         .iter()
         .map(|p| (p.name.name.clone(), TypeId::ERROR))
@@ -1676,7 +1786,7 @@ fn unknown_env(params: &[ast::GenericParam]) -> Vec<(String, TypeId)> {
 }
 
 /// Binds each type parameter to its type argument.
-fn bind(params: &[ast::GenericParam], args: &[TypeId]) -> Vec<(String, TypeId)> {
+pub(crate) fn bind(params: &[ast::GenericParam], args: &[TypeId]) -> Vec<(String, TypeId)> {
     params
         .iter()
         .map(|p| p.name.name.clone())

@@ -1,0 +1,71 @@
+# Nominal traits, bounds and operator overloading (DESIGN 3.11).
+# milestone: M3
+# expect: 15.70795
+# expect: circle of area 3.14159
+# expect: square of area 4.0
+# expect: Point(x=1, y=2)
+# expect: True False True
+# expect: [Point(x=3, y=0), Point(x=1, y=2)]
+# expect: Point(x=3, y=0)
+# expect: Vec(x=4.0, y=6.0) Vec(x=2.0, y=3.0)
+
+trait Shape:
+    fn area(self) -> float
+    fn name(self) -> str
+    fn describe(self) -> str:
+        return f"{self.name()} of area {self.area()}"
+
+class Circle(Shape):
+    r: float
+
+    fn area(self) -> float:
+        return 3.14159 * self.r * self.r
+
+    fn name(self) -> str:
+        return "circle"
+
+class Square(Shape):
+    side: float
+
+    fn area(self) -> float:
+        return self.side * self.side
+
+    fn name(self) -> str:
+        return "square"
+
+    fn describe(self) -> str:
+        return f"square of area {self.area()}"
+
+# Checked once, here: `x.area()` is what `Shape` provides.
+fn total_area<T: Shape>(xs: list<T>) -> float:
+    s = 0.0
+    for x in xs:
+        s = s + x.area()
+    return s
+
+# Declared but not written: derived field by field.
+class Point(Eq, Ord, Hash, Repr):
+    x: int
+    y: int
+
+class Vec(Repr):
+    x: float
+    y: float
+
+    fn __add__(self, other: Vec) -> Vec:
+        return Vec(x=self.x + other.x, y=self.y + other.y)
+
+    fn __mul__(self, k: float) -> Vec:
+        return Vec(x=self.x * k, y=self.y * k)
+
+fn main():
+    print(total_area([Circle(r=1.0), Circle(r=2.0)]))
+    print(Circle(r=1.0).describe())
+    print(Square(side=2.0).describe())
+    p = Point(x=1, y=2)
+    print(p)
+    print(p == Point(x=1, y=2), p < Point(x=0, y=9), hash(p) == hash(Point(x=1, y=2)))
+    print([Point(x=3, y=0), p])
+    print(max(p, Point(x=3, y=0)))
+    v = Vec(x=2.0, y=3.0)
+    print(v * 2.0, v)

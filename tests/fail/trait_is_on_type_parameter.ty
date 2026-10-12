@@ -1,0 +1,11 @@
+# In a checked generic a type parameter may stand for a value type such as
+# `int`, so it has no identity: `is` is rejected at the definition
+# (DESIGN 3.11).
+# milestone: M3
+# error: `is` cannot compare values of the type parameter `T`
+
+fn same<T: Eq>(a: T, b: T) -> bool:
+    return a is b
+
+fn main():
+    print(same(1, 1))

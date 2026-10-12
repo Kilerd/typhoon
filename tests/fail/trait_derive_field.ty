@@ -1,0 +1,17 @@
+# A derived `Eq` / `Ord` / `Hash` / `Repr` needs every field to implement the
+# trait (DESIGN 3.11); a class field implements it only when it declares it.
+# milestone: M3
+# error: cannot derive `Hash` for `Entry`: the field `value` has type `float`, which does not implement `Hash`
+# error: cannot derive `Repr` for `Entry`: the field `owner` has type `Owner`, which does not implement `Repr`
+# error: declare `Repr` on `Owner`
+
+class Owner:
+    name: str
+
+class Entry(Eq, Hash, Repr):
+    key: str
+    value: float
+    owner: Owner
+
+fn main():
+    print(Entry(key="a", value=1.0, owner=Owner(name="x")).key)

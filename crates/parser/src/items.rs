@@ -1,6 +1,8 @@
 //! Top-level declarations: `fn`, `class` and constants (DESIGN 3.2, 3.3, 3.8).
 
-use typhoon_ast::{ClassDecl, ConstDecl, Field, FnDecl, Item, Param};
+use typhoon_ast::{
+    Block, ClassDecl, ConstDecl, Field, FnDecl, Ident, Item, Param, TraitDecl, TraitMethod,
+};
 use typhoon_diag::Diagnostic;
 use typhoon_lexer::TokenKind;
 
@@ -12,6 +14,7 @@ impl Parser<'_> {
         match self.kind() {
             TokenKind::Fn => self.parse_fn_decl().map(Item::Fn),
             TokenKind::Class => self.parse_class_decl().map(Item::Class),
+            TokenKind::Trait => self.parse_trait_decl().map(Item::Trait),
             TokenKind::Ident(name) if name == "def" => {
                 let span = self.span();
                 self.report(
@@ -179,39 +182,14 @@ impl Parser<'_> {
             return None;
         };
         let generics = self.parse_generic_params();
-        // `class B(A):` — DESIGN 3.8 has no inheritance at all.
-        if self.at(&TokenKind::LParen) {
-            let span = self.span();
-            self.report(
-                Diagnostic::error("inheritance is not supported")
-                    .with_label(span, "a class cannot list base classes")
-                    .with_help("compose instead: give the class a field of the other type")
-                    .with_note(
-                        "typhoon has no inheritance; traits are an open question, \
-                         see DESIGN.md section 9",
-                    ),
-            );
-            let mut depth = 0usize;
-            loop {
-                match self.kind() {
-                    TokenKind::LParen => {
-                        depth += 1;
-                        self.bump();
-                    }
-                    TokenKind::RParen => {
-                        self.bump();
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
-                    }
-                    TokenKind::Eof | TokenKind::Newline => break,
-                    _ => {
-                        self.bump();
-                    }
-                }
-            }
-        }
+        // `class C(T1, T2):` lists the traits `C` implements (DESIGN 3.11).
+        // Whether a name is a trait or a class (inheritance, which typhoon
+        // does not have) is for sema to say.
+        let traits = if self.at(&TokenKind::LParen) {
+            self.parse_trait_list()
+        } else {
+            Vec::new()
+        };
         if self.at(&TokenKind::LBrace) {
             let span = self.span();
             self.report(
@@ -223,6 +201,7 @@ impl Parser<'_> {
             return Some(ClassDecl {
                 name,
                 generics,
+                traits,
                 fields: Vec::new(),
                 methods: Vec::new(),
                 span: start.merge(body.span),
@@ -248,6 +227,7 @@ impl Parser<'_> {
             return Some(ClassDecl {
                 name,
                 generics,
+                traits,
                 fields,
                 methods,
                 span: start.merge(span),
@@ -296,9 +276,170 @@ impl Parser<'_> {
         Some(ClassDecl {
             name,
             generics,
+            traits,
             fields,
             methods,
             span: start.merge(end),
+        })
+    }
+
+    /// `(T1, T2)` after a class name: the traits the class implements.
+    fn parse_trait_list(&mut self) -> Vec<Ident> {
+        let mut traits = Vec::new();
+        self.bump(); // `(`
+        loop {
+            if matches!(
+                self.kind(),
+                TokenKind::RParen | TokenKind::Eof | TokenKind::Newline | TokenKind::Colon
+            ) {
+                break;
+            }
+            let before = self.pos();
+            if let Some(name) = self.expect_ident("a trait name") {
+                traits.push(name);
+            } else if self.pos() == before {
+                self.bump();
+            }
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        if !self.expect(&TokenKind::RParen, "`)` after the trait list") {
+            // Skip the rest of a malformed list so the header still parses.
+            while !matches!(
+                self.kind(),
+                TokenKind::Colon | TokenKind::Newline | TokenKind::Eof | TokenKind::Indent
+            ) {
+                self.bump();
+            }
+        }
+        traits
+    }
+
+    /// `trait Name:` plus its body of method signatures (DESIGN 3.11). A
+    /// method whose header ends at the line is required; one with a `:` and a
+    /// body is a default implementation.
+    pub(crate) fn parse_trait_decl(&mut self) -> Option<TraitDecl> {
+        let start = self.span();
+        self.bump(); // `trait`
+        let Some(name) = self.expect_ident("a trait name") else {
+            self.sync_to_item();
+            return None;
+        };
+        if self.at(&TokenKind::Lt) {
+            let span = self.span();
+            self.report(
+                Diagnostic::error("generic traits are not supported")
+                    .with_label(span, "a trait takes no type parameters")
+                    .with_note("see DESIGN.md section 3.11"),
+            );
+            self.parse_generic_params();
+        }
+        self.expect_colon("the trait header");
+        let mut methods = Vec::new();
+        let mut end = self.prev_span();
+        if !self.eat(&TokenKind::Newline) && !self.at(&TokenKind::Indent) {
+            self.expected("end of line after the trait header");
+            self.sync_to_newline();
+        }
+        if !self.eat(&TokenKind::Indent) {
+            let span = self.span();
+            self.report(
+                Diagnostic::error("expected an indented block after the trait header")
+                    .with_label(span, "expected an indented block")
+                    .with_help("indent the method signatures by 4 spaces"),
+            );
+            return Some(TraitDecl {
+                name,
+                methods,
+                span: start.merge(span),
+            });
+        }
+        loop {
+            self.skip_newlines();
+            if matches!(self.kind(), TokenKind::Dedent | TokenKind::Eof) {
+                break;
+            }
+            let before = self.pos();
+            match self.kind() {
+                TokenKind::Fn => {
+                    if let Some(method) = self.parse_trait_method() {
+                        end = method.decl.span;
+                        methods.push(method);
+                    }
+                }
+                TokenKind::Pass => {
+                    self.bump();
+                    end = self.prev_span();
+                    self.expect_newline("`pass`");
+                }
+                _ => {
+                    let span = self.span();
+                    self.report(
+                        Diagnostic::error("expected a method declaration")
+                            .with_label(span, "a trait contains only `fn` signatures")
+                            .with_help("traits have no fields; declare them on the classes"),
+                    );
+                    self.recover_from_stray_header();
+                }
+            }
+            if self.pos() == before {
+                self.bump();
+            }
+        }
+        self.eat(&TokenKind::Dedent);
+        Some(TraitDecl {
+            name,
+            methods,
+            span: start.merge(end),
+        })
+    }
+
+    /// One `fn` inside a trait: a signature, with or without a default body.
+    fn parse_trait_method(&mut self) -> Option<TraitMethod> {
+        let start = self.span();
+        self.bump(); // `fn`
+        let Some(name) = self.expect_ident("a method name") else {
+            self.sync_to_newline();
+            return None;
+        };
+        let generics = self.parse_generic_params();
+        let params = self.parse_params();
+        let ret = if self.eat(&TokenKind::Arrow) {
+            Some(self.parse_type())
+        } else {
+            None
+        };
+        if self.at(&TokenKind::Colon) || self.at(&TokenKind::LBrace) {
+            let body = self.parse_body("the method header");
+            let span = start.merge(body.span);
+            return Some(TraitMethod {
+                decl: FnDecl {
+                    name,
+                    generics,
+                    params,
+                    ret,
+                    body,
+                    span,
+                },
+                has_body: true,
+            });
+        }
+        let span = self.span_from(start);
+        self.expect_newline("a required method signature");
+        Some(TraitMethod {
+            decl: FnDecl {
+                name,
+                generics,
+                params,
+                ret,
+                body: Block {
+                    stmts: Vec::new(),
+                    span,
+                },
+                span,
+            },
+            has_body: false,
         })
     }
 

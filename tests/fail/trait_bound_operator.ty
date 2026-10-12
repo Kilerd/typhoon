@@ -1,0 +1,13 @@
+# An operator on a bounded `T` needs the trait that provides it: `T: Eq` has
+# `==` but not `<` (DESIGN 3.11).
+# milestone: M3
+# error: `T` values cannot be compared with `<`
+# error: add the bound `T: Ord`
+
+fn smaller<T: Eq>(a: T, b: T) -> T:
+    if a < b:
+        return a
+    return b
+
+fn main():
+    print(smaller(1, 2))

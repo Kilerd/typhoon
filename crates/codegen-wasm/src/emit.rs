@@ -947,14 +947,19 @@ mod tests {
     }
 
     /// `tests/run/runtime_surface.ty` exists to call every runtime entry point
-    /// exactly once — together with its M3 companion
+    /// exactly once — together with its M3 companions
     /// `tests/run/runtime_surface_dict.ty` for the dict / set / sorted /
-    /// slicing calls; if they stop doing so, part of the C ABI is no longer
-    /// covered by the golden suite on either backend.
+    /// slicing calls and `tests/run/runtime_surface_traits.ty` for `repr` and
+    /// `hash` (DESIGN §3.11); if they stop doing so, part of the C ABI is no
+    /// longer covered by the golden suite on either backend.
     #[test]
     fn the_runtime_surface_program_imports_every_runtime_function() {
         let mut imported = Vec::new();
-        for program in ["runtime_surface.ty", "runtime_surface_dict.ty"] {
+        for program in [
+            "runtime_surface.ty",
+            "runtime_surface_dict.ty",
+            "runtime_surface_traits.ty",
+        ] {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .and_then(std::path::Path::parent)

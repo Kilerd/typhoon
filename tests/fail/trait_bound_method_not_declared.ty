@@ -1,0 +1,23 @@
+# A bounded `T` is checked at the definition and has exactly the methods of
+# its bounds, even if every type it is used with has more (DESIGN 3.11).
+# milestone: M3
+# error: `T` has no method `perimeter`
+# error: add a trait bound that declares `perimeter`
+
+trait Shape:
+    fn area(self) -> float
+
+class Square(Shape):
+    side: float
+
+    fn area(self) -> float:
+        return self.side * self.side
+
+    fn perimeter(self) -> float:
+        return 4.0 * self.side
+
+fn outline<T: Shape>(x: T) -> float:
+    return x.perimeter()
+
+fn main():
+    print(outline(Square(side=1.0)))

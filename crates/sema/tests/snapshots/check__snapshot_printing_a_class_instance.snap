@@ -9,4 +9,4 @@ error: cannot print a `Point`
   |           ^^^^^^^^^^^^ this is a `Point`
   |
   = note: see DESIGN.md section 3.8
-  = help: format the fields explicitly; a repr protocol arrives in M3
+  = help: define `__repr__` on the class (or declare `Repr`)

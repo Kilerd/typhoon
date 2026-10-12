@@ -1,0 +1,21 @@
+# A trait's default method is checked once, against what the trait itself
+# declares; a mistake there is reported once, not once per class
+# (DESIGN 3.11).
+# milestone: M3
+# error: `Self` has no method `nme`
+
+trait Greeter:
+    fn name(self) -> str
+    fn greet(self) -> str:
+        return "hi " + self.nme()
+
+class A(Greeter):
+    fn name(self) -> str:
+        return "a"
+
+class B(Greeter):
+    fn name(self) -> str:
+        return "b"
+
+fn main():
+    print(A().greet(), B().greet())

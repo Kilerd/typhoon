@@ -113,9 +113,14 @@ impl<'p> Emitter<'p> {
             hir::ExprKind::BoolCmp { op, lhs, rhs } => {
                 self.expr(func, lhs);
                 self.expr(func, rhs);
+                // `False < True` (DESIGN §3.11): 0 and 1, compared unsigned.
                 self.ins(match op {
                     hir::CmpOp::Eq => Instruction::I32Eq,
-                    _ => Instruction::I32Ne,
+                    hir::CmpOp::Ne => Instruction::I32Ne,
+                    hir::CmpOp::Lt => Instruction::I32LtU,
+                    hir::CmpOp::Le => Instruction::I32LeU,
+                    hir::CmpOp::Gt => Instruction::I32GtU,
+                    hir::CmpOp::Ge => Instruction::I32GeU,
                 });
             }
             hir::ExprKind::FloatCmp { op, lhs, rhs } => {
@@ -244,6 +249,24 @@ impl<'p> Emitter<'p> {
                 let ty = value.ty;
                 self.expr(func, value);
                 self.format_value(ty, hir::FormatSpec::Display);
+            }
+            // `repr(x)`: the printer, writing into a capture buffer
+            // (DESIGN §3.11).
+            hir::ExprKind::Repr(value) => {
+                let ty = value.ty;
+                let slots = self.spill_expr(func, value);
+                self.call_rt(Rt::ReprBegin);
+                self.print_value(ty, &slots, true);
+                self.call_rt(Rt::ReprEnd);
+            }
+            hir::ExprKind::Hash(value) => {
+                let ty = value.ty;
+                self.expr(func, value);
+                if ty == TypeId::BOOL {
+                    self.ins(Instruction::I64ExtendI32U);
+                } else {
+                    self.call_rt(Rt::StrHash);
+                }
             }
 
             // -- list -----------------------------------------------------
@@ -820,7 +843,10 @@ impl<'p> Emitter<'p> {
             Type::Int => self.call_rt(Rt::StrFromInt),
             Type::Float => self.call_rt(Rt::StrFromFloat),
             Type::Bool => self.call_rt(Rt::StrFromBool),
+            // `str(obj)` and `{obj}`: its `__repr__` (DESIGN §3.11).
+            Type::Class(class) => self.class_repr(class),
             // Not reachable: sema only lets a `str`, `int`, `float` or `bool`
+
             // into a hole. Mirror the native backend, which renders anything
             // else as the empty string.
             _ => {

@@ -188,8 +188,10 @@ fn dumps_a_full_module() {
         name: ident("Stack", 22),
         generics: vec![GenericParam {
             name: ident("T", 28),
+            bounds: vec![],
             span: sp(28, 29),
         }],
+        traits: vec![],
         fields: vec![Field {
             name: ident("items", 36),
             ty: named_ty("list", 43, vec![named_ty("T", 48, vec![])]),

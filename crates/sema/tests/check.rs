@@ -540,8 +540,8 @@ fn operators_are_defined_per_type() {
         ["`-` cannot be applied to `str` and `str`"].as_slice(),
     );
     rejects_main(
-        "print(True < False)",
-        ["`<` cannot be applied to `bool` and `bool`"].as_slice(),
+        "print([1] < [2])",
+        ["`<` cannot be applied to `list<int>` and `list<int>`"].as_slice(),
     );
     rejects_main(
         "print(1.0 & 2.0)",
@@ -554,6 +554,8 @@ fn operators_are_defined_per_type() {
     ok_main("print(\"a\" == \"b\", True != False)");
     // `str` gained the ordering operators in M2 (code point order).
     ok_main("print(\"a\" < \"b\", \"a\" >= \"b\")");
+    // `bool` is `Ord` in M3, `False < True` (DESIGN §3.11).
+    ok_main("print(True < False, False <= True)");
 }
 
 #[test]
@@ -1565,9 +1567,10 @@ fn every_link_of_a_chain_is_type_checked() {
         ["mismatched types: expected `int`, found `str`"].as_slice(),
     );
     rejects_main(
-        "print(True < False < True)",
-        ["`<` cannot be applied to `bool` and `bool`"].as_slice(),
+        "print([1] < [2] < [3])",
+        ["`<` cannot be applied to `list<int>` and `list<int>`"].as_slice(),
     );
+
     // One mistake in the middle is reported once, not once per link.
     let rendered = err(&in_main("print(1 < nope < 3)"));
     assert_eq!(rendered.matches("error: ").count(), 1, "{rendered}");

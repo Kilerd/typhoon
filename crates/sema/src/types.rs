@@ -457,12 +457,13 @@ impl TypeTable {
         }
     }
 
-    /// Whether `print` and `==` are defined for `ty`.
+    /// Whether `print` and `==` are defined for `ty` without any class
+    /// protocol method.
     ///
-    /// M2 has no repr or equality protocol for class instances, so a class —
-    /// and anything containing one — is neither printable nor comparable
-    /// (DESIGN §3.8; the protocols arrive in M3). A `T | None` prints as its
-    /// value or `None`, like Python.
+    /// A class instance — and anything containing one — needs its `__repr__`
+    /// / `__eq__`, which only the checker can look up (DESIGN §3.11), so this
+    /// table-only answer is `false` for it. A `T | None` prints as its value
+    /// or `None`, like Python.
     pub fn is_printable(&self, ty: TypeId) -> bool {
         if let Type::Optional(inner) = self.get(ty) {
             return self.is_printable(inner);

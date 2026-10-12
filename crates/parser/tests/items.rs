@@ -233,20 +233,46 @@ fn several_functions_in_a_row_without_blank_lines() {
 }
 
 #[test]
-fn a_base_class_list_is_rejected_with_a_dedicated_message() {
-    let messages = common::messages("class B(A):\n    x: int\n");
-    assert!(
-        messages
-            .iter()
-            .any(|m| m.contains("inheritance is not supported")),
-        "{messages:?}"
-    );
-    // Recovery still yields the class, so its body is checked as usual.
-    let (module, _) = common::module_with_diags("class B(A):\n    x: int\n");
+fn a_class_header_lists_traits() {
+    // Whether `A` is a trait or a class (inheritance, which typhoon does not
+    // have) is for sema to decide (DESIGN 3.11).
+    let module = module("class B(A, Eq):\n    x: int\n");
     match &module.items[0] {
         Item::Class(decl) => {
             assert_eq!(decl.name.as_str(), "B");
+            let traits: Vec<&str> = decl.traits.iter().map(|t| t.as_str()).collect();
+            assert_eq!(traits, ["A", "Eq"]);
             assert_eq!(decl.fields.len(), 1);
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_trait_has_required_and_default_methods() {
+    let module = module(
+        "trait Shape:\n    fn area(self) -> float\n    fn twice(self) -> float:\n        return 2.0 * self.area()\n",
+    );
+    match &module.items[0] {
+        Item::Trait(decl) => {
+            assert_eq!(decl.name.as_str(), "Shape");
+            assert_eq!(decl.methods.len(), 2);
+            assert!(!decl.methods[0].has_body);
+            assert!(decl.methods[1].has_body);
+            assert_eq!(decl.methods[1].decl.body.stmts.len(), 1);
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn generic_parameters_take_bounds() {
+    let module = module("fn f<T: Eq + Hash, U>(a: T, b: U):\n    pass\n");
+    match &module.items[0] {
+        Item::Fn(decl) => {
+            let bounds: Vec<&str> = decl.generics[0].bounds.iter().map(|b| b.as_str()).collect();
+            assert_eq!(bounds, ["Eq", "Hash"]);
+            assert!(decl.generics[1].bounds.is_empty());
         }
         other => panic!("{other:?}"),
     }

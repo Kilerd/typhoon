@@ -1,0 +1,12 @@
+# The runtime entry points behind traits (DESIGN 3.11): `repr(x)` captures
+# what the printer writes (`ty_repr_begin` / `ty_repr_end`) and `hash(s)` of a
+# `str` is `ty_str_hash`. The companion of runtime_surface.ty, whose wasm unit
+# test checks that every runtime import is called by one of them.
+# milestone: M3
+# expect: ["a", "b"] 10
+# expect: True False
+
+fn main():
+    text = repr(["a", "b"])
+    print(text, len(text))
+    print(hash("typhoon") == hash("typ" + "hoon"), hash("a") == hash("b"))

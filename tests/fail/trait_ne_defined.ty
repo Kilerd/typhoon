@@ -1,0 +1,16 @@
+# `!=` is always `not __eq__`, so `__ne__` cannot be defined (DESIGN 3.11).
+# milestone: M3
+# error: `__ne__` cannot be defined
+# error: `!=` is always `not __eq__`
+
+class Tag:
+    v: int
+
+    fn __eq__(self, other: Tag) -> bool:
+        return self.v == other.v
+
+    fn __ne__(self, other: Tag) -> bool:
+        return self.v != other.v
+
+fn main():
+    print(Tag(v=1) != Tag(v=2))

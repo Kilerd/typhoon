@@ -32,6 +32,10 @@
 //! * generic functions and classes are monomorphized: every instance is
 //!   checked with its type arguments substituted, and lowered to ordinary
 //!   functions and classes (DESIGN §3.9, §4.5);
+//! * a class implements every trait it declares, with the trait's signatures;
+//!   a generic item with a trait bound is checked once at its definition, and
+//!   its type arguments implement the bounds; an operator on a class instance
+//!   calls its dunder method (DESIGN §3.11);
 //! * a dict key or a set element is hashable (`int`, `bool`, `str`, or a flat
 //!   tuple of those), and `{}` / `set()` get their types from the context,
 //!   like `[]` (DESIGN §3.10, §4.1);
@@ -46,10 +50,13 @@ mod collections;
 mod comp;
 mod consts;
 mod dump;
+mod dunder;
 mod exprs;
 mod generics;
 pub mod hir;
 mod optional;
+mod protocols;
+mod traits;
 pub mod types;
 
 use typhoon_ast as ast;
@@ -76,7 +83,17 @@ pub fn check_module(
     // Diagnostics about the module as a whole point at the start of the file.
     let whole_file = Span::new(file, 0, 0);
 
+    // Default methods of user traits become methods of the classes that
+    // declare the trait without overriding them (DESIGN §3.11).
+    let expanded = traits::expand_trait_defaults(module);
+    let module = expanded.as_ref().unwrap_or(module);
+
     let fn_decls = checker.collect_items(module);
+    // Trait conformance of every class, and the derived `Eq` / `Ord` /
+    // `Hash` / `Repr` methods; then the definition-time check of every trait
+    // default and every generic item with a bound (DESIGN §3.11).
+    checker.check_conformance(module);
+    checker.check_definitions();
     let mut functions = Vec::with_capacity(fn_decls.len());
     for (id, decl) in fn_decls.iter().enumerate() {
         functions.push(checker.check_function(decl, hir::FuncId(id as u32)));
@@ -87,6 +104,7 @@ pub fn check_module(
     let main = checker.check_entry_point(&fn_decls, whole_file);
 
     let types = checker.types.clone();
+    let protocols = checker.protocols();
     let errors_after = diags.iter().filter(|d| d.is_error()).count();
     if errors_after > errors_before {
         return None;
@@ -95,6 +113,7 @@ pub fn check_module(
         types,
         functions,
         main: main?,
+        protocols,
     })
 }
 
@@ -109,6 +128,9 @@ impl<'a> Checker<'a> {
     /// signatures of free functions and methods, in the order their bodies are
     /// checked.
     fn collect_items<'m>(&mut self, module: &'m ast::Module) -> Vec<&'m ast::FnDecl> {
+        // Trait names come first, because the bounds of a generic class are
+        // validated when its name is registered.
+        self.register_traits(module);
         for item in &module.items {
             if let ast::Item::Class(decl) = item {
                 self.collect_class_name(decl);
@@ -117,6 +139,12 @@ impl<'a> Checker<'a> {
         for item in &module.items {
             if let ast::Item::Const(decl) = item {
                 self.collect_const(decl);
+            }
+        }
+        self.validate_traits();
+        for item in &module.items {
+            if let ast::Item::Class(decl) = item {
+                self.collect_class_traits(decl);
             }
         }
         self.validate_generic_classes();
@@ -145,7 +173,7 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
-                ast::Item::Const(_) => {}
+                ast::Item::Const(_) | ast::Item::Trait(_) => {}
             }
         }
         decls
@@ -319,6 +347,11 @@ impl<'a> Checker<'a> {
             }
         };
 
+        // `Self` names the class inside its methods (DESIGN §3.11).
+        let self_ty = class.map(|class| self.types.class_ty(class));
+        if let Some(ty) = self_ty {
+            self.generics.env.push(("Self".to_string(), ty));
+        }
         let mut params = Vec::with_capacity(decl.params.len());
         let mut seen: Vec<&str> = Vec::new();
         for param in &decl.params {
@@ -380,12 +413,16 @@ impl<'a> Checker<'a> {
             Some(ty) => self.resolve_type(ty),
             None => TypeId::UNIT,
         };
+        if self_ty.is_some() {
+            self.generics.env.pop();
+        }
         self.sigs.push(FnSig {
             name: qualified,
             symbol,
             params,
             ret,
             name_span: decl.name.span,
+            self_ty,
         });
         if class.is_none() {
             self.fn_index.insert(decl.name.name.clone(), id);
@@ -401,8 +438,18 @@ impl<'a> Checker<'a> {
             .map(|id| self.sigs[id.index()].name_span)
             .or_else(|| self.consts.get(name).map(|c| c.span))
             .or_else(|| self.classes.get(name).map(|c| c.name_span))
-            .or_else(|| self.generics.name_span(name));
+            .or_else(|| self.generics.name_span(name))
+            .or_else(|| self.trait_name_span(name));
         match previous {
+            // A builtin trait has no definition to point at (DESIGN §3.11).
+            Some(previous) if previous.is_dummy() => {
+                self.error(
+                    Diagnostic::error(format!("`{name}` is the name of a builtin trait"))
+                        .with_label(span, "pick another name")
+                        .with_note("see DESIGN.md section 3.11"),
+                );
+                true
+            }
             Some(previous) => {
                 self.error(
                     Diagnostic::error(format!("the name `{name}` is defined multiple times"))
@@ -424,6 +471,23 @@ impl<'a> Checker<'a> {
         self.loop_depth = 0;
         self.ret_ty = self.sigs[id.index()].ret;
         self.fn_name = self.sigs[id.index()].name.clone();
+        // A copy of a trait default that failed its own check would only
+        // repeat those diagnostics (DESIGN §3.11).
+        if self.is_poisoned_default(decl) {
+            return hir::Function {
+                name: self.fn_name.clone(),
+                symbol: self.sigs[id.index()].symbol.clone(),
+                params: Vec::new(),
+                ret: self.ret_ty,
+                locals: Vec::new(),
+                body: hir::Block::default(),
+                span: decl.span,
+            };
+        }
+        let self_ty = self.sigs[id.index()].self_ty;
+        if let Some(ty) = self_ty {
+            self.generics.env.push(("Self".to_string(), ty));
+        }
 
         let params: Vec<(String, TypeId, Span)> = self.sigs[id.index()]
             .params
@@ -452,6 +516,9 @@ impl<'a> Checker<'a> {
                 )
                 .with_help(format!("add a `return <{ret_name}>` on every path")),
             );
+        }
+        if self_ty.is_some() {
+            self.generics.env.pop();
         }
 
         hir::Function {

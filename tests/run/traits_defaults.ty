@@ -1,0 +1,75 @@
+# Default methods are copied into a class unless it overrides them; `Self` in
+# a trait (and in a class) names the implementing class; a generic class
+# declares traits for every instance (DESIGN 3.11).
+# milestone: M3
+# expect: True 2 False Stack(items=[1, 2])
+# expect: False 1 True
+# expect: hi, I am a cat
+# expect: WOOF
+# expect: 3 True
+# expect: Stack(items=[Version(major=1, minor=2), Version(major=1, minor=2)]) Stack(items=[1.5, 1.5])
+
+trait Sized:
+    fn size(self) -> int
+    fn is_empty(self) -> bool:
+        return self.size() == 0
+    fn bigger(self, other: Self) -> bool:
+        return self.size() > other.size()
+
+class Stack<T>(Sized, Repr):
+    items: list<T>
+
+    fn size(self) -> int:
+        return len(self.items)
+
+    fn push(self, v: T) -> Self:
+        self.items.append(v)
+        return self
+
+trait Speaker:
+    fn sound(self) -> str
+    fn speak(self) -> str:
+        return shout(self.sound())
+
+fn shout(s: str) -> str:
+    return s.upper()
+
+class Cat(Speaker):
+    fn sound(self) -> str:
+        return "meow"
+
+    fn speak(self) -> str:
+        return "hi, I am a cat"
+
+class Dog(Speaker):
+    fn sound(self) -> str:
+        return "woof"
+
+class Counter(Sized):
+    n: int
+
+    fn size(self) -> int:
+        return self.n
+
+    fn same(self, other: Self) -> bool:
+        return self.n == other.n
+
+class Version(Eq, Ord, Repr):
+    major: int
+    minor: int
+
+fn wrap<T: Repr>(x: T) -> Stack<T>:
+    s: Stack<T> = Stack(items=[])
+    s.push(x).push(x)
+    return s
+
+fn main():
+    s: Stack<int> = Stack(items=[])
+    print(s.is_empty(), s.push(1).push(2).size(), s.is_empty(), s)
+    t: Stack<int> = Stack(items=[7])
+    print(t.bigger(s), t.size(), s.bigger(t))
+    print(Cat().speak())
+    print(Dog().speak())
+    c = Counter(n=3)
+    print(c.size(), c.same(Counter(n=3)))
+    print(wrap(Version(major=1, minor=2)), wrap(1.5))
