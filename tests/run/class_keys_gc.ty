@@ -1,0 +1,34 @@
+# Class keys are pointers the collector must see (DESIGN 3.11, 5.1): a table
+# whose only reference to its key instances is its own entry array keeps them
+# alive through many collections, and they still hash and compare correctly.
+# milestone: M3
+# expect: 2000 True True
+# expect: 1999000 0
+
+class Cell(Eq, Hash):
+    name: str
+    n: int
+
+fn churn(rounds: int) -> int:
+    total = 0
+    for i in range(rounds):
+        total = total + len(f"garbage {i} {i * 7}")
+    return total
+
+fn main():
+    cells: dict<Cell, int> = {}
+    for i in range(2000):
+        cells[Cell(name=f"c{i}", n=i)] = i
+    churn(300000)
+    print(len(cells), Cell(name="c0", n=0) in cells, Cell(name="c1999", n=1999) in cells)
+    total = 0
+    bad = 0
+    for i in range(2000):
+        v = cells.get(Cell(name=f"c{i}", n=i), -1)
+        if v != i:
+            bad = bad + 1
+        total = total + v
+    for c in cells:
+        if c.name != f"c{c.n}":
+            bad = bad + 1
+    print(total, bad)

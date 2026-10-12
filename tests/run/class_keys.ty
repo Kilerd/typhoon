@@ -20,6 +20,7 @@
 # expect: 1 299 0 298
 # expect: {Name("ada"): 2, Name("bob"): 1} True
 # expect: 64 0 64
+# expect: True False ["key", "table", "key", "table"]
 
 class Point(Eq, Hash, Repr):
     x: int
@@ -48,6 +49,14 @@ class Name(Eq, Hash, Repr):
 
     fn __repr__(self) -> str:
         return f"Name({repr(self.text)})"
+
+fn traced_key(trace: list<str>, x: int) -> Point:
+    trace.append("key")
+    return Point(x=x, y=0)
+
+fn traced_table(trace: list<str>, s: set<Point>) -> set<Point>:
+    trace.append("table")
+    return s
 
 fn main():
     d: dict<Point, str> = {Point(x=1, y=2): "a", Point(x=3, y=4): "b"}
@@ -115,3 +124,11 @@ fn main():
         if p not in grid:
             missing = missing + 1
     print(len(grid), missing, len(moved))
+
+    # `in` evaluates its left operand first, as in Python; `__hash__` and
+    # `__eq__` run once both are known.
+    trace: list<str> = []
+    pts = {Point(x=1, y=0)}
+    hit = traced_key(trace, 1) in traced_table(trace, pts)
+    miss = traced_key(trace, 2) in traced_table(trace, pts)
+    print(hit, miss, trace)
