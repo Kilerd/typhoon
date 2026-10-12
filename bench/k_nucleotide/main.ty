@@ -1,0 +1,113 @@
+# k_nucleotide: the Benchmarks Game hash-table benchmark. Count every k-mer of
+# a DNA sequence in a dict<str, int>: the 1- and 2-mer frequency tables sorted
+# by frequency, then the counts of five fixed sequences up to 18 long.
+#
+# The input is generated in-program rather than read from stdin: it is the
+# THREE section (Homo sapiens frequencies) of the Benchmarks Game `fasta`
+# output, upper-cased, produced by fasta's linear congruential generator
+# after the 3 * N draws of section TWO. Measures str slicing and a string-
+# keyed hash table (one key allocation per k-mer for Typhoon, a zero-copy
+# substring for Go). Must stay structurally identical to main.go (DESIGN
+# 7.2): same generator, same dict traffic, same sort keys.
+#
+# milestone: M3
+# expect: A 30.298
+# expect: T 30.147
+# expect: C 19.802
+# expect: G 19.754
+# expect:
+# expect: AA 9.178
+# expect: TA 9.131
+# expect: AT 9.130
+# expect: TT 9.089
+# expect: CA 6.004
+# expect: AC 6.002
+# expect: AG 5.988
+# expect: GA 5.984
+# expect: CT 5.971
+# expect: TC 5.970
+# expect: GT 5.956
+# expect: TG 5.956
+# expect: CC 3.918
+# expect: GC 3.912
+# expect: CG 3.909
+# expect: GG 3.901
+# expect:
+# expect: 88278	GGT
+# expect: 26769	GGTA
+# expect: 2833	GGTATT
+# expect: 53	GGTATTTTAATT
+# expect: 53	GGTATTTTAATTTATAGT
+
+# fasta's N: section THREE is 5 * N nucleotides long.
+N: int = 1500000
+
+IM: int = 139968
+IA: int = 3877
+IC: int = 29573
+IM_F: float = 139968.0
+
+# fasta's random number generator: `next` is `random(1.0)`.
+class Lcg:
+    last: int
+
+    fn next(self) -> float:
+        self.last = (self.last * IA + IC) % IM
+        return float(self.last) / IM_F
+
+# The first letter whose cumulative probability exceeds `r`, else the last.
+fn pick(cumulative: list<float>, r: float) -> int:
+    for i in range(len(cumulative)):
+        if r < cumulative[i]:
+            return i
+    return len(cumulative) - 1
+
+# Section THREE of `fasta n`, upper-cased.
+fn make_sequence(n: int) -> str:
+    rng = Lcg(last=42)
+    # Section ONE repeats a fixed string and draws nothing; section TWO
+    # draws one random number per nucleotide.
+    for i in range(3 * n):
+        rng.next()
+    probabilities: list<float> = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008]
+    letters: list<str> = ["A", "C", "G", "T"]
+    cumulative: list<float> = []
+    acc = 0.0
+    for p in probabilities:
+        acc = acc + p
+        cumulative.append(acc)
+    parts: list<str> = []
+    for i in range(5 * n):
+        parts.append(letters[pick(cumulative, rng.next())])
+    return "".join(parts)
+
+# Every k-mer of length `frame` with its number of occurrences.
+fn frequencies(seq: str, frame: int) -> dict<str, int>:
+    counts: dict<str, int> = {}
+    n = len(seq) - frame + 1
+    for i in range(n):
+        key = seq[i:i + frame]
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+# The k-mers of length `frame` by descending frequency, ties by name.
+fn write_frequencies(seq: str, frame: int):
+    counts = frequencies(seq, frame)
+    total = len(seq) - frame + 1
+    order: list<tuple<int, str>> = []
+    for item in counts.items():
+        order.append((-item[1], item[0]))
+    for entry in sorted(order):
+        print(f"{entry[1]} {100.0 * float(-entry[0]) / float(total):.3f}")
+    print("")
+
+fn write_count(seq: str, target: str):
+    counts = frequencies(seq, len(target))
+    print(f"{counts.get(target, 0)}\t{target}")
+
+fn main():
+    seq = make_sequence(N)
+    write_frequencies(seq, 1)
+    write_frequencies(seq, 2)
+    for target in ["GGT", "GGTA", "GGTATT", "GGTATTTTAATT", "GGTATTTTAATTTATAGT"]:
+        write_count(seq, target)

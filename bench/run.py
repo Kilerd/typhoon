@@ -31,6 +31,7 @@ BENCHMARKS = [
     ("binary_trees", 2.0, "allocation heavy, M2 (Boehm phase)"),
     ("fannkuch", 1.0, "integer arrays, M2"),
     ("spectral_norm", 1.0, "float, M1 target, needs list<float> from M2"),
+    ("k_nucleotide", 1.5, "dict heavy, M3 (M4: 1.0x)"),
 ]
 
 GO_FALLBACKS = ["/opt/homebrew/opt/go/bin/go", "/usr/local/go/bin/go"]
@@ -251,6 +252,7 @@ def main():
           % (", plus a %.0f%% tolerance" % (args.tolerance * 100) if args.tolerance else ""))
     print("M1 rows and fannkuch are <= 1.0x Go; binary_trees is <= 2.0x while the Boehm")
     print("collector is in place (M2), tightening to <= 1.0x after escape analysis (M5).")
+    print("k_nucleotide is <= 1.5x at M3, tightening to <= 1.0x with the M4 string work.")
     if typhoon is None:
         print("typhoon was not run, so nothing here can pass or fail yet.")
 

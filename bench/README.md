@@ -40,7 +40,8 @@ Build the compiler first (`cargo build --release -p typhoon`) so `run.sh` finds
 `target/release/typhoon`; use `--no-typhoon` to just refresh the Go baselines.
 
 `bench/go.mod` exists only so `go vet ./...` works inside a benchmark directory; the Go
-programs import nothing outside `fmt` and `math`.
+programs import nothing outside `fmt` and `math` (plus `sort` and `strings` in
+`k_nucleotide`).
 
 ## Benchmarks
 
@@ -53,6 +54,7 @@ programs import nothing outside `fmt` and `math`.
 | `binary_trees` | allocator and GC: 202M two-pointer `class` nodes, nullable references | `MIN_DEPTH = 4`, `MAX_DEPTH = 18`, `SCALE = 3` | 10 lines, from `stretch tree of depth 19 check: 1048575` to `long lived tree of depth 18 check: 524287` | <= 2.0x Go (M2, Boehm phase) -> <= 1.0x (M5) |
 | `fannkuch` | `list<int>` indexing and in-place swaps in tight loops | `N = 11` | `556355` / `Pfannkuchen(11) = 51` | <= 1.0x Go (M2) |
 | `spectral_norm` | `list<float>` sequential reads, float divide, multiply-add | `N = 6650`, `ITERATIONS = 10` | `1.274224153` | <= 1.0x Go (M1 target, needs M2 lists) |
+| `k_nucleotide` | `str` slicing and a `dict<str, int>`: 52.5M k-mer lookups over a generated fasta sequence | `N = 1500000` (7.5M nucleotides) | 27 lines, from `A 30.298` to `53	GGTATTTTAATTTATAGT` | <= 1.5x Go (M3) -> <= 1.0x (M4) |
 
 Sizes were chosen so Go takes 1-3 s on this machine: long enough that process startup
 and scheduler noise are irrelevant, short enough that a full run of the suite is under
