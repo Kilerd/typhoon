@@ -42,6 +42,35 @@
 //! buffer holding it laid out as a tuple (an `alloca` natively, the static
 //! [`ty_key_buf`] on wasm).
 //!
+//! # Class keys
+//!
+//! A user class is a key through its `__hash__` and `__eq__` (DESIGN §3.11),
+//! and the runtime cannot call user code — on wasm it is a separate module
+//! (DESIGN §6.2.1). So a [`KEY_CLASS`] table turns the lookup inside out: the
+//! generated code calls `__hash__`, then walks the candidates the runtime
+//! hands out and confirms each with `__eq__`:
+//!
+//! ```text
+//! h   = key.__hash__()
+//! pos = ty_dict_probe(d, h, -1)              # first entry whose hash is h, or -1
+//! while pos >= 0 and not ty_dict_probe_key(d, pos).__eq__(key):
+//!     pos = ty_dict_probe(d, h, pos)         # the next one
+//! slot = ty_dict_probe_slot(d, h, pos)       # or _insert / _remove; null on a miss
+//! ```
+//!
+//! The loop is an ordinary function the checker writes (one per key class),
+//! so `__eq__` is a direct, inlinable call and nothing crosses a function
+//! pointer. Its state — `pos` — lives in the caller, not in the table, so a
+//! lookup in the same table from inside `__eq__` cannot disturb it. The user
+//! hash is mixed like an `int` before it picks a slot, so a `__hash__`
+//! returning `self.x` spreads as well as an `int` key does, and only entries
+//! with an equal 64-bit hash ever reach `__eq__`.
+//!
+//! An `__eq__` that mutates the table it is being looked up in gets no
+//! guarantee beyond memory safety: every `pos` handed back is re-validated
+//! (it must still reference a live entry with the key's hash), and an
+//! insertion re-finds its empty slot.
+//!
 //! # The lookup cache
 //!
 //! `counts[k] = counts.get(k, 0) + 1` and `if k in d: d[k] = d[k] + 1` look the
@@ -76,6 +105,11 @@ pub const KEY_FLOAT: u64 = 2;
 pub const KEY_BOOL: u64 = 3;
 /// Descriptor kind of a `str` member: one pointer.
 pub const KEY_STR: u64 = 4;
+/// Descriptor kind of a class key: one pointer to an instance whose
+/// `__hash__` and `__eq__` only the generated code can call (DESIGN §3.11).
+/// The runtime never hashes or compares such a key itself; see
+/// [class keys](self#class-keys).
+pub const KEY_CLASS: u64 = 5;
 
 /// The most members a descriptor can describe: 16 nibbles in a `u64`.
 pub const MAX_KEY_FIELDS: usize = 16;
@@ -139,7 +173,7 @@ impl KeyShape {
             shape.count += 1;
             offset += size;
             shape.align = shape.align.max(size);
-            shape.has_pointers |= u64::from(kind) == KEY_STR;
+            shape.has_pointers |= matches!(u64::from(kind), KEY_STR | KEY_CLASS);
         }
         shape.size = offset.next_multiple_of(shape.align);
         shape
@@ -282,6 +316,9 @@ unsafe fn hash_fields(shape: &KeyShape, p: *const u8) -> u64 {
         let fh = match kind {
             KEY_BOOL => hash_int(u64::from(unsafe { *field })),
             KEY_STR => hash_bytes(unsafe { str_bytes(read_ptr(field)) }),
+            // Never reached through a table (the generated code hashes class
+            // keys), but identity keeps it well defined.
+            KEY_CLASS => hash_int(unsafe { read_ptr(field) } as usize as u64),
             _ => hash_int(unsafe { read_u64(field) }),
         };
         h = mum(h ^ fh, P3);
@@ -300,6 +337,7 @@ unsafe fn fields_equal(shape: &KeyShape, a: *const u8, b: *const u8) -> bool {
         match kind {
             KEY_BOOL => *x == *y,
             KEY_STR => str_bytes(read_ptr(x)) == str_bytes(read_ptr(y)),
+            KEY_CLASS => read_ptr(x) == read_ptr(y),
             _ => read_u64(x) == read_u64(y),
         }
     })
@@ -312,6 +350,7 @@ unsafe fn write_field(w: &mut Vec<u8>, kind: u64, p: *const u8) {
             KEY_BOOL => w.write_all(if *p != 0 { b"True" } else { b"False" }),
             KEY_STR => crate::write_str_repr(w, str_bytes(read_ptr(p))),
             KEY_FLOAT => crate::write_float(w, f64::from_bits(read_u64(p))),
+            KEY_CLASS => w.write_all(b"<object>"),
             _ => crate::write_int(w, read_u64(p) as i64),
         };
     }
@@ -326,6 +365,9 @@ const FAST_GENERIC: u32 = 0;
 const FAST_INT: u32 = 1;
 const FAST_BOOL: u32 = 2;
 const FAST_STR: u32 = 3;
+/// A class key, hashed and compared by the generated code through the
+/// `ty_dict_probe*` entry points (see [class keys](self#class-keys)).
+const FAST_EXTERN: u32 = 4;
 
 /// The low half of a deleted index slot.
 const TOMBSTONE: u32 = u32::MAX;
@@ -462,7 +504,7 @@ impl TyDict {
             match self.fast {
                 FAST_INT => write_u64(dst, word),
                 FAST_BOOL => *dst = word as u8,
-                FAST_STR => write_ptr(dst, word_ptr(word)),
+                FAST_STR | FAST_EXTERN => write_ptr(dst, word_ptr(word)),
                 _ => std::ptr::copy_nonoverlapping(word_ptr(word), dst, self.key_size as usize),
             }
         }
@@ -658,6 +700,13 @@ impl TyDict {
                 Probe::Miss { .. } => return None,
             }
         };
+        unsafe { self.delete_at(pos, entry) };
+        Some(entry)
+    }
+
+    /// Deletes `entry`, which index slot `pos` references.
+    #[inline(always)]
+    unsafe fn delete_at(&mut self, pos: usize, entry: usize) {
         unsafe {
             *self.index.add(pos) = u64::from(TOMBSTONE);
             let e = self.entry(entry);
@@ -668,7 +717,23 @@ impl TyDict {
         }
         self.len -= 1;
         self.cache_valid = 0;
-        Some(entry)
+    }
+
+    /// The live entry index slot `pos` references, when it has the (mixed)
+    /// hash `h`: how a class-key position from the generated code is
+    /// re-validated before it is trusted.
+    #[inline(always)]
+    unsafe fn entry_at(&self, h: u64, pos: i64) -> Option<usize> {
+        if pos < 0 || self.index.is_null() || pos as u64 > self.mask {
+            return None;
+        }
+        let slot = unsafe { *self.index.add(pos as usize) };
+        let idx = slot as u32;
+        if slot == 0 || idx == TOMBSTONE || i64::from(idx) > self.used {
+            return None;
+        }
+        let entry = idx as usize - 1;
+        (unsafe { read_u64(self.entry(entry)) } == h).then_some(entry)
     }
 
     /// Copies one field of every live entry into a fresh list.
@@ -751,6 +816,7 @@ pub extern "C" fn ty_dict_new(
         KEY_INT => FAST_INT,
         KEY_BOOL => FAST_BOOL,
         KEY_STR => FAST_STR,
+        KEY_CLASS => FAST_EXTERN,
         _ => FAST_GENERIC,
     };
     let values_atomic = val_atomic != 0 || val_size == 0;
@@ -919,6 +985,169 @@ pub unsafe extern "C" fn ty_dict_items(d: *const TyDict) -> *mut TyList {
         let atomic = d.flags & FLAG_ENTRIES_ATOMIC != 0;
         d.collect(ENTRY_HASH, d.pair_size as usize, atomic)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Class keys
+// ---------------------------------------------------------------------------
+
+/// Mixes a class key's `__hash__` into a table hash: a user hash is often
+/// small or regular (`self.x`, a product of fields), so it is spread like an
+/// `int` key before its low bits pick a slot. Never 0, which marks a deleted
+/// entry.
+#[inline(always)]
+fn class_hash(h: i64) -> u64 {
+    hash_int(h as u64).max(1)
+}
+
+/// One step of a class-key lookup (see [class keys](self#class-keys)): the
+/// index position of the next entry whose hash is the key's `__hash__` `h`,
+/// or -1 when an empty slot ends the probe sequence first.
+///
+/// `after` is -1 to start the sequence, or a position this function returned
+/// to continue past it. Every position it returns references a live entry.
+///
+/// # Safety
+///
+/// `d` must come from [`ty_dict_new`] with the [`KEY_CLASS`] descriptor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_probe(d: *const TyDict, h: i64, after: i64) -> i64 {
+    unsafe {
+        let d = &*d;
+        if d.len == 0 {
+            return -1;
+        }
+        let h = class_hash(h);
+        let mask = d.mask as usize;
+        let tag = (h >> 32) as u32;
+        let mut pos = if after < 0 {
+            h as usize & mask
+        } else {
+            (after as usize).wrapping_add(1) & mask
+        };
+        loop {
+            let slot = *d.index.add(pos);
+            if slot == 0 {
+                return -1;
+            }
+            let idx = slot as u32;
+            if (slot >> 32) as u32 == tag
+                && idx != TOMBSTONE
+                && read_u64(d.entry(idx as usize - 1)) == h
+            {
+                return pos as i64;
+            }
+            pos = (pos + 1) & mask;
+        }
+    }
+}
+
+/// The key of the entry at `pos`, a position [`ty_dict_probe`] just returned:
+/// the instance the generated code hands to `__eq__`.
+///
+/// # Safety
+///
+/// As for [`ty_dict_probe`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_probe_key(d: *const TyDict, pos: i64) -> *const u8 {
+    unsafe {
+        let d = &*d;
+        let slot = if pos >= 0 && !d.index.is_null() && pos as u64 <= d.mask {
+            *d.index.add(pos as usize)
+        } else {
+            0
+        };
+        let idx = slot as u32;
+        if slot == 0 || idx == TOMBSTONE || i64::from(idx) > d.used {
+            // Unreachable from generated code, which asks right after the
+            // probe; refuse rather than read a stale entry.
+            let msg = b"dict changed during a key lookup";
+            ty_panic(msg.as_ptr(), msg.len());
+        }
+        read_ptr(d.entry(idx as usize - 1).add(ENTRY_HASH))
+    }
+}
+
+/// The value slot of the entry at `pos` — the position whose key `__eq__`
+/// confirmed — or null when `pos` is -1 (a miss): `d[k]` and
+/// `d.get(k, default)` on a class key.
+///
+/// # Safety
+///
+/// As for [`ty_dict_probe`]; `h` is the key's `__hash__`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_probe_slot(d: *mut TyDict, h: i64, pos: i64) -> *mut u8 {
+    unsafe {
+        let d = &*d;
+        match d.entry_at(class_hash(h), pos) {
+            Some(entry) => d.value_of(entry),
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// The value slot of the class key `key`: the entry at `pos` when the lookup
+/// found it, otherwise a new entry for `key` whose value slot is
+/// uninitialised, as for [`ty_dict_insert`]: `d[k] = v` and `s.add(x)`.
+///
+/// # Safety
+///
+/// As for [`ty_dict_probe_slot`]; `key` is the instance's address.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_probe_insert(
+    d: *mut TyDict,
+    key: i64,
+    h: i64,
+    pos: i64,
+) -> *mut u8 {
+    unsafe {
+        let d = &mut *d;
+        let h = class_hash(h);
+        if let Some(entry) = d.entry_at(h, pos) {
+            return d.value_of(entry);
+        }
+        if d.index.is_null() {
+            d.rebuild(8);
+        }
+        // Found again rather than remembered, so that an `__eq__` that
+        // mutated the table cannot send the key to a stale slot.
+        let empty = d.empty_slot(h);
+        d.insert_at(key as u64, h, empty)
+    }
+}
+
+/// Deletes the entry at `pos` and returns its value slot — readable until the
+/// next insertion — or null on a miss: `d.pop(k)`, `s.remove(x)` and
+/// `s.discard(x)` on a class key.
+///
+/// # Safety
+///
+/// As for [`ty_dict_probe_slot`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_probe_remove(d: *mut TyDict, h: i64, pos: i64) -> *mut u8 {
+    unsafe {
+        let d = &mut *d;
+        match d.entry_at(class_hash(h), pos) {
+            Some(entry) => {
+                d.delete_at(pos as usize, entry);
+                d.value_of(entry)
+            }
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// Panics with `key not found: <repr>` for a class key, whose text the
+/// generated code rendered: its `__repr__`, or `<Name object>` without one.
+///
+/// # Safety
+///
+/// `repr` must point at a well-formed `str`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ty_dict_key_missing(repr: *const u8) -> ! {
+    let mut msg = b"key not found: ".to_vec();
+    msg.extend_from_slice(unsafe { str_bytes(repr) });
+    unsafe { ty_panic(msg.as_ptr(), msg.len()) }
 }
 
 /// The buffer the wasm backend lays a tuple key out in before passing its
@@ -1090,6 +1319,107 @@ mod tests {
             assert!(ty_dict_remove(d, 0).is_null());
             assert_eq!((*d).len, 1);
             assert_eq!((*d).entry_size, 16);
+        }
+    }
+
+    /// A stand-in for a class instance: an `int` behind a pointer, with a
+    /// deliberately weak `__hash__` (three buckets) and value equality.
+    fn instance(value: i64) -> i64 {
+        Box::leak(Box::new(value)) as *mut i64 as usize as i64
+    }
+
+    fn weak_hash(key: i64) -> i64 {
+        unsafe { *(key as usize as *const i64) % 3 }
+    }
+
+    /// The loop the checker writes per key class: probe, confirm with
+    /// `__eq__`, continue.
+    unsafe fn find_pos(d: *mut TyDict, key: i64) -> i64 {
+        unsafe {
+            let h = weak_hash(key);
+            let mut pos = ty_dict_probe(d, h, -1);
+            while pos >= 0 {
+                let stored = ty_dict_probe_key(d, pos) as usize as *const i64;
+                if *stored == *(key as usize as *const i64) {
+                    return pos;
+                }
+                pos = ty_dict_probe(d, h, pos);
+            }
+            -1
+        }
+    }
+
+    unsafe fn class_insert(d: *mut TyDict, key: i64) -> *mut u8 {
+        unsafe {
+            let pos = find_pos(d, key);
+            ty_dict_probe_insert(d, key, weak_hash(key), pos)
+        }
+    }
+
+    #[test]
+    fn class_keys_are_confirmed_by_the_caller() {
+        unsafe {
+            let d = ty_dict_new(KEY_CLASS as i64, 8, 8, 1);
+            assert_eq!(find_pos(d, instance(1)), -1);
+            assert!(ty_dict_probe_slot(d, 0, -1).is_null());
+            // Colliding hashes, growth from 8 slots to 2048.
+            for v in 0..1000i64 {
+                write_i64(class_insert(d, instance(v)), v * 10);
+            }
+            assert_eq!((*d).len, 1000);
+            // A different instance with the same value finds the entry.
+            for v in [0i64, 1, 2, 500, 999] {
+                let key = instance(v);
+                let pos = find_pos(d, key);
+                assert!(pos >= 0, "{v}");
+                assert_eq!(read_i64(ty_dict_probe_slot(d, weak_hash(key), pos)), v * 10);
+            }
+            assert_eq!(find_pos(d, instance(1000)), -1);
+            // Overwriting keeps the length and the first instance.
+            write_i64(class_insert(d, instance(7)), -7);
+            assert_eq!((*d).len, 1000);
+            // Remove every even value, then re-insert: they move to the end.
+            for v in (0..1000i64).step_by(2) {
+                let key = instance(v);
+                let pos = find_pos(d, key);
+                assert_eq!(
+                    read_i64(ty_dict_probe_remove(d, weak_hash(key), pos)),
+                    v * 10
+                );
+                let again = find_pos(d, key);
+                assert!(ty_dict_probe_remove(d, weak_hash(key), again).is_null());
+            }
+            assert_eq!((*d).len, 500);
+            for v in (0..1000i64).step_by(2) {
+                write_i64(class_insert(d, instance(v)), v);
+            }
+            let keys = ty_dict_keys(d);
+            assert_eq!((*keys).len, 1000);
+            let first = read_ptr((*keys).data) as *const i64;
+            let middle = read_ptr((*keys).data.add(500 * PTR_SIZE)) as *const i64;
+            assert_eq!((*first, *middle), (1, 0));
+            assert!(KeyShape::of(KEY_CLASS).has_pointers);
+        }
+    }
+
+    #[test]
+    fn stale_class_key_positions_are_rejected() {
+        unsafe {
+            let d = ty_dict_new(KEY_CLASS as i64, 0, 1, 1);
+            let a = instance(4);
+            ty_dict_probe_insert(d, a, weak_hash(a), -1);
+            let pos = find_pos(d, a);
+            assert!(pos >= 0);
+            // The wrong hash, a position past the index, an empty slot.
+            assert!(ty_dict_probe_slot(d, 2, pos).is_null());
+            assert!(ty_dict_probe_slot(d, weak_hash(a), 1 << 40).is_null());
+            assert!(ty_dict_probe_remove(d, weak_hash(a), (pos + 1) & 7).is_null());
+            assert_eq!((*d).len, 1);
+            // A stale hit position inserts afresh instead of trusting it.
+            assert!(!ty_dict_probe_remove(d, weak_hash(a), pos).is_null());
+            ty_dict_probe_insert(d, a, weak_hash(a), pos);
+            assert_eq!((*d).len, 1);
+            assert!(find_pos(d, a) >= 0);
         }
     }
 
