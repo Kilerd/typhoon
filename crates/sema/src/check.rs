@@ -138,6 +138,9 @@ pub(crate) struct Checker<'a> {
     /// expression that re-reads its value (DESIGN §3.6: a middle operand is
     /// evaluated exactly once).
     pub(crate) chain_operands: HashMap<*const ast::Expr, Option<hir::Expr>>,
+    /// Greater than zero while a constant expression is checked that a
+    /// short-circuit means is never evaluated (DESIGN §3.6).
+    pub(crate) const_unreached: u32,
 }
 
 /// Whether control can fall out of the bottom of a block.
@@ -175,6 +178,7 @@ impl<'a> Checker<'a> {
             narrowed: HashSet::new(),
             generics: crate::generics::Generics::default(),
             chain_operands: HashMap::new(),
+            const_unreached: 0,
         }
     }
 

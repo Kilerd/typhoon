@@ -59,7 +59,13 @@ impl Checker<'_> {
             }
             ast::ExprKind::BoolOp { op, lhs, rhs, .. } => {
                 let a = self.eval_const(lhs)?;
-                let b = self.eval_const(rhs)?;
+                // `False and x` / `True or x` never evaluate `x`, as at run time.
+                let decided = matches!(
+                    (op, &a),
+                    (ast::BoolOp::And, ConstValue::Bool(false))
+                        | (ast::BoolOp::Or, ConstValue::Bool(true))
+                );
+                let b = self.eval_const_reached(rhs, !decided)?;
                 match (&a, &b) {
                     (ConstValue::Bool(x), ConstValue::Bool(y)) => {
                         Some(ConstValue::Bool(match op {
@@ -74,13 +80,15 @@ impl Checker<'_> {
                 }
             }
             ast::ExprKind::Compare { left, tail } => {
-                // A chain holds when every link does (DESIGN §3.6).
+                // A chain holds when every link does, and stops at the first
+                // link that does not (DESIGN §3.6): the operands after it are
+                // checked but never evaluated, as at run time.
                 let mut lhs = self.eval_const(left)?;
                 let mut holds = true;
                 for link in tail {
-                    let rhs = self.eval_const(&link.rhs)?;
+                    let rhs = self.eval_const_reached(&link.rhs, holds)?;
                     match self.const_compare(link.op, &lhs, &rhs, expr.span)? {
-                        ConstValue::Bool(value) => holds &= value,
+                        ConstValue::Bool(value) => holds = holds && value,
                         other => return Some(other),
                     }
                     lhs = rhs;
@@ -92,6 +100,30 @@ impl Checker<'_> {
                 None
             }
         }
+    }
+
+    /// Evaluates `expr`, or — when a short-circuit means it is never reached
+    /// — only checks it: an error in its value (a division by zero, say) is
+    /// then not an error, while one in its types still is.
+    fn eval_const_reached(&mut self, expr: &ast::Expr, reached: bool) -> Option<ConstValue> {
+        if reached {
+            return self.eval_const(expr);
+        }
+        self.const_unreached += 1;
+        let value = self.eval_const(expr);
+        self.const_unreached -= 1;
+        value
+    }
+
+    /// Reports an error in the value of a constant expression, or, in an
+    /// operand that is never evaluated, stands in a value of the right type
+    /// so that the rest of the expression is still checked.
+    fn const_fault(&mut self, diag: Diagnostic, stand_in: ConstValue) -> Option<ConstValue> {
+        if self.const_unreached > 0 {
+            return Some(stand_in);
+        }
+        self.error(diag);
+        None
     }
 
     fn not_constant(&mut self, span: Span, label: &str) {
@@ -129,35 +161,28 @@ impl Checker<'_> {
                     ast::BinOp::Mul => x.wrapping_mul(y),
                     ast::BinOp::Div => {
                         if y == 0 {
-                            self.const_div_by_zero(span);
-                            return None;
+                            return self.const_fault(div_by_zero(span), ConstValue::Float(0.0));
                         }
                         return Some(ConstValue::Float(x as f64 / y as f64));
                     }
                     ast::BinOp::FloorDiv => {
                         if y == 0 {
-                            self.const_div_by_zero(span);
-                            return None;
+                            return self.const_fault(div_by_zero(span), ConstValue::Int(0));
                         }
                         floor_div(x, y)
                     }
                     ast::BinOp::Mod => {
                         if y == 0 {
-                            self.const_div_by_zero(span);
-                            return None;
+                            return self.const_fault(div_by_zero(span), ConstValue::Int(0));
                         }
                         floor_mod(x, y)
                     }
                     ast::BinOp::Pow => {
                         if y < 0 {
-                            self.error(
-                                Diagnostic::error("negative exponent in an integer power")
-                                    .with_label(span, "`int ** int` needs a non-negative exponent")
-                                    .with_help(
-                                        "use `float(x) ** float(y)` for a negative exponent",
-                                    ),
-                            );
-                            return None;
+                            let diag = Diagnostic::error("negative exponent in an integer power")
+                                .with_label(span, "`int ** int` needs a non-negative exponent")
+                                .with_help("use `float(x) ** float(y)` for a negative exponent");
+                            return self.const_fault(diag, ConstValue::Int(0));
                         }
                         int_pow(x, y)
                     }
@@ -166,11 +191,9 @@ impl Checker<'_> {
                     ast::BinOp::BitXor => x ^ y,
                     ast::BinOp::Shl | ast::BinOp::Shr => {
                         if y < 0 {
-                            self.error(
-                                Diagnostic::error("negative shift amount")
-                                    .with_label(span, "a shift amount must not be negative"),
-                            );
-                            return None;
+                            let diag = Diagnostic::error("negative shift amount")
+                                .with_label(span, "a shift amount must not be negative");
+                            return self.const_fault(diag, ConstValue::Int(0));
                         }
                         let amount = y.min(63) as u32;
                         if op == ast::BinOp::Shl {
@@ -209,13 +232,6 @@ impl Checker<'_> {
         }
     }
 
-    fn const_div_by_zero(&mut self, span: Span) {
-        self.error(
-            Diagnostic::error("division by zero in a constant expression")
-                .with_label(span, "this divides by zero"),
-        );
-    }
-
     fn const_compare(
         &mut self,
         op: ast::CmpOp,
@@ -249,6 +265,12 @@ impl Checker<'_> {
         };
         Some(ConstValue::Bool(value))
     }
+}
+
+/// The error for a division by zero in a constant expression.
+fn div_by_zero(span: Span) -> Diagnostic {
+    Diagnostic::error("division by zero in a constant expression")
+        .with_label(span, "this divides by zero")
 }
 
 /// The name of a constant's type, for diagnostics.

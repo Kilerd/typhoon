@@ -1,0 +1,9 @@
+# A constant chain operand that is never evaluated is still type-checked:
+# only errors in its value are skipped (DESIGN 3.3, 3.6).
+# milestone: M3
+# error: `<` cannot be applied to `int` and `str`
+
+X: bool = 1 > 2 < "a"
+
+fn main():
+    print(X)

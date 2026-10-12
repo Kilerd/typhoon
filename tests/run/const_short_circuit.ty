@@ -1,0 +1,24 @@
+# Constant expressions short-circuit like the same expressions at run time
+# (DESIGN 3.3, 3.6): a chain stops at its first false link and `and` / `or`
+# at a decided left operand, so a division by zero (or a negative exponent
+# or shift) that is never reached is not an error.
+# milestone: M3
+# expect: False False True True False
+# expect: False True
+# expect: False
+
+A: bool = 1 > 2 < 1 // 0
+B: bool = 3 < 2 < 1 % 0 == 5
+C: bool = 1 < 2 < 3 > 2
+D: bool = True or 2 ** -1 == 0
+E: bool = 1 < 2 > 3 < 1 << -1
+F: bool = False and 1 / 0 > 0.5
+G: bool = 2 < 3 or 1 // 0 == 0
+
+fn f(x: bool = 0 > 1 < 1 // 0) -> bool:
+    return x
+
+fn main():
+    print(A, B, C, D, E)
+    print(F, G)
+    print(f())
