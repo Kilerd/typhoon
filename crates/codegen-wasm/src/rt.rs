@@ -127,11 +127,24 @@ pub enum Rt {
     ReprEnd,
     /// `ty_str_hash(s) -> int`: `hash(s)`.
     StrHash,
+    /// `ty_dict_probe(table, hash, after) -> pos`: one step of a class-key
+    /// lookup (DESIGN §3.11).
+    DictProbe,
+    /// `ty_dict_probe_key(table, pos) -> key`.
+    DictProbeKey,
+    /// `ty_dict_probe_slot(table, hash, pos) -> slot or 0`.
+    DictProbeSlot,
+    /// `ty_dict_probe_insert(table, key, hash, pos) -> slot`.
+    DictProbeInsert,
+    /// `ty_dict_probe_remove(table, hash, pos) -> slot or 0`.
+    DictProbeRemove,
+    /// `ty_dict_key_missing(repr)`: the `key not found` panic of a class key.
+    DictKeyMissing,
 }
 
 impl Rt {
     /// Every runtime function, in import order.
-    pub const ALL: [Rt; 51] = [
+    pub const ALL: [Rt; 57] = [
         Rt::Init,
         Rt::Exit,
         Rt::Panic,
@@ -183,6 +196,12 @@ impl Rt {
         Rt::ReprBegin,
         Rt::ReprEnd,
         Rt::StrHash,
+        Rt::DictProbe,
+        Rt::DictProbeKey,
+        Rt::DictProbeSlot,
+        Rt::DictProbeInsert,
+        Rt::DictProbeRemove,
+        Rt::DictKeyMissing,
     ];
 
     /// The exported symbol name.
@@ -239,6 +258,12 @@ impl Rt {
             Rt::ReprBegin => "ty_repr_begin",
             Rt::ReprEnd => "ty_repr_end",
             Rt::StrHash => "ty_str_hash",
+            Rt::DictProbe => "ty_dict_probe",
+            Rt::DictProbeKey => "ty_dict_probe_key",
+            Rt::DictProbeSlot => "ty_dict_probe_slot",
+            Rt::DictProbeInsert => "ty_dict_probe_insert",
+            Rt::DictProbeRemove => "ty_dict_probe_remove",
+            Rt::DictKeyMissing => "ty_dict_key_missing",
         }
     }
 
@@ -282,6 +307,11 @@ impl Rt {
             Rt::KeyBuf => (&[], &[I]),
             Rt::ListSorted => (&[I, L], &[I]),
             Rt::StrSlice => (&[I, L, L], &[I]),
+            Rt::DictProbe => (&[I, L, L], &[L]),
+            Rt::DictProbeKey => (&[I, L], &[I]),
+            Rt::DictProbeSlot | Rt::DictProbeRemove => (&[I, L, L], &[I]),
+            Rt::DictProbeInsert => (&[I, L, L, L], &[I]),
+            Rt::DictKeyMissing => (&[I], &[]),
         }
     }
 }

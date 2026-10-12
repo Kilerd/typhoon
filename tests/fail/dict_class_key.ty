@@ -1,11 +1,17 @@
-# A class instance cannot be a dict key yet: that needs an eq/hash protocol
-# (DESIGN 9). Keys are int, bool, str or tuples of those.
+# A class is a dict key only when it implements `Hash` (and with it `Eq`),
+# declared on the class: having the dunder methods is not enough (DESIGN 3.11).
 # milestone: M3
 # error: `Point` cannot be a dict key
-# error: eq/hash protocol
+# error: declare it on the class, e.g. `class Point(Eq, Hash):`
 
 class Point:
     x: int
+
+    fn __eq__(self, other: Point) -> bool:
+        return self.x == other.x
+
+    fn __hash__(self) -> int:
+        return self.x
 
 fn main():
     d: dict<Point, int> = {}

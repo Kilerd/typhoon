@@ -1,8 +1,10 @@
-# `sorted` orders scalars and flat tuples of them; a class has no order.
+# `sorted` orders a class only through `__lt__` and `__eq__` (declare `Eq` and
+# `Ord`, DESIGN 3.11); a class without them has no order.
 # milestone: M3
 # error: `sorted` cannot order `Point` values
+# error: declare `Eq` and `Ord`
 
-class Point:
+class Point(Eq, Hash):
     x: int
 
 fn main():

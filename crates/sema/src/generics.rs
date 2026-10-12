@@ -1640,14 +1640,12 @@ impl Checker<'_> {
                     "dict" if args.len() == 2 => {
                         let key = self.subst(&args[0], generics, bindings)?;
                         let value = self.subst(&args[1], generics, bindings)?;
-                        (self.types.is_hashable(key) && value != TypeId::UNIT)
+                        (self.is_key_type(key) && value != TypeId::UNIT)
                             .then(|| self.types.dict_of(key, value))
                     }
                     "set" if args.len() == 1 => {
                         let elem = self.subst(&args[0], generics, bindings)?;
-                        self.types
-                            .is_hashable(elem)
-                            .then(|| self.types.set_of(elem))
+                        self.is_key_type(elem).then(|| self.types.set_of(elem))
                     }
                     _ if self.generics.has_class(text) => {
                         let wanted = self.generics.classes[text].decl.generics.len();

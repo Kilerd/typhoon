@@ -11,9 +11,13 @@
 //! static key buffer — after its members have been stored there. The native
 //! backend uses a stack slot instead; wasm has no addressable stack, and the
 //! buffer is filled immediately before the one call that reads it.
+//!
+//! A class key (DESIGN §3.11) goes through the class's `__hash__`, the probe
+//! function sema wrote for it and one `ty_dict_probe_*` call, exactly like the
+//! native backend.
 
 use typhoon_sema::hir;
-use typhoon_sema::types::{Type, TypeId};
+use typhoon_sema::types::{ClassId, Type, TypeId};
 use wasm_encoder::{BlockType, Instruction, MemArg, ValType};
 
 use super::Emitter;
@@ -22,18 +26,27 @@ use crate::rt::Rt;
 impl<'p> Emitter<'p> {
     // -- keys and slots --------------------------------------------------------
 
-    /// The runtime descriptor of the key (or `sorted` element) type `ty`.
+    /// The runtime descriptor of the key type `ty`.
     fn desc_of(&self, ty: TypeId) -> i64 {
         self.types
-            .key_desc(ty)
-            .expect("sema only lets hashable / sortable types through") as i64
+            .table_key_desc(ty)
+            .expect("sema only lets hashable types through") as i64
+    }
+
+    /// The class of a class key, whose operations go through its `__hash__`
+    /// and probe function.
+    fn class_key(&self, ty: TypeId) -> Option<ClassId> {
+        match self.types.get(ty) {
+            Type::Class(class) => Some(class),
+            _ => None,
+        }
     }
 
     /// Pushes the `i64` key word of the spilled key `value` of type `ty`.
     fn push_key_word(&mut self, ty: TypeId, value: &[u32]) {
         match self.types.get(ty) {
             Type::Int => self.ins(Instruction::LocalGet(value[0])),
-            Type::Bool | Type::Str => {
+            Type::Bool | Type::Str | Type::Class(_) => {
                 self.ins(Instruction::LocalGet(value[0]));
                 self.ins(Instruction::I64ExtendI32U);
             }
@@ -57,12 +70,92 @@ impl<'p> Emitter<'p> {
     /// `rt(table, key word)`, leaving the returned slot address in a fresh
     /// local.
     fn table_call(&mut self, rt: Rt, table: u32, key_ty: TypeId, key: &[u32]) -> u32 {
+        if let Some(class) = self.class_key(key_ty) {
+            return self.class_table_call(rt, class, table, key_ty, key);
+        }
         self.ins(Instruction::LocalGet(table));
         self.push_key_word(key_ty, key);
         self.call_rt(rt);
         let slot = self.scratch(ValType::I32);
         self.ins(Instruction::LocalSet(slot));
         slot
+    }
+
+    /// [`Emitter::table_call`] for a class key: `__hash__`, the probe
+    /// function, then the `ty_dict_probe_*` call standing for `rt`, with the
+    /// `key not found` panic inline.
+    fn class_table_call(
+        &mut self,
+        rt: Rt,
+        class: ClassId,
+        table: u32,
+        key_ty: TypeId,
+        key: &[u32],
+    ) -> u32 {
+        let (h, pos) = self.class_probe(class, table, key);
+        self.ins(Instruction::LocalGet(table));
+        let probe = match rt {
+            Rt::DictInsert => {
+                self.push_key_word(key_ty, key);
+                Rt::DictProbeInsert
+            }
+            Rt::DictRemove | Rt::DictPop => Rt::DictProbeRemove,
+            _ => Rt::DictProbeSlot,
+        };
+        self.ins(Instruction::LocalGet(h));
+        self.ins(Instruction::LocalGet(pos));
+        self.call_rt(probe);
+        let slot = self.scratch(ValType::I32);
+        self.ins(Instruction::LocalSet(slot));
+        if matches!(rt, Rt::DictGet | Rt::DictPop) {
+            self.missing_class_key(slot, class, key);
+        }
+        slot
+    }
+
+    /// `(hash, position)` locals of a class key: its `__hash__`, then the
+    /// probe function, whose position is -1 when the key is absent.
+    fn class_probe(&mut self, class: ClassId, table: u32, key: &[u32]) -> (u32, u32) {
+        let protocols = &self.program.protocols;
+        let (Some(hash_fn), Some(probe_fn)) = (
+            protocols.hash.get(&class).copied(),
+            protocols.key_probe.get(&class).copied(),
+        ) else {
+            panic!("sema registers the probe of every key class");
+        };
+        self.ins(Instruction::LocalGet(key[0]));
+        self.call_protocol(hash_fn);
+        let h = self.scratch(ValType::I64);
+        self.ins(Instruction::LocalSet(h));
+        self.ins(Instruction::LocalGet(table));
+        self.ins(Instruction::LocalGet(key[0]));
+        self.ins(Instruction::LocalGet(h));
+        self.call_protocol(probe_fn);
+        let pos = self.scratch(ValType::I64);
+        self.ins(Instruction::LocalSet(pos));
+        (h, pos)
+    }
+
+    /// Panics with `key not found: <repr>` when `slot` is 0: the key's
+    /// `__repr__`, or `<Name object>` for a class without one.
+    fn missing_class_key(&mut self, slot: u32, class: ClassId, key: &[u32]) {
+        self.ins(Instruction::LocalGet(slot));
+        self.ins(Instruction::I32Eqz);
+        self.open_if(BlockType::Empty);
+        match self.program.protocols.repr.get(&class).copied() {
+            Some(repr) => {
+                self.ins(Instruction::LocalGet(key[0]));
+                self.call_protocol(repr);
+            }
+            None => {
+                let name = format!("<{} object>", self.types.class(class).name);
+                let text = self.string_literal(&name);
+                self.ins(Instruction::GlobalGet(text));
+            }
+        }
+        self.call_rt(Rt::DictKeyMissing);
+        self.ins(Instruction::Unreachable);
+        self.end();
     }
 
     // -- construction ----------------------------------------------------------
@@ -217,6 +310,17 @@ impl<'p> Emitter<'p> {
     ) {
         let t = self.spill_expr(func, table)[0];
         let k = self.spill_expr(func, key);
+        if let Some(class) = self.class_key(key.ty) {
+            let (_, pos) = self.class_probe(class, t, &k);
+            self.ins(Instruction::LocalGet(pos));
+            self.ins(Instruction::I64Const(0));
+            self.ins(if negated {
+                Instruction::I64LtS
+            } else {
+                Instruction::I64GeS
+            });
+            return;
+        }
         let slot = self.table_call(Rt::DictFind, t, key.ty, &k);
         self.ins(Instruction::LocalGet(slot));
         if negated {
@@ -255,7 +359,11 @@ impl<'p> Emitter<'p> {
     pub(crate) fn sorted(&mut self, func: &'p hir::Function, list: &hir::Expr) {
         let elem = self.types.as_list(list.ty).expect("`sorted` takes a list");
         self.expr(func, list);
-        self.ins(Instruction::I64Const(self.desc_of(elem)));
+        let desc = self
+            .types
+            .key_desc(elem)
+            .expect("sema sorts other element types itself");
+        self.ins(Instruction::I64Const(desc as i64));
         self.call_rt(Rt::ListSorted);
     }
 

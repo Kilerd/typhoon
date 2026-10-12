@@ -1,0 +1,14 @@
+# `s.remove(x)` with a missing class element panics; a class without
+# `__repr__` is named instead of rendered (DESIGN 3.11, 4.3).
+# milestone: M3
+# expect: 1
+# exit: 101
+# stderr: key not found: <Tag object>
+
+class Tag(Eq, Hash):
+    name: str
+
+fn main():
+    s = {Tag(name="a")}
+    print(len(s))
+    s.remove(Tag(name="b"))

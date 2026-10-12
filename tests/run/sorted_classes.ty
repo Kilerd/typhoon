@@ -1,0 +1,60 @@
+# `sorted` over classes that implement `Ord` (DESIGN 3.11): a stable merge
+# sort calling `__lt__`, for derived and hand-written orders, tuples holding a
+# class, and the keys of a dict or a set of class keys.
+# milestone: M3
+# expect: [] [Job(1, "only")]
+# expect: [Job(1, "b"), Job(1, "d"), Job(2, "a"), Job(2, "c"), Job(3, "e")]
+# expect: [Job(2, "a"), Job(1, "b"), Job(2, "c"), Job(1, "d"), Job(3, "e")]
+# expect: [Ver(major=1, minor=2), Ver(major=1, minor=10), Ver(major=2, minor=0)]
+# expect: [(Ver(major=1, minor=2), "x"), (Ver(major=1, minor=2), "y"), (Ver(major=3, minor=1), "a")]
+# expect: [Ver(major=0, minor=1), Ver(major=4, minor=4)] [Ver(major=2, minor=2), Ver(major=5, minor=0)]
+# expect: True 200 True
+# expect: True
+
+# Ordered by priority only, so equal priorities keep their input order.
+class Job(Eq, Ord, Repr):
+    priority: int
+    name: str
+
+    fn __eq__(self, other: Job) -> bool:
+        return self.priority == other.priority
+
+    fn __lt__(self, other: Job) -> bool:
+        return self.priority < other.priority
+
+    fn __repr__(self) -> str:
+        return f"Job({self.priority}, {repr(self.name)})"
+
+class Ver(Eq, Ord, Hash, Repr):
+    major: int
+    minor: int
+
+fn sorted_ok(xs: list<Ver>) -> bool:
+    for i in range(1, len(xs)):
+        if xs[i] < xs[i - 1]:
+            return False
+    return True
+
+fn main():
+    empty: list<Job> = []
+    print(sorted(empty), sorted([Job(priority=1, name="only")]))
+    jobs = [Job(priority=2, name="a"), Job(priority=1, name="b"), Job(priority=2, name="c"), Job(priority=1, name="d"), Job(priority=3, name="e")]
+    print(sorted(jobs))
+    # The input list itself is untouched.
+    print(jobs)
+    print(sorted([Ver(major=2, minor=0), Ver(major=1, minor=10), Ver(major=1, minor=2)]))
+    print(sorted([(Ver(major=3, minor=1), "a"), (Ver(major=1, minor=2), "y"), (Ver(major=1, minor=2), "x")]))
+    d = {Ver(major=4, minor=4): 1, Ver(major=0, minor=1): 2}
+    s = {Ver(major=5, minor=0), Ver(major=2, minor=2)}
+    print(sorted(d), sorted(s))
+    # A longer list, scrambled by a multiplicative step, against `int` order.
+    many: list<Ver> = []
+    for i in range(200):
+        k = (i * 7919) % 200
+        many.append(Ver(major=k // 10, minor=k % 10))
+    out = sorted(many)
+    print(sorted_ok(out), len(out), out[0] == Ver(major=0, minor=0) and out[199] == Ver(major=19, minor=9))
+    ints: list<int> = []
+    for v in out:
+        ints.append(v.major * 10 + v.minor)
+    print(ints == sorted(ints))

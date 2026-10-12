@@ -344,6 +344,10 @@ fn dump_expr(program: &Program, func: &Function, expr: &Expr) -> String {
             let name = if *strict { "remove" } else { "discard" };
             format!("{}.{name}({})", e(set), e(value))
         }
+        ExprKind::TableProbe { table, hash, after } => {
+            format!("probe({}, {}, {})", e(table), e(hash), e(after))
+        }
+        ExprKind::TableKey { table, pos } => format!("key_at({}, {})", e(table), e(pos)),
         ExprKind::Sorted(v) => format!("sorted({})", e(v)),
         ExprKind::StrSlice {
             string,

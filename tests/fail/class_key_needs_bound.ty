@@ -1,0 +1,14 @@
+# In a checked generic, a type parameter is a key only when it is bounded by
+# `Hash` (DESIGN 3.11); the error is reported once, at the definition.
+# milestone: M3
+# error: `T` cannot be a set element
+# error: bound the type parameter: `T: Hash`
+
+fn uniques<T: Repr>(xs: list<T>) -> int:
+    seen: set<T> = set()
+    for x in xs:
+        seen.add(x)
+    return len(seen)
+
+fn main():
+    print(uniques([1, 2, 1]))

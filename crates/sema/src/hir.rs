@@ -70,14 +70,27 @@ impl Program {
 /// `T | None`, though, codegen walks the structure itself — the element loop
 /// of `xs == ys`, `v in xs`, `print(xs)` — and reaches the class there; these
 /// tables tell it which function to call for one element. Every method listed
-/// has the canonical signature: `__eq__(self, other: C) -> bool` and
-/// `__repr__(self) -> str`.
+/// has the canonical signature: `__eq__(self, other: C) -> bool`,
+/// `__repr__(self) -> str` and `__hash__(self) -> int`.
+///
+/// A class used as a `dict` key or a `set` element has an entry in both
+/// [`Protocols::hash`] and [`Protocols::key_probe`]: every table operation on
+/// such a key calls `__hash__`, then the probe function, then one
+/// `ty_dict_probe_*` runtime call (see `crates/runtime/src/dict.rs`).
 #[derive(Debug, Clone, Default)]
 pub struct Protocols {
     /// `__eq__` per class.
     pub eq: HashMap<ClassId, FuncId>,
     /// `__repr__` per class.
     pub repr: HashMap<ClassId, FuncId>,
+    /// `__hash__` per class used as a dict key or a set element.
+    pub hash: HashMap<ClassId, FuncId>,
+    /// The probe function per key class, a synthesized
+    /// `(table: set<C>, key: C, hash: int) -> int` that walks the candidates
+    /// of [`ExprKind::TableProbe`] and confirms them with `__eq__`. It returns
+    /// the index position of the entry holding a key equal to `key`, or -1.
+    /// `table` may be any `dict<C, V>` as well: both are the same table.
+    pub key_probe: HashMap<ClassId, FuncId>,
 }
 
 /// One user function.
@@ -743,9 +756,33 @@ pub enum ExprKind {
         strict: bool,
     },
 
+    /// One step of a class-key lookup (DESIGN §3.11), `ty_dict_probe`: the
+    /// index position of the next entry of `table` whose hash is `hash` — the
+    /// key's `__hash__` — after the position `after` (-1 starts the probe
+    /// sequence), or -1 when there is none. Only the probe functions of
+    /// [`Protocols::key_probe`] use it.
+    TableProbe {
+        /// The `dict<C, V>` or `set<C>`.
+        table: Box<Expr>,
+        /// The key's `__hash__`, an `int`.
+        hash: Box<Expr>,
+        /// Where to continue, an `int`.
+        after: Box<Expr>,
+    },
+    /// The key stored at a position [`ExprKind::TableProbe`] has just
+    /// returned, `ty_dict_probe_key`; the expression has the key type.
+    TableKey {
+        /// The `dict<C, V>` or `set<C>`.
+        table: Box<Expr>,
+        /// The position, an `int`.
+        pos: Box<Expr>,
+    },
+
     // -- builtins over containers ---------------------------------------------
     /// `sorted(xs)`: a sorted copy of a `list<T>` (a dict or a set is passed
-    /// as its [`ExprKind::HashKeys`]).
+    /// as its [`ExprKind::HashKeys`]) whose elements the runtime can order
+    /// itself; any other `Ord` element type is sorted by a synthesized merge
+    /// sort that calls `__lt__` (DESIGN §3.11).
     Sorted(Box<Expr>),
     /// `s[start:stop]` on a `str`, in code points with Python's clamping; an
     /// omitted start is `0` and an omitted stop `i64::MAX`.

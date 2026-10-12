@@ -1,7 +1,11 @@
-# An f-string hole takes a scalar, exactly as for a list (DESIGN 3.7).
+# An f-string hole takes a dict like any container, but every class inside it
+# needs a `__repr__` (DESIGN 3.7, 3.11).
 # milestone: M3
-# error: cannot interpolate a `dict<str, int>`
+# error: cannot interpolate a `dict<str, Point>`
+
+class Point:
+    x: int
 
 fn main():
-    d = {"x": 1}
+    d = {"x": Point(x=1)}
     print(f"{d}")

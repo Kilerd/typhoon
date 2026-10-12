@@ -2224,15 +2224,18 @@ impl Checker<'_> {
                             span,
                         }
                     }
+                    // A container is its `repr`, what `print` writes for it
+                    // (DESIGN §3.11, §4.6): `str([1, "a"])` is `[1, "a"]`.
+                    ty if self.ensure_repr(ty, span) => self.repr_value(value, span),
                     _ => {
                         let found = self.types.name(value.ty);
                         self.error(
                             Diagnostic::error(format!("`str` is not defined for `{found}`"))
                                 .with_label(value.span, format!("this is {}", a_type(&found)))
-                                .with_help("`str` takes an `int`, a `float`, a `bool` or a `str`")
+                                .with_help("`str` takes any value `print` can render")
                                 .with_note(
-                                    "a class needs `__repr__` (or to declare `Repr`); \
-                                     write `repr(x)` for a container, see DESIGN.md section 3.11",
+                                    "a class needs `__repr__` (or to declare `Repr`), \
+                                     also inside a container, see DESIGN.md section 3.11",
                                 ),
                         );
                         self.error_expr(span)
@@ -2320,15 +2323,18 @@ impl Checker<'_> {
                         || self.types.as_optional(value.ty).is_some_and(is_scalar)
                         || (self.types.class_of(value.ty).is_some()
                             && self.ensure_repr(value.ty, value.span));
-                    if !scalar {
+                    // A container (or a `T | None` of one) renders exactly as
+                    // `print` writes it, through `repr` (DESIGN §3.11, §4.6).
+                    let container = !scalar && self.ensure_repr(value.ty, value.span);
+                    if !scalar && !container {
                         let found = self.types.name(value.ty);
                         self.error(
                             Diagnostic::error(format!("cannot interpolate {}", a_type(&found)))
                                 .with_label(value.span, format!("this is {}", a_type(&found)))
                                 .with_help(
-                                    "an f-string hole takes an `int`, `float`, `bool`, `str` \
-                                     or a class with `__repr__`; write `{repr(x)}` for a \
-                                     container",
+                                    "an f-string hole takes any value `print` can render; \
+                                     a class needs `__repr__` (or to declare `Repr`), \
+                                     also inside a container",
                                 )
                                 .with_note("see DESIGN.md sections 3.7 and 3.11"),
                         );
@@ -2337,6 +2343,12 @@ impl Checker<'_> {
                     let Some(spec) = self.check_format_spec(spec.as_deref(), *span, value.ty)
                     else {
                         continue;
+                    };
+                    let value = if container {
+                        let at = value.span;
+                        self.repr_value(value, at)
+                    } else {
+                        value
                     };
                     out.push(hir::FStringPart::Value { expr: value, spec });
                 }

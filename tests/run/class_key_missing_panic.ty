@@ -1,0 +1,15 @@
+# `d[k]` with a missing class key panics with the key's `__repr__`
+# (DESIGN 3.11, 4.3).
+# milestone: M3
+# expect: 1
+# exit: 101
+# stderr: key not found: Point(x=5, y=6)
+
+class Point(Eq, Hash, Repr):
+    x: int
+    y: int
+
+fn main():
+    d = {Point(x=1, y=2): 1}
+    print(d[Point(x=1, y=2)])
+    print(d[Point(x=5, y=6)])

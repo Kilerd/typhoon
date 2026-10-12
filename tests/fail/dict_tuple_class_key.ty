@@ -1,0 +1,12 @@
+# A tuple key holding a class instance is not supported yet; the class itself
+# can be the key (DESIGN 3.11).
+# milestone: M3
+# error: `tuple<int, Point>` cannot be a dict key
+# error: a tuple key cannot contain a class instance yet
+
+class Point(Eq, Hash):
+    x: int
+
+fn main():
+    d = {(1, Point(x=1)): "a"}
+    print(len(d))

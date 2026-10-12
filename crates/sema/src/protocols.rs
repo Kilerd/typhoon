@@ -11,10 +11,14 @@
 //!   and [`Checker::repr_value`] lower one operation on already-checked
 //!   operands to HIR.
 //! * Derived methods and a few helpers (tuple `<`, tuple and optional hashes,
-//!   `min` / `max` over an `Ord` type) are written directly as HIR: their
-//!   signature is registered when they are first needed, and the body is
-//!   built by [`Checker::build_synth`] when the instance queue is drained —
-//!   so the codegens never learn that traits exist.
+//!   `min` / `max` and `sorted` over an `Ord` type, the probe function of a
+//!   class used as a dict key) are written directly as HIR: their signature
+//!   is registered when they are first needed, and the body is built by
+//!   [`Checker::build_synth`] when the instance queue is drained — so the
+//!   codegens never learn that traits exist.
+//! * [`Checker::register_class_keys`] runs once every body is checked and
+//!   gives every class used as a key its `__hash__` and probe function in
+//!   [`hir::Protocols`].
 
 use typhoon_diag::Span;
 
@@ -62,6 +66,47 @@ fn and(lhs: hir::Expr, rhs: hir::Expr) -> hir::Expr {
         TypeId::BOOL,
         span,
     )
+}
+
+fn or(lhs: hir::Expr, rhs: hir::Expr) -> hir::Expr {
+    let span = lhs.span;
+    expr(
+        hir::ExprKind::Or {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        },
+        TypeId::BOOL,
+        span,
+    )
+}
+
+fn int_cmp(op: hir::CmpOp, lhs: hir::Expr, rhs: hir::Expr) -> hir::Expr {
+    let span = lhs.span;
+    expr(
+        hir::ExprKind::IntCmp {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        },
+        TypeId::BOOL,
+        span,
+    )
+}
+
+fn assign(local: hir::LocalId, value: hir::Expr) -> hir::Stmt {
+    hir::Stmt::Assign { local, value }
+}
+
+/// Adds a local to a synthesized function. The names are distinct within
+/// each function, since the native backend names its stack slots after them.
+fn push_local(locals: &mut Vec<hir::Local>, name: &str, ty: TypeId, span: Span) -> hir::LocalId {
+    locals.push(hir::Local {
+        name: name.to_string(),
+        ty,
+        span,
+        is_param: false,
+    });
+    hir::LocalId(locals.len() as u32 - 1)
 }
 
 /// `(acc ^ value) * PRIME`, wrapping.
@@ -419,6 +464,18 @@ impl Checker<'_> {
             }
             SynthKind::Min => ("min", vec![("a", ty), ("b", ty)], ty),
             SynthKind::Max => ("max", vec![("a", ty), ("b", ty)], ty),
+            SynthKind::KeyProbe => {
+                let table = self.types.set_of(ty);
+                (
+                    "probe",
+                    vec![("table", table), ("key", ty), ("hash", TypeId::INT)],
+                    TypeId::INT,
+                )
+            }
+            SynthKind::Sort => {
+                let list = self.types.list_of(ty);
+                ("sorted", vec![("xs", list)], list)
+            }
             SynthKind::Derive(_) => unreachable!("derived methods use `register_derived`"),
         };
         let display = format!("{label}<{name}>");
@@ -452,7 +509,7 @@ impl Checker<'_> {
         let span = job.span;
         let sig = &self.sigs[job.id.index()];
         let (name, symbol, ret_ty) = (sig.name.clone(), sig.symbol.clone(), sig.ret);
-        let locals: Vec<hir::Local> = sig
+        let mut locals: Vec<hir::Local> = sig
             .params
             .iter()
             .map(|p| hir::Local {
@@ -517,6 +574,8 @@ impl Checker<'_> {
                 };
                 vec![when(cond, vec![ret(b)]), ret(a)]
             }
+            SynthKind::KeyProbe => self.key_probe_body(ty, &mut locals, span),
+            SynthKind::Sort => self.sort_body(ty, &mut locals, span),
         };
         hir::Function {
             name,
@@ -540,6 +599,274 @@ impl Checker<'_> {
         }
         stmts.push(ret(boolean(false, span)));
         stmts
+    }
+
+    /// The probe function of the key class `class_ty` (see
+    /// [`hir::Protocols::key_probe`] and `crates/runtime/src/dict.rs`):
+    ///
+    /// ```text
+    /// fn probe(table: set<C>, key: C, hash: int) -> int:
+    ///     pos = probe(table, hash, -1)
+    ///     while pos >= 0:
+    ///         if key_at(table, pos) == key: return pos
+    ///         pos = probe(table, hash, pos)
+    ///     return -1
+    /// ```
+    ///
+    /// The stored key is the receiver of `__eq__`, as in CPython.
+    fn key_probe_body(
+        &mut self,
+        class_ty: TypeId,
+        locals: &mut Vec<hir::Local>,
+        span: Span,
+    ) -> Vec<hir::Stmt> {
+        let table_ty = locals[0].ty;
+        let (table, key, hash) = (hir::LocalId(0), hir::LocalId(1), hir::LocalId(2));
+        let pos = push_local(locals, "pos", TypeId::INT, span);
+        let probe = |after: hir::Expr| {
+            expr(
+                hir::ExprKind::TableProbe {
+                    table: Box::new(local(table, table_ty, span)),
+                    hash: Box::new(local(hash, TypeId::INT, span)),
+                    after: Box::new(after),
+                },
+                TypeId::INT,
+                span,
+            )
+        };
+        let stored = expr(
+            hir::ExprKind::TableKey {
+                table: Box::new(local(table, table_ty, span)),
+                pos: Box::new(local(pos, TypeId::INT, span)),
+            },
+            class_ty,
+            span,
+        );
+        let equal = self.eq_values(stored, local(key, class_ty, span), span);
+        let found = int_cmp(hir::CmpOp::Ge, local(pos, TypeId::INT, span), int(0, span));
+        vec![
+            assign(pos, probe(int(-1, span))),
+            hir::Stmt::While {
+                cond: found,
+                body: hir::Block {
+                    stmts: vec![
+                        when(equal, vec![ret(local(pos, TypeId::INT, span))]),
+                        assign(pos, probe(local(pos, TypeId::INT, span))),
+                    ],
+                },
+            },
+            ret(int(-1, span)),
+        ]
+    }
+
+    /// `sorted(xs)` over the `Ord` element type `elem` (DESIGN §3.11): a
+    /// bottom-up merge sort between two copies of `xs`, which is stable
+    /// because a run only yields to the next one when that element is
+    /// strictly smaller — the only comparison is `__lt__`, as in Python.
+    ///
+    /// ```text
+    /// n = len(xs); a = xs + []; b = xs + []; width = 1
+    /// while width < n:
+    ///     i = 0
+    ///     while i < n:
+    ///         mid = min(i + width, n); hi = min(mid + width, n)
+    ///         l = i; r = mid; k = i
+    ///         while k < hi:
+    ///             if l < mid and (r >= hi or not (a[r] < a[l])):
+    ///                 b[k] = a[l]; l = l + 1
+    ///             else:
+    ///                 b[k] = a[r]; r = r + 1
+    ///             k = k + 1
+    ///         i = hi
+    ///     a, b = b, a; width = width + width
+    /// return a
+    /// ```
+    fn sort_body(
+        &mut self,
+        elem: TypeId,
+        locals: &mut Vec<hir::Local>,
+        span: Span,
+    ) -> Vec<hir::Stmt> {
+        use hir::CmpOp::{Ge, Lt};
+        let list_ty = locals[0].ty;
+        let xs = hir::LocalId(0);
+        let mut int_local = |name: &str| push_local(locals, name, TypeId::INT, span);
+        let (n, width, i, mid, hi, l, r, k) = (
+            int_local("n"),
+            int_local("width"),
+            int_local("i"),
+            int_local("mid"),
+            int_local("hi"),
+            int_local("l"),
+            int_local("r"),
+            int_local("k"),
+        );
+        let a = push_local(locals, "a", list_ty, span);
+        let b = push_local(locals, "b", list_ty, span);
+        let tmp = push_local(locals, "tmp", list_ty, span);
+
+        let iv = |id: hir::LocalId| local(id, TypeId::INT, span);
+        let lv = |id: hir::LocalId| local(id, list_ty, span);
+        let plus = |x: hir::Expr, y: hir::Expr| {
+            expr(
+                hir::ExprKind::IntBin {
+                    op: hir::IntOp::Add,
+                    lhs: Box::new(x),
+                    rhs: Box::new(y),
+                },
+                TypeId::INT,
+                span,
+            )
+        };
+        let min = |x: hir::Expr, y: hir::Expr| {
+            expr(
+                hir::ExprKind::IntMinMax {
+                    op: hir::MinMax::Min,
+                    lhs: Box::new(x),
+                    rhs: Box::new(y),
+                },
+                TypeId::INT,
+                span,
+            )
+        };
+        let get = |list: hir::LocalId, index: hir::LocalId| {
+            expr(
+                hir::ExprKind::ListGet {
+                    list: Box::new(lv(list)),
+                    index: Box::new(iv(index)),
+                },
+                elem,
+                span,
+            )
+        };
+        let copy = || {
+            let empty = expr(
+                hir::ExprKind::ListNew {
+                    elem,
+                    items: Vec::new(),
+                },
+                list_ty,
+                span,
+            );
+            expr(
+                hir::ExprKind::ListConcat {
+                    lhs: Box::new(lv(xs)),
+                    rhs: Box::new(empty),
+                },
+                list_ty,
+                span,
+            )
+        };
+        let put = |from: hir::LocalId| hir::Stmt::SetIndex {
+            list: lv(b),
+            index: iv(k),
+            value: get(a, from),
+        };
+        let bump = |id: hir::LocalId| assign(id, plus(iv(id), int(1, span)));
+
+        let right_first = self.lt_values(get(a, r), get(a, l), span);
+        let take_left = and(
+            int_cmp(Lt, iv(l), iv(mid)),
+            or(int_cmp(Ge, iv(r), iv(hi)), not(right_first)),
+        );
+        let merge = hir::Stmt::While {
+            cond: int_cmp(Lt, iv(k), iv(hi)),
+            body: hir::Block {
+                stmts: vec![
+                    hir::Stmt::If {
+                        cond: take_left,
+                        then: hir::Block {
+                            stmts: vec![put(l), bump(l)],
+                        },
+                        else_: Some(hir::Block {
+                            stmts: vec![put(r), bump(r)],
+                        }),
+                    },
+                    bump(k),
+                ],
+            },
+        };
+        let pass = hir::Stmt::While {
+            cond: int_cmp(Lt, iv(i), iv(n)),
+            body: hir::Block {
+                stmts: vec![
+                    assign(mid, min(plus(iv(i), iv(width)), iv(n))),
+                    assign(hi, min(plus(iv(mid), iv(width)), iv(n))),
+                    assign(l, iv(i)),
+                    assign(r, iv(mid)),
+                    assign(k, iv(i)),
+                    merge,
+                    assign(i, iv(hi)),
+                ],
+            },
+        };
+        vec![
+            assign(
+                n,
+                expr(hir::ExprKind::ListLen(Box::new(lv(xs))), TypeId::INT, span),
+            ),
+            assign(a, copy()),
+            assign(b, copy()),
+            assign(width, int(1, span)),
+            hir::Stmt::While {
+                cond: int_cmp(Lt, iv(width), iv(n)),
+                body: hir::Block {
+                    stmts: vec![
+                        assign(i, int(0, span)),
+                        pass,
+                        assign(tmp, lv(a)),
+                        assign(a, lv(b)),
+                        assign(b, lv(tmp)),
+                        assign(width, plus(iv(width), iv(width))),
+                    ],
+                },
+            },
+            ret(lv(a)),
+        ]
+    }
+
+    // -- class keys -------------------------------------------------------------
+
+    /// Registers, for every class used as a dict key or a set element, the
+    /// `__hash__` and the probe function codegen calls for each table
+    /// operation (see [`hir::Protocols::key_probe`]), and its `__repr__` when
+    /// it has one, for the `key not found` panic.
+    ///
+    /// Run once every body is checked, over every interned table type: the
+    /// definition-time checks have been rolled back by then, so only real
+    /// key classes are left.
+    pub(crate) fn register_class_keys(&mut self, span: Span) {
+        let classes: Vec<ClassId> = (0..self.types.len() as u32)
+            .filter_map(|index| match self.types.get(TypeId(index)) {
+                Type::Dict(key, _) | Type::Set(key) => match self.types.get(key) {
+                    Type::Class(class) => Some(class),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        for class in classes {
+            if self.traits.key_probes.contains_key(&class) || self.is_opaque(class) {
+                continue;
+            }
+            let hash = self.proto_method(class, Builtin::Hash, span);
+            let eq = self.proto_method(class, Builtin::Eq, span);
+            let (Some(hash), Some(_)) = (hash, eq) else {
+                // Reported where the table type was written.
+                continue;
+            };
+            self.traits.hash_fns.insert(class, hash);
+            let class_ty = self.types.class_ty(class);
+            if self.satisfies(class_ty, Builtin::Repr.id())
+                || self
+                    .methods
+                    .contains_key(&(class, Builtin::Repr.method().to_string()))
+            {
+                self.ensure_repr(class_ty, span);
+            }
+            let probe = self.synth_fn(SynthKind::KeyProbe, class_ty, span);
+            self.traits.key_probes.insert(class, probe);
+        }
     }
 
     /// The body of a derived method of the class `class_ty`.

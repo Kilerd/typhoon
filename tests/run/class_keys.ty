@@ -1,0 +1,117 @@
+# User classes as dict keys and set elements through `Hash` and `Eq`
+# (DESIGN 3.11): derived and hand-written implementations, hashes that collide
+# on purpose, growth, removal and re-insertion, and every dict / set operation.
+# milestone: M3
+# expect: {Point(x=1, y=2): "a", Point(x=3, y=4): "b"} 2
+# expect: a b True False True
+# expect: b missing None True
+# expect: c {Point(x=1, y=2): "c", Point(x=3, y=4): "b"}
+# expect: [Point(x=1, y=2), Point(x=3, y=4)] ["c", "b"]
+# expect: [(Point(x=1, y=2), "c"), (Point(x=3, y=4), "b")]
+# expect: b {Point(x=1, y=2): "c"} gone 1
+# expect: {Point(x=1, y=2): "c", Point(x=3, y=4): "again"}
+# expect: 1,2 3,4
+# expect: {Point(x=0, y=0), Point(x=1, y=1), Point(x=2, y=4)} 3 True False
+# expect: set() 0
+# expect: Bucket(3) Bucket(3) 2
+# expect: 300 300 0
+# expect: 150 True False True
+# expect: 300 4522300
+# expect: 1 299 0 298
+# expect: {Name("ada"): 2, Name("bob"): 1} True
+# expect: 64 0 64
+
+class Point(Eq, Hash, Repr):
+    x: int
+    y: int
+
+# A hand-written `__hash__` that collides on purpose: only `n % 7` reaches it,
+# so equal hashes are common and `__eq__` has to tell the keys apart.
+class Bucket(Eq, Hash):
+    n: int
+
+    fn __eq__(self, other: Bucket) -> bool:
+        return self.n == other.n
+
+    fn __hash__(self) -> int:
+        return self.n % 7
+
+    fn __repr__(self) -> str:
+        return f"Bucket({self.n})"
+
+# Every instance hashes to the same value.
+class Name(Eq, Hash, Repr):
+    text: str
+
+    fn __hash__(self) -> int:
+        return 42
+
+    fn __repr__(self) -> str:
+        return f"Name({repr(self.text)})"
+
+fn main():
+    d: dict<Point, str> = {Point(x=1, y=2): "a", Point(x=3, y=4): "b"}
+    print(d, len(d))
+    print(d[Point(x=1, y=2)], d[Point(x=3, y=4)], Point(x=3, y=4) in d, Point(x=4, y=3) in d, Point(x=9, y=9) not in d)
+    found = d.get(Point(x=1, y=9))
+    print(d.get(Point(x=3, y=4), "missing"), d.get(Point(x=0, y=0), "missing"), found, found is None)
+    # Overwriting keeps the original position.
+    d[Point(x=1, y=2)] = "c"
+    print(d[Point(x=1, y=2)], d)
+    print(d.keys(), d.values())
+    print(d.items())
+    print(d.pop(Point(x=3, y=4)), d, d.pop(Point(x=3, y=4), "gone"), len(d))
+    d[Point(x=3, y=4)] = "again"
+    print(d)
+    parts: list<str> = []
+    for k in d:
+        parts.append(f"{k.x},{k.y}")
+    print(" ".join(parts))
+
+    # Sets: literal duplicates collapse, add / discard / remove.
+    s = {Point(x=0, y=0), Point(x=1, y=1), Point(x=0, y=0)}
+    s.add(Point(x=2, y=4))
+    s.add(Point(x=1, y=1))
+    print(s, len(s), Point(x=2, y=4) in s, Point(x=4, y=2) in s)
+    s.discard(Point(x=0, y=0))
+    s.discard(Point(x=7, y=7))
+    s.remove(Point(x=1, y=1))
+    s.remove(Point(x=2, y=4))
+    print(s, len(s))
+
+    # Colliding hashes, growth well past the first table, removal of half the
+    # keys, then re-insertion.
+    b: dict<Bucket, int> = {}
+    for i in range(300):
+        b[Bucket(n=i)] = i * i
+    three = Bucket(n=3)
+    print(three, Bucket(n=3), b[Bucket(n=2)] - 2)
+    total = 0
+    for key in b:
+        total = total + b[key] - key.n * key.n
+    print(len(b), len(b.keys()), total)
+    for i in range(0, 300, 2):
+        b.pop(Bucket(n=i))
+    print(len(b), Bucket(n=1) in b, Bucket(n=2) in b, b.get(Bucket(n=4), -1) == -1)
+    for i in range(0, 300, 2):
+        b[Bucket(n=i)] = i
+    acc = 0
+    for v in b.values():
+        acc = acc + v
+    order = b.keys()
+    print(len(b), acc)
+    print(order[0].n, order[149].n, order[150].n, order[299].n)
+
+    # A comprehension builds a table of class keys; every hash is equal.
+    names = ["ada", "bob", "ada"]
+    counts = {Name(text=w): 0 for w in names}
+    for w in names:
+        counts[Name(text=w)] = counts[Name(text=w)] + 1
+    print(counts, Name(text="ada") in counts)
+    grid = {Point(x=i % 8, y=i // 8) for i in range(64)}
+    moved = {Point(x=p.y, y=p.x) for p in grid}
+    missing = 0
+    for p in moved:
+        if p not in grid:
+            missing = missing + 1
+    print(len(grid), missing, len(moved))

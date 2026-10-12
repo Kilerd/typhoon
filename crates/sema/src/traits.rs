@@ -220,6 +220,13 @@ pub(crate) enum SynthKind {
     Min,
     /// `max(a, b)` on an `Ord` type without a native maximum.
     Max,
+    /// The probe function of a class used as a dict key or a set element
+    /// (see [`hir::Protocols::key_probe`]); the operand type is the class.
+    KeyProbe,
+    /// `sorted(xs)` over an `Ord` element type the runtime cannot order
+    /// itself: a stable merge sort calling `__lt__`; the operand type is the
+    /// element type.
+    Sort,
 }
 
 /// Everything the checker knows about traits.
@@ -241,6 +248,10 @@ pub(crate) struct Traits {
     /// The `__eq__` / `__repr__` codegen calls inside containers.
     pub(crate) eq_fns: HashMap<ClassId, hir::FuncId>,
     pub(crate) repr_fns: HashMap<ClassId, hir::FuncId>,
+    /// The `__hash__` and the probe function of every class used as a key,
+    /// filled in once checking is done ([`Checker::register_class_keys`]).
+    pub(crate) hash_fns: HashMap<ClassId, hir::FuncId>,
+    pub(crate) key_probes: HashMap<ClassId, hir::FuncId>,
     /// Synthesized helpers, memoized per kind and operand type.
     pub(crate) synth: HashMap<(SynthKind, TypeId), hir::FuncId>,
     /// Synthesized functions whose bodies are still to be built.
@@ -622,6 +633,8 @@ impl Checker<'_> {
         hir::Protocols {
             eq: self.traits.eq_fns.clone(),
             repr: self.traits.repr_fns.clone(),
+            hash: self.traits.hash_fns.clone(),
+            key_probe: self.traits.key_probes.clone(),
         }
     }
 
@@ -1328,6 +1341,12 @@ impl Checker<'_> {
             .retain(|class, func| class.index() < classes && func.index() < sigs);
         traits
             .repr_fns
+            .retain(|class, func| class.index() < classes && func.index() < sigs);
+        traits
+            .hash_fns
+            .retain(|class, func| class.index() < classes && func.index() < sigs);
+        traits
+            .key_probes
             .retain(|class, func| class.index() < classes && func.index() < sigs);
         traits.synth.retain(|_, func| func.index() < sigs);
         traits.pending = mark.synth_pending;

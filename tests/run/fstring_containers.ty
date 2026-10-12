@@ -1,0 +1,38 @@
+# An f-string hole and `str(x)` accept containers (DESIGN 3.7, 3.11): the
+# text is exactly what `print` writes, `str` elements quoted, classes through
+# their `__repr__`, an empty set as `set()`.
+# milestone: M3
+# expect: xs=[1, 2, 3] names=["a", "b"] empty=[]
+# expect: d={"x": 1, "y": 2} s={3, 1} none=set() t=(1, "a", True)
+# expect: nested=[[1], [], [2, 3]] pairs={1: (2.5, "z")}
+# expect: maybe=[1] / None
+# expect: pts=[P(1)] {P(2): [P(3)]}
+# expect: [1, 2] {"k": [True]} (1,) set() 11
+# expect: [1, 2]!
+
+class P(Eq, Hash):
+    n: int
+
+    fn __repr__(self) -> str:
+        return f"P({self.n})"
+
+fn show<T: Repr>(x: T) -> str:
+    return f"{x}!"
+
+fn main():
+    xs = [1, 2, 3]
+    names = ["a", "b"]
+    empty: list<int> = []
+    print(f"xs={xs} names={names} empty={empty}")
+    d = {"x": 1, "y": 2}
+    s = {3, 1}
+    none: set<int> = set()
+    print(f"d={d} s={s} none={none} t={(1, 'a', True)}")
+    print(f"nested={[[1], [], [2, 3]]} pairs={ {1: (2.5, 'z')} }")
+    maybe: list<int> | None = [1]
+    other: list<int> | None = None
+    print(f"maybe={maybe} / {other}")
+    print(f"pts={[P(n=1)]} { {P(n=2): [P(n=3)]} }")
+    text = str([1, 2])
+    print(text, str({"k": [True]}), str((1,)), str(none), len(text) + len(str((1,))) + 1)
+    print(show([1, 2]))

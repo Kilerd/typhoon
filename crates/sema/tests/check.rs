@@ -1018,9 +1018,13 @@ fn str_converts_every_scalar() {
     assert!(dump.contains("c = str(True:bool):str"), "{dump}");
     // `str(s)` on a `str` is the identity, so it leaves no node behind.
     assert!(dump.contains("d = \"x\":str"), "{dump}");
-    rejects_main(
-        "xs = [1]\nprint(str(xs))",
-        ["`str` is not defined for `list<int>`"].as_slice(),
+    // A container is its `repr` (DESIGN §3.11); a class inside one still
+    // needs a `__repr__`.
+    let dump = ok_main("xs = [1]\ne = str(xs)");
+    assert!(dump.contains("e = repr(xs:list<int>):str"), "{dump}");
+    rejects(
+        &format!("{POINT}fn main():\n    print(str([Point(x=1.0)]))\n"),
+        ["`str` is not defined for `list<Point>`"].as_slice(),
     );
 }
 
@@ -1250,10 +1254,13 @@ fn containers_of_class_instances_are_neither_printed_nor_compared() {
         &format!("{POINT}fn main():\n    print((1, Point(x=1.0)))\n"),
         ["cannot print a `tuple<int, Point>`"].as_slice(),
     );
-    rejects_main(
-        "xs = [1]\nprint(f\"{xs}\")",
-        ["cannot interpolate a `list<int>`"].as_slice(),
+    rejects(
+        &format!("{program}    print(f\"{{ps}}\")\n"),
+        ["cannot interpolate a `list<Point>`"].as_slice(),
     );
+    // Without a class inside, an f-string hole takes the container's `repr`.
+    let dump = ok_main("xs = [1]\nprint(f\"{xs}\")");
+    assert!(dump.contains("repr(xs:list<int>):str"), "{dump}");
 }
 
 // ---------------------------------------------------------------------------

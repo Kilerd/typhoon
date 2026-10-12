@@ -36,9 +36,9 @@
 //!   a generic item with a trait bound is checked once at its definition, and
 //!   its type arguments implement the bounds; an operator on a class instance
 //!   calls its dunder method (DESIGN §3.11);
-//! * a dict key or a set element is hashable (`int`, `bool`, `str`, or a flat
-//!   tuple of those), and `{}` / `set()` get their types from the context,
-//!   like `[]` (DESIGN §3.10, §4.1);
+//! * a dict key or a set element is hashable (`int`, `bool`, `str`, a flat
+//!   tuple of those, or a class implementing `Hash`), and `{}` / `set()` get
+//!   their types from the context, like `[]` (DESIGN §3.10, §3.11, §4.1);
 //! * features that parse but belong to a later milestone are rejected with
 //!   one diagnostic each.
 
@@ -100,6 +100,11 @@ pub fn check_module(
     }
     // The instances of generic functions and methods requested so far, and
     // the ones those request in turn (DESIGN §4.5).
+    checker.check_instances(&mut functions);
+    // Every class used as a dict key or a set element gets the probe
+    // function codegen calls (DESIGN §3.11); building it may instantiate a
+    // derived `__hash__` / `__eq__` / `__repr__` in turn.
+    checker.register_class_keys(whole_file);
     checker.check_instances(&mut functions);
     let main = checker.check_entry_point(&fn_decls, whole_file);
 

@@ -1,8 +1,11 @@
-# An f-string hole formats a scalar; a repr protocol for containers arrives in
-# M3 (DESIGN 3.7, 4.6).
+# An f-string hole renders a container the way `print` does (M3), which needs
+# a `__repr__` on every class inside it (DESIGN 3.7, 3.11).
 # milestone: M2
-# error: cannot interpolate a `list<int>`
+# error: cannot interpolate a `list<Point>`
+
+class Point:
+    x: int
 
 fn main():
-    xs: list<int> = [1, 2]
+    xs = [Point(x=1)]
     print(f"{xs}")

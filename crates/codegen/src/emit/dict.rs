@@ -12,23 +12,38 @@
 //! `bool` is zero-extended, a `str` is its address, and a tuple is the address
 //! of a stack slot holding it (laid out exactly like a tuple in a list).
 //! The key type is described to the runtime by the descriptor
-//! [`typhoon_sema::types::TypeTable::key_desc`] computes.
+//! [`typhoon_sema::types::TypeTable::table_key_desc`] computes.
+//!
+//! A class key (DESIGN §3.11) is hashed and compared by generated code: every
+//! operation calls the class's `__hash__`, then the probe function sema wrote
+//! for the class ([`hir::Protocols::key_probe`]), which finds the matching
+//! entry's index position, then one `ty_dict_probe_*` call that turns the
+//! position into a value slot (see `crates/runtime/src/dict.rs`).
 
 use std::fmt::Write;
 
 use typhoon_sema::hir;
-use typhoon_sema::types::{Type, TypeId};
+use typhoon_sema::types::{ClassId, Type, TypeId};
 
 use super::{Emitter, Tbaa};
 
 impl<'p> Emitter<'p> {
     // -- keys and slots --------------------------------------------------------
 
-    /// The runtime descriptor of the key (or `sorted` element) type `ty`.
+    /// The runtime descriptor of the key type `ty`.
     fn desc_of(&self, ty: TypeId) -> u64 {
         self.types
-            .key_desc(ty)
-            .expect("sema only lets hashable / sortable types through")
+            .table_key_desc(ty)
+            .expect("sema only lets hashable types through")
+    }
+
+    /// The class of a class key, whose operations go through its `__hash__`
+    /// and probe function.
+    fn class_key(&self, ty: TypeId) -> Option<ClassId> {
+        match self.types.get(ty) {
+            Type::Class(class) => Some(class),
+            _ => None,
+        }
     }
 
     /// Turns a key value into the `i64` key word the runtime takes.
@@ -40,7 +55,7 @@ impl<'p> Emitter<'p> {
                 self.emit(&format!("{out} = zext i1 {value} to i64"));
                 out
             }
-            Type::Str => {
+            Type::Str | Type::Class(_) => {
                 let out = self.fresh();
                 self.emit(&format!("{out} = ptrtoint ptr {value} to i64"));
                 out
@@ -88,6 +103,135 @@ impl<'p> Emitter<'p> {
         let out = self.fresh();
         self.emit(&format!(
             "{out} = call ptr @{name}(ptr {table}, i64 {word})"
+        ));
+        out
+    }
+
+    /// The value slot of `key` for the table operation `name` (one of the
+    /// `ty_dict_*` lookups of [`Emitter::table_call`]): a plain runtime call
+    /// on the key word, or for a class key the `__hash__` / probe / slot
+    /// sequence, with the `key not found` panic emitted inline.
+    fn key_slot(&mut self, name: &'static str, table: &str, key_ty: TypeId, key: &str) -> String {
+        let Some(class) = self.class_key(key_ty) else {
+            let word = self.key_word(key_ty, key);
+            return self.table_call(name, table, &word);
+        };
+        let (h, pos) = self.class_probe(class, table, key_ty, key);
+        let slot = self.fresh();
+        match name {
+            "ty_dict_insert" => {
+                let word = self.key_word(key_ty, key);
+                self.decls
+                    .insert("declare ptr @ty_dict_probe_insert(ptr, i64, i64, i64) nounwind");
+                self.emit(&format!(
+                    "{slot} = call ptr @ty_dict_probe_insert(ptr {table}, i64 {word}, i64 {h}, i64 {pos})"
+                ));
+            }
+            "ty_dict_remove" | "ty_dict_pop" => {
+                self.decls
+                    .insert("declare ptr @ty_dict_probe_remove(ptr, i64, i64) nounwind");
+                self.emit(&format!(
+                    "{slot} = call ptr @ty_dict_probe_remove(ptr {table}, i64 {h}, i64 {pos})"
+                ));
+            }
+            _ => {
+                self.decls
+                    .insert("declare ptr @ty_dict_probe_slot(ptr, i64, i64) nounwind");
+                self.emit(&format!(
+                    "{slot} = call ptr @ty_dict_probe_slot(ptr {table}, i64 {h}, i64 {pos})"
+                ));
+            }
+        }
+        if matches!(name, "ty_dict_get" | "ty_dict_pop") {
+            self.missing_class_key(&slot, class, key_ty, key);
+        }
+        slot
+    }
+
+    /// `(hash, position)` of a class key: its `__hash__`, then the probe
+    /// function, whose position is -1 when the key is absent.
+    fn class_probe(
+        &mut self,
+        class: ClassId,
+        table: &str,
+        key_ty: TypeId,
+        key: &str,
+    ) -> (String, String) {
+        let protocols = &self.program.protocols;
+        let (Some(hash_fn), Some(probe_fn)) = (
+            protocols.hash.get(&class).copied(),
+            protocols.key_probe.get(&class).copied(),
+        ) else {
+            panic!("sema registers the probe of every key class");
+        };
+        let probe = self.program.function(probe_fn);
+        let table_ty = probe.locals[probe.params[0].index()].ty;
+        let h = self.call_protocol(hash_fn, &[(key_ty, key)]);
+        let pos = self.call_protocol(
+            probe_fn,
+            &[(table_ty, table), (key_ty, key), (TypeId::INT, &h)],
+        );
+        (h, pos)
+    }
+
+    /// Panics with `key not found: <repr>` when `slot` is null: the key's
+    /// `__repr__`, or `<Name object>` for a class without one.
+    fn missing_class_key(&mut self, slot: &str, class: ClassId, key_ty: TypeId, key: &str) {
+        let missing = self.binop("icmp eq", "ptr", slot, "null");
+        let fail = self.fresh_label("key.missing");
+        let found = self.fresh_label("key.found");
+        self.cond_br(&missing, &fail, &found);
+        self.start_block(&fail);
+        let text = match self.program.protocols.repr.get(&class).copied() {
+            Some(repr) => self.call_protocol(repr, &[(key_ty, key)]),
+            None => {
+                let name = format!("<{} object>", self.types.class(class).name);
+                self.string_literal(&name)
+            }
+        };
+        self.decls
+            .insert("declare void @ty_dict_key_missing(ptr) noreturn nounwind");
+        self.emit(&format!("call void @ty_dict_key_missing(ptr {text})"));
+        self.emit("unreachable");
+        self.terminated = true;
+        self.start_block(&found);
+    }
+
+    /// `ty_dict_probe(table, hash, after)`: one step of a class-key lookup,
+    /// inside a probe function.
+    pub(super) fn table_probe(
+        &mut self,
+        func: &'p hir::Function,
+        table: &hir::Expr,
+        hash: &hir::Expr,
+        after: &hir::Expr,
+    ) -> String {
+        let t = self.expr(func, table);
+        let h = self.expr(func, hash);
+        let a = self.expr(func, after);
+        self.decls
+            .insert("declare i64 @ty_dict_probe(ptr, i64, i64) nounwind");
+        let out = self.fresh();
+        self.emit(&format!(
+            "{out} = call i64 @ty_dict_probe(ptr {t}, i64 {h}, i64 {a})"
+        ));
+        out
+    }
+
+    /// `ty_dict_probe_key(table, pos)`: the key a probe step stopped at.
+    pub(super) fn table_key(
+        &mut self,
+        func: &'p hir::Function,
+        table: &hir::Expr,
+        pos: &hir::Expr,
+    ) -> String {
+        let t = self.expr(func, table);
+        let p = self.expr(func, pos);
+        self.decls
+            .insert("declare ptr @ty_dict_probe_key(ptr, i64) nounwind");
+        let out = self.fresh();
+        self.emit(&format!(
+            "{out} = call ptr @ty_dict_probe_key(ptr {t}, i64 {p})"
         ));
         out
     }
@@ -154,8 +298,7 @@ impl<'p> Emitter<'p> {
         for (k, v) in entries {
             let k_value = self.expr(func, k);
             let v_value = self.expr(func, v);
-            let word = self.key_word(key, &k_value);
-            let slot = self.table_call("ty_dict_insert", &table, &word);
+            let slot = self.key_slot("ty_dict_insert", &table, key, &k_value);
             self.store_value_slot(&slot, value, &v_value);
         }
         table
@@ -171,8 +314,7 @@ impl<'p> Emitter<'p> {
         let table = self.table_alloc(elem, None);
         for item in items {
             let value = self.expr(func, item);
-            let word = self.key_word(elem, &value);
-            self.table_call("ty_dict_insert", &table, &word);
+            self.key_slot("ty_dict_insert", &table, elem, &value);
         }
         table
     }
@@ -189,8 +331,7 @@ impl<'p> Emitter<'p> {
     ) -> String {
         let table = self.expr(func, dict);
         let k = self.expr(func, key);
-        let word = self.key_word(key.ty, &k);
-        let slot = self.table_call("ty_dict_get", &table, &word);
+        let slot = self.key_slot("ty_dict_get", &table, key.ty, &k);
         self.load_value_slot(&slot, value_ty)
     }
 
@@ -237,8 +378,7 @@ impl<'p> Emitter<'p> {
         let table = self.expr(func, dict);
         let k = self.expr(func, key);
         let fallback = self.expr(func, default);
-        let word = self.key_word(key.ty, &k);
-        let slot = self.table_call("ty_dict_find", &table, &word);
+        let slot = self.key_slot("ty_dict_find", &table, key.ty, &k);
         self.slot_or_default(&slot, value_ty, &fallback)
     }
 
@@ -255,14 +395,13 @@ impl<'p> Emitter<'p> {
         let table = self.expr(func, dict);
         let k = self.expr(func, key);
         let fallback = default.map(|d| self.expr(func, d));
-        let word = self.key_word(key.ty, &k);
         match fallback {
             Some(fallback) => {
-                let slot = self.table_call("ty_dict_remove", &table, &word);
+                let slot = self.key_slot("ty_dict_remove", &table, key.ty, &k);
                 self.slot_or_default(&slot, value_ty, &fallback)
             }
             None => {
-                let slot = self.table_call("ty_dict_pop", &table, &word);
+                let slot = self.key_slot("ty_dict_pop", &table, key.ty, &k);
                 self.load_value_slot(&slot, value_ty)
             }
         }
@@ -280,8 +419,7 @@ impl<'p> Emitter<'p> {
         let table = self.expr(func, dict);
         let k = self.expr(func, key);
         let v = self.expr(func, value);
-        let word = self.key_word(key.ty, &k);
-        let slot = self.table_call("ty_dict_insert", &table, &word);
+        let slot = self.key_slot("ty_dict_insert", &table, key.ty, &k);
         self.store_value_slot(&slot, value.ty, &v);
     }
 
@@ -295,6 +433,11 @@ impl<'p> Emitter<'p> {
     ) -> String {
         let t = self.expr(func, table);
         let k = self.expr(func, key);
+        if let Some(class) = self.class_key(key.ty) {
+            let (_, pos) = self.class_probe(class, &t, key.ty, &k);
+            let pred = if negated { "icmp slt" } else { "icmp sge" };
+            return self.binop(pred, "i64", &pos, "0");
+        }
         let word = self.key_word(key.ty, &k);
         let slot = self.table_call("ty_dict_find", &t, &word);
         let pred = if negated { "icmp eq" } else { "icmp ne" };
@@ -311,8 +454,7 @@ impl<'p> Emitter<'p> {
     ) {
         let t = self.expr(func, set);
         let v = self.expr(func, value);
-        let word = self.key_word(value.ty, &v);
-        self.table_call(call, &t, &word);
+        self.key_slot(call, &t, value.ty, &v);
     }
 
     /// `len(d)`, read from the header like a list's length.
@@ -341,7 +483,10 @@ impl<'p> Emitter<'p> {
     pub(super) fn sorted(&mut self, func: &'p hir::Function, list: &hir::Expr) -> String {
         let elem = self.types.as_list(list.ty).expect("`sorted` takes a list");
         let value = self.expr(func, list);
-        let desc = self.desc_of(elem);
+        let desc = self
+            .types
+            .key_desc(elem)
+            .expect("sema sorts other element types itself");
         self.decls
             .insert("declare noalias ptr @ty_list_sorted(ptr, i64) nounwind");
         let out = self.fresh();

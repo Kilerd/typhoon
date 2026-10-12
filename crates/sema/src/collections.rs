@@ -4,10 +4,12 @@
 //! The hooks live where the M2 containers are checked (`exprs.rs` for
 //! expressions, `check.rs` for statements); the rules live here.
 //!
-//! * A key (or a set element) is an `int`, a `bool`, a `str` or a flat tuple
-//!   of those. A class key would need an eq/hash protocol, which is not
-//!   decided yet (DESIGN §9), and a `float` key Python's `-0.0 == 0.0` /
-//!   NaN rules; both are rejected where the type is written or inferred.
+//! * A key (or a set element) is an `int`, a `bool`, a `str`, a flat tuple
+//!   of those, or a class implementing `Hash` and `Eq` (DESIGN §3.11), whose
+//!   table operations go through its `__hash__` and a synthesized probe
+//!   function (`protocols.rs`). A `float` key would need Python's
+//!   `-0.0 == 0.0` / NaN rules and is rejected where the type is written or
+//!   inferred, as are tuples holding a class and `T | None` keys.
 //! * `{}` is an empty dict and `set()` an empty set; both need an expected
 //!   type, exactly like `[]` (DESIGN §3.7, §4.4).
 //! * `d[k]` panics on a missing key, `d.get(k, default)` does not; there is no
@@ -22,6 +24,7 @@ use typhoon_diag::{Diagnostic, Span};
 
 use crate::check::{Checker, a_type};
 use crate::hir;
+use crate::traits::{Builtin, SynthKind};
 use crate::types::{Type, TypeId};
 
 impl Checker<'_> {
@@ -61,9 +64,22 @@ impl Checker<'_> {
         self.types.dict_of(args[0], args[1])
     }
 
+    /// Whether `ty` may be a dict key or a set element: a type the runtime
+    /// hashes itself (`int`, `bool`, `str`, a flat tuple of those), or a class
+    /// that implements `Hash` — and with it `Eq` — DESIGN §3.11. A type
+    /// parameter qualifies when it is bounded by `Hash`.
+    pub(crate) fn is_key_type(&mut self, ty: TypeId) -> bool {
+        if self.types.is_hashable(ty) {
+            return true;
+        }
+        matches!(self.types.get(ty), Type::Class(_))
+            && self.satisfies(ty, Builtin::Hash.id())
+            && self.satisfies(ty, Builtin::Eq.id())
+    }
+
     /// Reports `ty` when it cannot be a dict key or a set element.
     pub(crate) fn require_key_type(&mut self, ty: TypeId, span: Span, container: &str) -> bool {
-        if ty == TypeId::ERROR || self.types.is_hashable(ty) {
+        if ty == TypeId::ERROR || self.is_key_type(ty) {
             return true;
         }
         let name = self.types.name(ty);
@@ -74,12 +90,28 @@ impl Checker<'_> {
         };
         let mut diag = Diagnostic::error(format!("`{name}` cannot be {what}"))
             .with_label(span, format!("`{name}` is not hashable"))
-            .with_help("keys must be `int`, `bool`, `str`, or a tuple of those");
+            .with_help(
+                "keys must be `int`, `bool`, `str`, a tuple of those, \
+                 or a class that declares `Eq` and `Hash`",
+            );
         diag = match self.types.get(ty) {
-            Type::Class(_) | Type::Optional(_) => diag.with_note(
-                "a class key needs an eq/hash protocol, which is not decided yet, \
-                 see DESIGN.md section 9",
-            ),
+            Type::Class(class) if self.is_opaque(class) => diag.with_note(format!(
+                "bound the type parameter: `{name}: Hash`, see DESIGN.md section 3.11"
+            )),
+            Type::Class(_) => diag.with_note(format!(
+                "`{name}` does not implement `Hash`; declare it on the class, \
+                 e.g. `class {name}(Eq, Hash):`, see DESIGN.md section 3.11"
+            )),
+            Type::Tuple(id)
+                if self
+                    .types
+                    .tuple_members(id)
+                    .iter()
+                    .any(|m| self.types.class_of(*m).is_some()) =>
+            {
+                diag.with_note("a tuple key cannot contain a class instance yet")
+            }
+            Type::Optional(_) => diag.with_note("a `T | None` key is not supported"),
             Type::Float => diag.with_note("`float` keys are not supported; use an `int` key"),
             _ => diag,
         };
@@ -751,13 +783,22 @@ impl Checker<'_> {
             return self.error_expr(span);
         };
         if !self.types.is_sortable(elem) {
+            // Any other `Ord` type — a class with `__lt__` and `__eq__`, a
+            // tuple holding one — through a merge sort calling `__lt__`
+            // (DESIGN §3.11).
+            if self.ensure_ord(elem, value.span) {
+                let func = self.synth_fn(SynthKind::Sort, elem, span);
+                return self.call_fn(func, vec![value], vec![0], span);
+            }
             let name = self.types.name(elem);
             self.error(
                 Diagnostic::error(format!("`sorted` cannot order `{name}` values"))
                     .with_label(value.span, format!("the elements are `{name}`"))
                     .with_help(
-                        "`sorted` orders `int`, `float`, `bool`, `str` and flat tuples of those",
-                    ),
+                        "`sorted` orders `int`, `float`, `bool`, `str`, tuples, \
+                         and classes with `__lt__` and `__eq__` (declare `Eq` and `Ord`)",
+                    )
+                    .with_note("see DESIGN.md section 3.11"),
             );
             return self.error_expr(span);
         }

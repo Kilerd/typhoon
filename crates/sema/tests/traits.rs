@@ -2,9 +2,11 @@
 //! checker lowers them to, and what the definition-time check of a bounded
 //! item leaves behind (nothing).
 
+use std::collections::HashMap;
+
 use typhoon_diag::{Diagnostics, SourceMap, render_all};
-use typhoon_sema::hir::{ExprKind, Program, Stmt};
-use typhoon_sema::types::Type;
+use typhoon_sema::hir::{ExprKind, FuncId, Program, Stmt};
+use typhoon_sema::types::{ClassId, Type};
 use typhoon_sema::{check_module, dump_program};
 
 /// Type-checks `src`, returning the program or the rendered diagnostics.
@@ -221,4 +223,50 @@ fn main():
         .expect("the method");
     let other = same.locals[same.params[1].index()].ty;
     assert!(matches!(program.types.get(other), Type::Class(_)));
+}
+
+#[test]
+fn class_keys_register_their_hash_and_probe() {
+    let program = ok(&format!(
+        "{POINT}fn main():\n    s = {{Point(x=1, y=2)}}\n    print(Point(x=1, y=2) in s)\n"
+    ));
+    let point = program
+        .types
+        .classes()
+        .iter()
+        .position(|c| c.name == "Point")
+        .expect("Point is declared");
+    let of_point = |table: &HashMap<ClassId, FuncId>| {
+        table
+            .iter()
+            .find(|(class, _)| class.index() == point)
+            .map(|(_, func)| *func)
+    };
+    let hash = of_point(&program.protocols.hash).expect("a key class has its `__hash__`");
+    assert_eq!(program.function(hash).name, "Point.__hash__");
+    let probe = of_point(&program.protocols.key_probe).expect("and its probe function");
+    let probe = program.function(probe);
+    assert_eq!(probe.name, "probe<Point>");
+    assert_eq!(probe.params.len(), 3);
+    // The probe confirms each candidate with the class's `__eq__`.
+    let dump = dump_program(&program);
+    assert!(dump.contains("probe(table:set<Point>"), "{dump}");
+    assert!(dump.contains("Point.__eq__(key_at("), "{dump}");
+}
+
+#[test]
+fn sorted_over_an_ord_class_is_a_synthesized_merge_sort() {
+    let program = ok(&format!(
+        "{POINT}fn main():\n    print(sorted([Point(x=2, y=0), Point(x=1, y=0)]))\n"
+    ));
+    let sort = program
+        .functions
+        .iter()
+        .find(|f| f.name == "sorted<Point>")
+        .expect("a merge sort for Point");
+    assert_eq!(program.types.name(sort.ret), "list<Point>");
+    let dump = dump_program(&program);
+    assert!(dump.contains("Point.__lt__("), "{dump}");
+    // The runtime sort only sees scalars and flat tuples of them.
+    assert!(!dump.contains("sorted(["), "{dump}");
 }

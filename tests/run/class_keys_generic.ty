@@ -1,0 +1,74 @@
+# Class keys inside generic code (DESIGN 3.11): a checked generic class whose
+# `dict<T, int>` is valid because `T: Hash`, used with a class and with `str`;
+# an instance of a generic class as a key; a template generic that only finds
+# out it has a class key once it is instantiated.
+# milestone: M3
+# expect: 2 1 0
+# expect: {Card(rank=1, suit="s"): 2, Card(rank=12, suit="h"): 1}
+# expect: 2 1 {"x": 2, "y": 1}
+# expect: [Card(rank=1, suit="s"), Card(rank=12, suit="h")]
+# expect: {Pair(first=1, second="a"): True, Pair(first=2, second="b"): False}
+# expect: True False 2
+# expect: {Card(rank=3, suit="c"): 2, Card(rank=4, suit="d"): 1}
+# expect: {Card(rank=4, suit="d")} 1
+
+class Card(Eq, Ord, Hash, Repr):
+    rank: int
+    suit: str
+
+class Pair<A, B>(Eq, Hash, Repr):
+    first: A
+    second: B
+
+class Counter<T: Hash>:
+    counts: dict<T, int>
+
+    fn add(self, x: T):
+        self.counts[x] = self.counts.get(x, 0) + 1
+
+    fn count(self, x: T) -> int:
+        return self.counts.get(x, 0)
+
+fn most<T: Hash + Ord>(c: Counter<T>) -> list<T>:
+    return sorted(c.counts)
+
+fn tally<T>(xs: list<T>) -> dict<T, int>:
+    counts: dict<T, int> = {}
+    for x in xs:
+        if x in counts:
+            counts[x] = counts[x] + 1
+        else:
+            counts[x] = 1
+    return counts
+
+fn uniques<T: Hash>(xs: list<T>) -> set<T>:
+    seen: set<T> = set()
+    twice: set<T> = set()
+    for x in xs:
+        if x in seen:
+            twice.add(x)
+        seen.add(x)
+    for x in twice:
+        seen.remove(x)
+    return seen
+
+fn main():
+    cards: Counter<Card> = Counter(counts={})
+    cards.add(Card(rank=1, suit="s"))
+    cards.add(Card(rank=12, suit="h"))
+    cards.add(Card(rank=1, suit="s"))
+    print(cards.count(Card(rank=1, suit="s")), cards.count(Card(rank=12, suit="h")), cards.count(Card(rank=2, suit="s")))
+    print(cards.counts)
+    words: Counter<str> = Counter(counts={})
+    for w in ["x", "y", "x"]:
+        words.add(w)
+    print(words.count("x"), words.count("y"), words.counts)
+    print(most(cards))
+
+    flags = {Pair(first=1, second="a"): True, Pair(first=2, second="b"): False}
+    print(flags)
+    print(flags[Pair(first=1, second="a")], flags[Pair(first=2, second="b")], len(flags))
+
+    print(tally([Card(rank=3, suit="c"), Card(rank=4, suit="d"), Card(rank=3, suit="c")]))
+    u = uniques([Card(rank=3, suit="c"), Card(rank=4, suit="d"), Card(rank=3, suit="c")])
+    print(u, len(u))

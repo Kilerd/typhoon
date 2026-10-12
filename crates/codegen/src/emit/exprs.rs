@@ -454,6 +454,10 @@ impl<'p> Emitter<'p> {
                 self.set_update(func, set, value, call);
                 String::new()
             }
+            hir::ExprKind::TableProbe { table, hash, after } => {
+                self.table_probe(func, table, hash, after)
+            }
+            hir::ExprKind::TableKey { table, pos } => self.table_key(func, table, pos),
             hir::ExprKind::Sorted(list) => self.sorted(func, list),
             hir::ExprKind::StrSlice {
                 string,

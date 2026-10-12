@@ -437,6 +437,17 @@ impl<'p> Emitter<'p> {
                 let rt = if *strict { Rt::DictPop } else { Rt::DictRemove };
                 self.set_update(func, set, value, rt);
             }
+            hir::ExprKind::TableProbe { table, hash, after } => {
+                self.expr(func, table);
+                self.expr(func, hash);
+                self.expr(func, after);
+                self.call_rt(Rt::DictProbe);
+            }
+            hir::ExprKind::TableKey { table, pos } => {
+                self.expr(func, table);
+                self.expr(func, pos);
+                self.call_rt(Rt::DictProbeKey);
+            }
             hir::ExprKind::Sorted(list) => self.sorted(func, list),
             hir::ExprKind::StrSlice {
                 string,

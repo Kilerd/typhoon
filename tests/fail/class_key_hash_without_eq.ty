@@ -1,0 +1,11 @@
+# `Hash` requires `Eq` to be declared too: a key is found by its hash, then
+# confirmed by `__eq__` (DESIGN 3.11).
+# milestone: M3
+# error: the trait `Hash` requires `Eq`
+
+class Tag(Hash):
+    name: str
+
+fn main():
+    s = {Tag(name="a")}
+    print(len(s))

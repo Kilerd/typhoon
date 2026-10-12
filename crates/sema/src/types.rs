@@ -45,9 +45,10 @@ pub enum Type {
     /// passed by value — see [`TypeTable::is_tagged_optional`].
     Optional(TypeId),
     /// `dict<K, V>`, an insertion-ordered hash table on the GC heap
-    /// (DESIGN §4.1). `K` is always [`TypeTable::is_hashable`].
+    /// (DESIGN §4.1). `K` is [`TypeTable::is_hashable`] or a class that
+    /// implements `Hash` (DESIGN §3.11).
     Dict(TypeId, TypeId),
-    /// `set<T>`, the same table without values. `T` is hashable.
+    /// `set<T>`, the same table without values. `T` is a valid key type.
     Set(TypeId),
 }
 
@@ -325,9 +326,10 @@ impl TypeTable {
         }
     }
 
-    /// Whether `ty` may be a dict key or a set element: `int`, `bool`, `str`,
-    /// or a flat tuple of those (M3; a `float` key and a class key need an
-    /// eq/hash protocol that is not decided yet).
+    /// Whether the runtime can hash and compare `ty` itself as a dict key or
+    /// a set element: `int`, `bool`, `str`, or a flat tuple of those. A class
+    /// is a key too when it implements `Hash` (DESIGN §3.11), which only the
+    /// checker can tell; a `float` never is.
     pub fn is_hashable(&self, ty: TypeId) -> bool {
         let Some(mut desc) = self.key_desc(ty) else {
             return false;
@@ -341,8 +343,19 @@ impl TypeTable {
         true
     }
 
-    /// Whether `sorted` accepts a `list<ty>`: a scalar or a flat tuple of
-    /// `int`, `float`, `bool` and `str`.
+    /// The descriptor `ty_dict_new` takes for the key type `ty`: its
+    /// [`TypeTable::key_desc`], or `5` (`KEY_CLASS`) for a class key, which
+    /// the generated code hashes and compares (DESIGN §3.11).
+    pub fn table_key_desc(&self, ty: TypeId) -> Option<u64> {
+        match self.get(ty) {
+            Type::Class(_) => Some(5),
+            _ => self.key_desc(ty),
+        }
+    }
+
+    /// Whether the runtime's `sorted` orders a `list<ty>` itself: a scalar
+    /// or a flat tuple of `int`, `float`, `bool` and `str`. Other `Ord`
+    /// element types are sorted by a synthesized merge sort (DESIGN §3.11).
     pub fn is_sortable(&self, ty: TypeId) -> bool {
         self.key_desc(ty).is_some()
     }

@@ -1,12 +1,23 @@
 # The runtime entry points behind traits (DESIGN 3.11): `repr(x)` captures
 # what the printer writes (`ty_repr_begin` / `ty_repr_end`) and `hash(s)` of a
-# `str` is `ty_str_hash`. The companion of runtime_surface.ty, whose wasm unit
-# test checks that every runtime import is called by one of them.
+# `str` is `ty_str_hash`; a class key goes through `ty_dict_probe`,
+# `ty_dict_probe_key` and `ty_dict_probe_slot` / `_insert` / `_remove`, with
+# `ty_dict_key_missing` on the panic path of `d[k]`. The companion of
+# runtime_surface.ty, whose wasm unit test checks that every runtime import is
+# called by one of them.
 # milestone: M3
 # expect: ["a", "b"] 10
 # expect: True False
+# expect: 1 True 2 0
+
+class Key(Eq, Hash):
+    n: int
 
 fn main():
     text = repr(["a", "b"])
     print(text, len(text))
     print(hash("typhoon") == hash("typ" + "hoon"), hash("a") == hash("b"))
+    d: dict<Key, int> = {}
+    d[Key(n=1)] = 1
+    d[Key(n=2)] = 2
+    print(d[Key(n=1)], Key(n=2) in d, d.pop(Key(n=2)), len(d) - 1)

@@ -1,0 +1,46 @@
+# The example of DESIGN 3.11, verbatim: nominal traits, a checked generic,
+# derived Eq / Ord / Hash / Repr, operator overloading, and a derived-Hash
+# class as a set element, sorted through its Ord and printed in an f-string.
+# milestone: M3
+# expect: 15.70795
+# expect: Point(x=1, y=2) True True
+# expect: [Point(x=1, y=2)] Vec(x=2.0, y=4.0)
+# expect: 2 True [Point(x=0, y=5), Point(x=1, y=2)]
+# expect: seen = {Point(x=1, y=2), Point(x=0, y=5)}
+
+trait Shape:
+    fn area(self) -> float                # required: no body
+    fn describe(self) -> str:             # default implementation, may be overridden
+        return f"area {self.area()}"
+
+class Circle(Shape):                      # the parentheses list traits, never a base class
+    r: float
+
+    fn area(self) -> float:
+        return 3.14159 * self.r * self.r
+
+fn total_area<T: Shape>(xs: list<T>) -> float:   # checked once, here
+    s = 0.0
+    for x in xs:
+        s = s + x.area()
+    return s
+
+class Point(Eq, Ord, Hash, Repr):         # declared but not defined -> derived field-wise
+    x: int
+    y: int
+
+class Vec(Repr):
+    x: float
+    y: float
+
+    fn __mul__(self, k: float) -> Vec:    # `v * 2.0`; the operand follows the signature
+        return Vec(x=self.x * k, y=self.y * k)
+
+fn main():
+    print(total_area([Circle(r=1.0), Circle(r=2.0)]))
+    p = Point(x=1, y=2)
+    print(p, p == Point(x=1, y=2), p < Point(x=1, y=3))   # Point(x=1, y=2) True True
+    print([p], Vec(x=1.0, y=2.0) * 2.0)    # [Point(x=1, y=2)] Vec(x=2.0, y=4.0)
+    seen: set<Point> = {p, Point(x=1, y=2), Point(x=0, y=5)}  # a key through Hash + Eq
+    print(len(seen), Point(x=0, y=5) in seen, sorted(seen))  # 2 True [Point(x=0, y=5), Point(x=1, y=2)]
+    print(f"seen = {seen}")               # seen = {Point(x=1, y=2), Point(x=0, y=5)}
