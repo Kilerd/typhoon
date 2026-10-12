@@ -1,0 +1,13 @@
+# A `while` condition runs again after every iteration, so it cannot rely on
+# narrowing that the body may undo by assigning the local (DESIGN 3.8).
+# milestone: M3
+# error: `Point | None` may be `None` here
+
+class Point:
+    x: int
+
+fn main():
+    p: Point | None = Point(x=1)
+    if p is not None:
+        while p.x > 0:
+            p = None

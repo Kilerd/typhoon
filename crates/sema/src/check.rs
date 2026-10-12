@@ -1186,6 +1186,10 @@ impl<'a> Checker<'a> {
 
     fn check_while(&mut self, cond: &ast::Expr, body: &ast::Block) -> (Option<hir::Stmt>, Flow) {
         let narrow = self.narrowing_of(cond);
+        // The condition runs again after every iteration, so it sees what the
+        // body left behind: like the body and the code after the loop, it
+        // keeps the narrowing of a local only if the body never assigns it.
+        self.forget_narrowing_assigned_in(body);
         let cond = self.check_condition(cond);
         let entry = self.assigned.clone();
         let entry_narrow = self.narrowed.clone();
@@ -1291,10 +1295,14 @@ impl<'a> Checker<'a> {
     /// run zero times, so nothing it assigns or narrows survives the loop.
     fn check_loop_body(&mut self, body: &ast::Block, var: hir::LocalId) -> hir::Block {
         let entry = self.assigned.clone();
+        // The loop variable takes a new value on every iteration, and the body
+        // runs an unknown number of times: neither the body nor the code after
+        // the loop knows more about them than their types.
+        self.narrowed.remove(&var);
+        self.forget_narrowing_assigned_in(body);
         let entry_narrow = self.narrowed.clone();
         self.sync_assigned();
         self.assigned[var.index()] = true;
-        self.forget_narrowing_assigned_in(body);
         self.loop_depth += 1;
         let (body, _) = self.check_block(body);
         self.loop_depth -= 1;

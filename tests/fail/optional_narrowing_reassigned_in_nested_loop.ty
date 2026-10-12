@@ -1,0 +1,14 @@
+# Narrowing that the early-return form re-establishes inside an outer loop is
+# dropped again by an inner loop that assigns the local (DESIGN 3.8).
+# milestone: M3
+# error: `float | None` may be `None` here
+
+fn main():
+    f: float | None = 1.5
+    for i in range(2):
+        if f is None:
+            continue
+        for j in range(2):
+            if j == 1:
+                f = None
+        print(f * 2.0)

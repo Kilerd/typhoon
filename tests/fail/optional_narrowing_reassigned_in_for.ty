@@ -1,0 +1,11 @@
+# A `for` body that assigns a narrowed local may have stored `None` in it, so
+# the narrowing is gone after the loop as well as inside it (DESIGN 3.8).
+# milestone: M3
+# error: `int | None` may be `None` here
+
+fn main():
+    x: int | None = 7
+    if x is not None:
+        for i in range(1):
+            x = None
+        print(x + 1)

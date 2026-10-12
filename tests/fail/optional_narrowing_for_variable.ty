@@ -1,0 +1,11 @@
+# A `for` loop that reuses a narrowed local as its variable stores every
+# element in it, `None` included, so the narrowing is gone (DESIGN 3.8).
+# milestone: M3
+# error: `str | None` may be `None` here
+
+fn main():
+    words: list<str | None> = [None, "a"]
+    w: str | None = "x"
+    if w is not None:
+        for w in words:
+            print(w.upper())

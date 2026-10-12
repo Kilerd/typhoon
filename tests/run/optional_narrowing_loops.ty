@@ -1,0 +1,83 @@
+# What loops keep of `is None` narrowing (DESIGN 3.8): a local the body never
+# assigns stays narrowed in the condition, the body and after the loop; the
+# early-return form (`continue` / `break` / `return`) narrows inside a body;
+# a body that reassigns a local can narrow it again before using it. Class
+# references and tagged values (`int`, `float`) behave the same.
+# milestone: M3
+# expect: 12 3
+# expect: 6
+# expect: 4
+# expect: 5.0 7
+# expect: 9
+# expect: 5 1
+# expect: 3
+
+class Node:
+    value: int
+    next: Node | None = None
+
+fn sum_present(xs: list<int | None>) -> int:
+    total = 0
+    for x in xs:
+        if x is None:
+            continue
+        total = total + x
+    return total
+
+fn first_big(xs: list<int | None>, limit: int) -> int:
+    for x in xs:
+        if x is None:
+            return -1
+        if x > limit:
+            return x
+    return 0
+
+fn main():
+    # Not assigned in the body: narrowed in the condition, body and after.
+    n: int | None = 3
+    k = 0
+    if n is not None:
+        acc = 0
+        while k < n:
+            acc = acc + n
+            k = k + 1
+        for i in range(n):
+            acc = acc + i - i
+        print(acc + n, n)
+    print(sum_present([1, None, 2, 3]))
+    print(first_big([1, 4, None], 3))
+
+    # Nested loops that do not touch the narrowed locals.
+    f: float | None = 2.5
+    head: Node | None = Node(value=7)
+    if f is not None:
+        if head is not None:
+            for i in range(2):
+                for j in range(2):
+                    k = k + j
+            print(f * 2.0, head.value)
+
+    # Reassigned in the body, narrowed again before every use.
+    cur: Node | None = Node(value=2, next=Node(value=3, next=Node(value=4)))
+    total = 0
+    while True:
+        if cur is None:
+            break
+        total = total + cur.value
+        cur = cur.next
+    print(total)
+
+    # The `while` condition narrows its own body.
+    m: Node | None = Node(value=5, next=Node(value=1))
+    seen = 0
+    while m is not None:
+        seen = m.value
+        break
+    print(seen, len([v for v in [m] if v is not None]))
+    v: int | None = None
+    count = 0
+    for i in range(3):
+        v = i
+        if v is not None:
+            count = count + 1
+    print(count)

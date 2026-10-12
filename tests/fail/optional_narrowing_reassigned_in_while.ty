@@ -1,0 +1,16 @@
+# A `while` body that assigns a narrowed class reference may have stored
+# `None` in it, so the narrowing is gone after the loop (DESIGN 3.8).
+# milestone: M3
+# error: `Point | None` may be `None` here
+
+class Point:
+    x: int
+
+fn main():
+    p: Point | None = Point(x=5)
+    n = 0
+    if p is not None:
+        while n < 1:
+            p = None
+            n = n + 1
+        print(p.x)
