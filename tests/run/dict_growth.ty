@@ -1,0 +1,35 @@
+# A dict that grows, loses half its keys and grows again keeps every key, its
+# value and the insertion order — through several rebuilds of the table.
+# milestone: M3
+# expect: 1000
+# expect: 500 249500
+# expect: 1000 7 6993 0 6986
+# expect: 500
+# expect: 300 7 6
+
+fn main():
+    d: dict<int, int> = {}
+    for i in range(1000):
+        d[i * 7] = i
+    print(len(d))
+
+    total = 0
+    for i in range(0, 1000, 2):
+        total = total + d.pop(i * 7)
+    print(len(d), total)
+
+    for i in range(1000):
+        if i % 2 == 0:
+            d[i * 7] = 0 - i
+    keys = d.keys()
+    print(len(keys), keys[0], keys[499], keys[500], keys[999])
+
+    s = 0
+    for k in d:
+        s = s + d[k]
+    print(s)
+
+    words: dict<str, int> = {}
+    for i in range(2000):
+        words[str(i % 300)] = words.get(str(i % 300), 0) + 1
+    print(len(words), words["0"], words["299"])

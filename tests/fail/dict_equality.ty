@@ -1,0 +1,8 @@
+# `==` on dicts and sets is not defined yet.
+# milestone: M3
+# error: `dict<str, int>` values cannot be compared with `==`
+
+fn main():
+    a = {"x": 1}
+    b = {"x": 1}
+    print(a == b)

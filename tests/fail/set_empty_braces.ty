@@ -1,0 +1,7 @@
+# `{}` is an empty dict; an empty set is written `set()` (DESIGN 3.7).
+# milestone: M3
+# error: `{}` is an empty dict, not an empty set
+
+fn main():
+    s: set<int> = {}
+    print(len(s))

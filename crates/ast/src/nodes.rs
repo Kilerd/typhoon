@@ -394,6 +394,16 @@ pub enum ExprKind {
         /// The index expression.
         index: Box<Expr>,
     },
+    /// `base[start:stop]`, either bound optional. A step (`a:b:c`) is
+    /// rejected by the parser.
+    Slice {
+        /// The sliced expression.
+        base: Box<Expr>,
+        /// The first offset, `None` when omitted (`s[:b]`).
+        start: Option<Box<Expr>>,
+        /// The end offset, `None` when omitted (`s[a:]`).
+        stop: Option<Box<Expr>>,
+    },
     /// A prefix operator application.
     Unary {
         /// The operator.

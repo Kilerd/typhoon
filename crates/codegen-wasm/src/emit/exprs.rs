@@ -371,6 +371,55 @@ impl<'p> Emitter<'p> {
                     self.ins(Instruction::I32Eqz);
                 }
             }
+
+            // -- dict and set ------------------------------------------------
+            hir::ExprKind::DictNew {
+                key,
+                value,
+                entries,
+            } => self.dict_new(func, *key, *value, entries),
+            hir::ExprKind::SetNew { elem, items } => self.set_new(func, *elem, items),
+            hir::ExprKind::DictGet { dict, key } => self.dict_get(func, dict, key, expr.ty),
+            hir::ExprKind::DictGetOr { dict, key, default } => {
+                self.dict_get_or(func, dict, key, default, expr.ty)
+            }
+            hir::ExprKind::DictPop { dict, key, default } => {
+                self.dict_pop(func, dict, key, default.as_deref(), expr.ty)
+            }
+            hir::ExprKind::HashContains {
+                table,
+                key,
+                negated,
+            } => self.hash_contains(func, table, key, *negated),
+            hir::ExprKind::HashLen(table) => {
+                self.expr(func, table);
+                self.hash_len_on_stack();
+            }
+            hir::ExprKind::HashKeys(table) => {
+                self.expr(func, table);
+                self.call_rt(Rt::DictKeys);
+            }
+            hir::ExprKind::DictValues(table) => {
+                self.expr(func, table);
+                self.call_rt(Rt::DictValues);
+            }
+            hir::ExprKind::DictItems(table) => {
+                self.expr(func, table);
+                self.call_rt(Rt::DictItems);
+            }
+            hir::ExprKind::SetAdd { set, value } => {
+                self.set_update(func, set, value, Rt::DictInsert)
+            }
+            hir::ExprKind::SetRemove { set, value, strict } => {
+                let rt = if *strict { Rt::DictPop } else { Rt::DictRemove };
+                self.set_update(func, set, value, rt);
+            }
+            hir::ExprKind::Sorted(list) => self.sorted(func, list),
+            hir::ExprKind::StrSlice {
+                string,
+                start,
+                stop,
+            } => self.str_slice(func, string, start, stop),
         }
     }
 

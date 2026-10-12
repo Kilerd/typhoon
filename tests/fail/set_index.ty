@@ -1,0 +1,7 @@
+# A set has no positions.
+# milestone: M3
+# error: `set<int>` cannot be indexed
+
+fn main():
+    s = {1, 2}
+    print(s[0])

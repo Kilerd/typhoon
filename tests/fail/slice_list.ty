@@ -1,0 +1,7 @@
+# Only a `str` can be sliced in M3.
+# milestone: M3
+# error: `list<int>` cannot be sliced
+
+fn main():
+    xs = [1, 2, 3]
+    print(len(xs[0:2]))

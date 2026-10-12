@@ -256,7 +256,17 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::LBracket => {
                     self.bump();
-                    let index = self.parse_expr();
+                    // `s[a:b]`, `s[:b]`, `s[a:]` and `s[:]` are slices.
+                    let start = if self.at(&TokenKind::Colon) {
+                        None
+                    } else {
+                        Some(self.parse_expr())
+                    };
+                    if self.at(&TokenKind::Colon) {
+                        expr = self.parse_slice_rest(expr, start);
+                        continue;
+                    }
+                    let index = start.expect("parsed above when there is no `:`");
                     self.expect(&TokenKind::RBracket, "`]`");
                     let span = self.span_from(expr.span);
                     expr = Expr::new(
@@ -398,6 +408,39 @@ impl<'a> Parser<'a> {
         }
         self.expect(&TokenKind::RParen, "`)`");
         args
+    }
+
+    /// The rest of a slice after its optional start: `:stop]`. A third
+    /// component (`s[a:b:c]`) is reported, then skipped.
+    fn parse_slice_rest(&mut self, base: Expr, start: Option<Expr>) -> Expr {
+        self.bump(); // `:`
+        let stop = if self.at(&TokenKind::RBracket) || self.at(&TokenKind::Colon) {
+            None
+        } else {
+            Some(self.parse_expr())
+        };
+        if self.at(&TokenKind::Colon) {
+            let step_span = self.span();
+            self.bump();
+            if !self.at(&TokenKind::RBracket) {
+                let _ = self.parse_expr();
+            }
+            self.report(
+                Diagnostic::error("a slice step is not supported")
+                    .with_label(step_span, "only `[start:stop]` slices are supported")
+                    .with_help("slice without a step, e.g. `s[a:b]`"),
+            );
+        }
+        self.expect(&TokenKind::RBracket, "`]`");
+        let span = self.span_from(base.span);
+        Expr::new(
+            ExprKind::Slice {
+                base: Box::new(base),
+                start: start.map(Box::new),
+                stop: stop.map(Box::new),
+            },
+            span,
+        )
     }
 
     fn parse_primary(&mut self) -> Expr {

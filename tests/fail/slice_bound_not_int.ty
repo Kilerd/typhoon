@@ -1,0 +1,7 @@
+# Slice bounds are code point offsets, i.e. `int`s.
+# milestone: M3
+# error: a slice bound must be an `int`, found `str`
+
+fn main():
+    s = "typhoon"
+    print(s["a":])

@@ -9,4 +9,4 @@ error: cannot iterate over an `int`
   |              ^ this is an `int`
   |
   = note: see DESIGN.md section 3.5
-  = help: `for` walks a `range(...)`, a `list<T>` or a `str`
+  = help: `for` walks a `range(...)`, a `list<T>` or a `str`, or the keys of a `dict<K, V>` or a `set<T>`

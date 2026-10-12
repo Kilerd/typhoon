@@ -97,11 +97,35 @@ pub enum Rt {
     ListInsertSlot,
     /// `ty_list_concat(a, b, elem_size, atomic)`.
     ListConcat,
+    /// `ty_dict_new(desc, val_size, val_align, val_atomic)`: a dict or a set.
+    DictNew,
+    /// `ty_dict_find(table, key) -> slot or 0`.
+    DictFind,
+    /// `ty_dict_get(table, key) -> slot`, panicking on a missing key.
+    DictGet,
+    /// `ty_dict_insert(table, key) -> slot`.
+    DictInsert,
+    /// `ty_dict_remove(table, key) -> slot or 0`.
+    DictRemove,
+    /// `ty_dict_pop(table, key) -> slot`, panicking on a missing key.
+    DictPop,
+    /// `ty_dict_keys(table) -> list<K>`.
+    DictKeys,
+    /// `ty_dict_values(table) -> list<V>`.
+    DictValues,
+    /// `ty_dict_items(table) -> list<tuple<K, V>>`.
+    DictItems,
+    /// `ty_key_buf() -> ptr`: where a tuple key is laid out for a lookup.
+    KeyBuf,
+    /// `ty_list_sorted(list, desc) -> list`.
+    ListSorted,
+    /// `ty_str_slice(s, start, stop) -> str`.
+    StrSlice,
 }
 
 impl Rt {
     /// Every runtime function, in import order.
-    pub const ALL: [Rt; 36] = [
+    pub const ALL: [Rt; 48] = [
         Rt::Init,
         Rt::Exit,
         Rt::Panic,
@@ -138,6 +162,18 @@ impl Rt {
         Rt::ListGrow,
         Rt::ListInsertSlot,
         Rt::ListConcat,
+        Rt::DictNew,
+        Rt::DictFind,
+        Rt::DictGet,
+        Rt::DictInsert,
+        Rt::DictRemove,
+        Rt::DictPop,
+        Rt::DictKeys,
+        Rt::DictValues,
+        Rt::DictItems,
+        Rt::KeyBuf,
+        Rt::ListSorted,
+        Rt::StrSlice,
     ];
 
     /// The exported symbol name.
@@ -179,6 +215,18 @@ impl Rt {
             Rt::ListGrow => "ty_list_grow",
             Rt::ListInsertSlot => "ty_list_insert_slot",
             Rt::ListConcat => "ty_list_concat",
+            Rt::DictNew => "ty_dict_new",
+            Rt::DictFind => "ty_dict_find",
+            Rt::DictGet => "ty_dict_get",
+            Rt::DictInsert => "ty_dict_insert",
+            Rt::DictRemove => "ty_dict_remove",
+            Rt::DictPop => "ty_dict_pop",
+            Rt::DictKeys => "ty_dict_keys",
+            Rt::DictValues => "ty_dict_values",
+            Rt::DictItems => "ty_dict_items",
+            Rt::KeyBuf => "ty_key_buf",
+            Rt::ListSorted => "ty_list_sorted",
+            Rt::StrSlice => "ty_str_slice",
         }
     }
 
@@ -211,6 +259,14 @@ impl Rt {
             Rt::ListGrow => (&[I, L, I, L], &[]),
             Rt::ListInsertSlot => (&[I, L, L, I], &[I]),
             Rt::ListConcat => (&[I, I, L, I], &[I]),
+            Rt::DictNew => (&[L, L, L, I], &[I]),
+            Rt::DictFind | Rt::DictGet | Rt::DictInsert | Rt::DictRemove | Rt::DictPop => {
+                (&[I, L], &[I])
+            }
+            Rt::DictKeys | Rt::DictValues | Rt::DictItems => (&[I], &[I]),
+            Rt::KeyBuf => (&[], &[I]),
+            Rt::ListSorted => (&[I, L], &[I]),
+            Rt::StrSlice => (&[I, L, L], &[I]),
         }
     }
 }

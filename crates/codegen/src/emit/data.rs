@@ -887,6 +887,8 @@ impl<'p> Emitter<'p> {
                 self.emit(&format!("call void @ty_print_str(ptr {bytes}, i64 {len})"));
             }
             Type::List(elem) => self.print_list(elem, value),
+            Type::Dict(key, value_ty) => self.print_dict(key, value_ty, value),
+            Type::Set(elem) => self.print_set(elem, value),
             Type::Tuple(id) => {
                 let members = self.types.tuple_members(id).to_vec();
                 let llvm = self.llvm_ty(ty);

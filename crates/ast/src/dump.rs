@@ -319,6 +319,18 @@ impl Dumper {
                     d.expr("index", index);
                 });
             }
+            ExprKind::Slice { base, start, stop } => {
+                self.line(label, "Slice", expr.span);
+                self.nested(|d| {
+                    d.expr("base", base);
+                    if let Some(start) = start {
+                        d.expr("start", start);
+                    }
+                    if let Some(stop) = stop {
+                        d.expr("stop", stop);
+                    }
+                });
+            }
             ExprKind::Unary {
                 op,
                 op_span,

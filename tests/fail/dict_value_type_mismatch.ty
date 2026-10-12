@@ -1,0 +1,7 @@
+# `d[k] = v` stores a value of the dict's value type.
+# milestone: M3
+# error: mismatched types: expected `int`, found `str`
+
+fn main():
+    d = {"a": 1}
+    d["b"] = "two"

@@ -1,0 +1,77 @@
+# dict<K, V>: literals, lookup and update, get / pop, membership, the
+# keys / values / items lists, iteration and printing. Iteration order is
+# insertion order on every target (DESIGN 4.1).
+# milestone: M3
+# expect: {"one": 1, "two": 2, "three": 3}
+# expect: 3 2
+# expect: True False
+# expect: 2 0
+# expect: {"one": 1, "two": 20, "three": 3, "four": 4}
+# expect: ["one", "two", "three", "four"]
+# expect: [1, 20, 3, 4]
+# expect: [("one", 1), ("two", 20), ("three", 3), ("four", 4)]
+# expect: 20 3 -1
+# expect: {"one": 1, "four": 4}
+# expect: one 1
+# expect: four 4
+# expect: {"four": 4, "one": 100}
+# expect: False
+# expect: {0: 0.0, 1: 0.5, 4: 1.0, 9: 1.5, 16: 2.0}
+# expect: [0, 1, 4, 9, 16]
+# expect: a b True False
+# expect: {(0, 0): "origin", (1, 2): "a", (2, 1): "b"}
+# expect: {True: [0, 2, 4, 6], False: [1, 3, 5]}
+# expect: {"a": {"x": 1, "y": 2}}
+# expect: {"k": 3, "j": 2} 2
+
+fn main():
+    d: dict<str, int> = {"one": 1, "two": 2, "three": 3}
+    print(d)
+    print(len(d), d["two"])
+    print("one" in d, "zero" in d)
+    print(d.get("two", 0), d.get("zero", 0))
+
+    # overwriting keeps a key's place; a new key goes last
+    d["two"] = 20
+    d["four"] = 4
+    print(d)
+    print(d.keys())
+    print(d.values())
+    print(d.items())
+
+    print(d.pop("two"), d.pop("three", -1), d.pop("three", -1))
+    print(d)
+    for k in d:
+        print(k, d[k])
+
+    # a key deleted and inserted again moves to the end, as in Python
+    d.pop("one")
+    d["one"] = 100
+    print(d)
+    print("one" not in d)
+
+    squares: dict<int, float> = {}
+    for i in range(5):
+        squares[i * i] = float(i) / 2.0
+    print(squares)
+    print(sorted(squares))
+
+    grid: dict<tuple<int, int>, str> = {(0, 0): "origin"}
+    grid[(1, 2)] = "a"
+    grid[(2, 1)] = "b"
+    print(grid[(1, 2)], grid[(2, 1)], (0, 0) in grid, (3, 3) in grid)
+    print(grid)
+
+    groups: dict<bool, list<int>> = {True: [], False: []}
+    for n in range(7):
+        groups[n % 2 == 0].append(n)
+    print(groups)
+
+    nested: dict<str, dict<str, int>> = {}
+    nested["a"] = {"x": 1}
+    nested["a"]["y"] = 2
+    print(nested)
+
+    # a repeated key in a literal keeps its first position and its last value
+    dup = {"k": 1, "j": 2, "k": 3}
+    print(dup, len(dup))

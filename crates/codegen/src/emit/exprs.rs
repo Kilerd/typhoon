@@ -375,6 +375,61 @@ impl<'p> Emitter<'p> {
                 }
                 equal
             }
+
+            // -- dict and set ------------------------------------------------
+            hir::ExprKind::DictNew {
+                key,
+                value,
+                entries,
+            } => self.dict_new(func, *key, *value, entries),
+            hir::ExprKind::SetNew { elem, items } => self.set_new(func, *elem, items),
+            hir::ExprKind::DictGet { dict, key } => self.dict_get(func, dict, key, expr.ty),
+            hir::ExprKind::DictGetOr { dict, key, default } => {
+                self.dict_get_or(func, dict, key, default, expr.ty)
+            }
+            hir::ExprKind::DictPop { dict, key, default } => {
+                self.dict_pop(func, dict, key, default.as_deref(), expr.ty)
+            }
+            hir::ExprKind::HashContains {
+                table,
+                key,
+                negated,
+            } => self.hash_contains(func, table, key, *negated),
+            hir::ExprKind::HashLen(table) => {
+                let table = self.expr(func, table);
+                self.hash_len(&table)
+            }
+            hir::ExprKind::HashKeys(table) => {
+                let table = self.expr(func, table);
+                self.table_list(&table, "ty_dict_keys")
+            }
+            hir::ExprKind::DictValues(table) => {
+                let table = self.expr(func, table);
+                self.table_list(&table, "ty_dict_values")
+            }
+            hir::ExprKind::DictItems(table) => {
+                let table = self.expr(func, table);
+                self.table_list(&table, "ty_dict_items")
+            }
+            hir::ExprKind::SetAdd { set, value } => {
+                self.set_update(func, set, value, "ty_dict_insert");
+                String::new()
+            }
+            hir::ExprKind::SetRemove { set, value, strict } => {
+                let call = if *strict {
+                    "ty_dict_pop"
+                } else {
+                    "ty_dict_remove"
+                };
+                self.set_update(func, set, value, call);
+                String::new()
+            }
+            hir::ExprKind::Sorted(list) => self.sorted(func, list),
+            hir::ExprKind::StrSlice {
+                string,
+                start,
+                stop,
+            } => self.str_slice(func, string, start, stop),
         }
     }
 

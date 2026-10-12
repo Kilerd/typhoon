@@ -352,11 +352,7 @@ impl<'a> Checker<'a> {
             "float" => TypeId::FLOAT,
             "bool" => TypeId::BOOL,
             "str" => TypeId::STR,
-            "dict" | "set" => {
-                let what = format!("the type `{text}`");
-                self.unsupported(span, &what, "M3");
-                TypeId::ERROR
-            }
+            "dict" | "set" => self.resolve_hash_type(text, args, span),
             "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
                 let what = format!("the fixed-width type `{text}`");
                 self.unsupported(span, &what, "M3");
@@ -770,6 +766,9 @@ impl<'a> Checker<'a> {
         value: &ast::Expr,
     ) -> Option<hir::Stmt> {
         let list = self.check_expr(base);
+        if self.types.as_dict(list.ty).is_some() {
+            return self.check_dict_assign(list, index, value);
+        }
         let Some(elem) = self.types.as_list(list.ty) else {
             if list.ty != TypeId::ERROR {
                 let found = self.types.name(list.ty);
@@ -781,7 +780,10 @@ impl<'a> Checker<'a> {
                         diag.with_help("`str` is immutable; build a new one with `+` or `replace`")
                     }
                     Type::Tuple(_) => diag.with_help("tuples are values and cannot be mutated"),
-                    _ => diag.with_help("only a `list<T>` supports indexed assignment"),
+                    Type::Set(_) => diag.with_help("use `s.add(x)` to add to a set"),
+                    _ => diag.with_help(
+                        "only a `list<T>` or a `dict<K, V>` supports indexed assignment",
+                    ),
                 };
                 self.error(diag);
             }
@@ -923,6 +925,10 @@ impl<'a> Checker<'a> {
             }
             ast::ExprKind::Index { base, index } => {
                 let list = self.check_expr(base);
+                if self.types.as_dict(list.ty).is_some() {
+                    let key = self.check_dict_key_of(&list, index)?;
+                    return self.dict_store(list, key, value);
+                }
                 let elem = self.types.as_list(list.ty)?;
                 let index = self.check_expr(index);
                 let index = self.expect_ty(index, TypeId::INT);
@@ -1226,6 +1232,8 @@ impl<'a> Checker<'a> {
         }
 
         let iterable = self.check_expr(iter);
+        // A dict or a set is iterated through a snapshot of its keys.
+        let iterable = self.keys_snapshot(iterable);
         let (over, elem) = match self.types.get(iterable.ty) {
             Type::List(elem) => (hir::IterKind::List, elem),
             Type::Str => (hir::IterKind::Str, TypeId::STR),
@@ -1239,7 +1247,10 @@ impl<'a> Checker<'a> {
                 self.error(
                     Diagnostic::error(format!("cannot iterate over {}", a_type(&found)))
                         .with_label(iter.span, format!("this is {}", a_type(&found)))
-                        .with_help("`for` walks a `range(...)`, a `list<T>` or a `str`")
+                        .with_help(
+                            "`for` walks a `range(...)`, a `list<T>` or a `str`, \
+                             or the keys of a `dict<K, V>` or a `set<T>`",
+                        )
                         .with_note("see DESIGN.md section 3.5"),
                 );
                 return (self.check_dead_loop_body(var, body), Flow::Falls);

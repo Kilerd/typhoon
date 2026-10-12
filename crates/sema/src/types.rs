@@ -44,6 +44,11 @@ pub enum Type {
     /// otherwise (`int`, `float`, `bool`, a tuple) it is a `{ tag, T }` pair
     /// passed by value — see [`TypeTable::is_tagged_optional`].
     Optional(TypeId),
+    /// `dict<K, V>`, an insertion-ordered hash table on the GC heap
+    /// (DESIGN §4.1). `K` is always [`TypeTable::is_hashable`].
+    Dict(TypeId, TypeId),
+    /// `set<T>`, the same table without values. `T` is hashable.
+    Set(TypeId),
 }
 
 /// A handle into a [`TypeTable`].
@@ -249,6 +254,99 @@ impl TypeTable {
         }
     }
 
+    /// Interns `dict<key, value>`, together with the `tuple<key, value>`
+    /// its `items()` produce.
+    pub fn dict_of(&mut self, key: TypeId, value: TypeId) -> TypeId {
+        self.tuple_of(&[key, value]);
+        self.intern(Type::Dict(key, value))
+    }
+
+    /// Interns `set<elem>`.
+    pub fn set_of(&mut self, elem: TypeId) -> TypeId {
+        self.intern(Type::Set(elem))
+    }
+
+    /// The key and value types of `ty` when it is a `dict<K, V>`.
+    pub fn as_dict(&self, ty: TypeId) -> Option<(TypeId, TypeId)> {
+        match self.get(ty) {
+            Type::Dict(key, value) => Some((key, value)),
+            _ => None,
+        }
+    }
+
+    /// The element type of `ty` when it is a `set<T>`.
+    pub fn as_set(&self, ty: TypeId) -> Option<TypeId> {
+        match self.get(ty) {
+            Type::Set(elem) => Some(elem),
+            _ => None,
+        }
+    }
+
+    /// The runtime key descriptor of `ty`: one 4-bit kind per member, first
+    /// member in the lowest nibble — `1` int, `2` float, `3` bool, `4` str
+    /// (`crates/runtime/src/dict.rs` decodes it and derives every offset
+    /// from it).
+    ///
+    /// Defined for the scalars `int`, `float`, `bool`, `str` and for flat
+    /// tuples of up to 16 of them; `None` for anything else. Both dict keys
+    /// and `sorted` elements are described this way.
+    ///
+    /// ```
+    /// use typhoon_sema::types::{TypeId, TypeTable};
+    ///
+    /// let mut types = TypeTable::new();
+    /// assert_eq!(types.key_desc(TypeId::STR), Some(4));
+    /// let pair = types.tuple_of(&[TypeId::INT, TypeId::STR]);
+    /// assert_eq!(types.key_desc(pair), Some(0x41));
+    /// ```
+    pub fn key_desc(&self, ty: TypeId) -> Option<u64> {
+        fn scalar(ty: Type) -> Option<u64> {
+            match ty {
+                Type::Int => Some(1),
+                Type::Float => Some(2),
+                Type::Bool => Some(3),
+                Type::Str => Some(4),
+                _ => None,
+            }
+        }
+        match self.get(ty) {
+            Type::Tuple(id) => {
+                let members = self.tuple_members(id);
+                if members.len() > 16 {
+                    return None;
+                }
+                let mut desc = 0u64;
+                for (i, member) in members.iter().enumerate() {
+                    desc |= scalar(self.get(*member))? << (4 * i);
+                }
+                Some(desc)
+            }
+            other => scalar(other),
+        }
+    }
+
+    /// Whether `ty` may be a dict key or a set element: `int`, `bool`, `str`,
+    /// or a flat tuple of those (M3; a `float` key and a class key need an
+    /// eq/hash protocol that is not decided yet).
+    pub fn is_hashable(&self, ty: TypeId) -> bool {
+        let Some(mut desc) = self.key_desc(ty) else {
+            return false;
+        };
+        while desc != 0 {
+            if desc & 0xF == 2 {
+                return false;
+            }
+            desc >>= 4;
+        }
+        true
+    }
+
+    /// Whether `sorted` accepts a `list<ty>`: a scalar or a flat tuple of
+    /// `int`, `float`, `bool` and `str`.
+    pub fn is_sortable(&self, ty: TypeId) -> bool {
+        self.key_desc(ty).is_some()
+    }
+
     // -- classes -----------------------------------------------------------
 
     /// Registers a class by name with no fields yet, returning its id and the
@@ -346,7 +444,12 @@ impl TypeTable {
         }
         match self.get(ty) {
             Type::Error | Type::Unit | Type::Int | Type::Float | Type::Bool => true,
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => false,
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => false,
             Type::Tuple(id) => self
                 .tuple_members(id)
                 .iter()
@@ -366,7 +469,8 @@ impl TypeTable {
         }
         match self.get(ty) {
             Type::Int | Type::Float | Type::Bool | Type::Str => true,
-            Type::List(elem) => self.is_printable(elem),
+            Type::List(elem) | Type::Set(elem) => self.is_printable(elem),
+            Type::Dict(key, value) => self.is_printable(key) && self.is_printable(value),
             Type::Tuple(id) => self.tuple_members(id).iter().all(|m| self.is_printable(*m)),
             Type::Error | Type::Unit | Type::Class(_) | Type::Optional(_) => false,
         }
@@ -381,7 +485,12 @@ impl TypeTable {
         }
         matches!(
             self.get(ty),
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_)
+            Type::Str
+                | Type::List(_)
+                | Type::Class(_)
+                | Type::Optional(_)
+                | Type::Dict(..)
+                | Type::Set(_)
         )
     }
 
@@ -417,6 +526,10 @@ impl TypeTable {
             }
             Type::Class(c) => self.class(c).name.clone(),
             Type::Optional(inner) => format!("{} | None", self.name(inner)),
+            Type::Dict(key, value) => {
+                format!("dict<{}, {}>", self.name(key), self.name(value))
+            }
+            Type::Set(elem) => format!("set<{}>", self.name(elem)),
         }
     }
 }
@@ -434,6 +547,8 @@ pub fn type_name(ty: Type) -> &'static str {
         Type::Tuple(_) => "tuple",
         Type::Class(_) => "class",
         Type::Optional(_) => "optional",
+        Type::Dict(..) => "dict",
+        Type::Set(_) => "set",
     }
 }
 
@@ -621,6 +736,30 @@ mod tests {
         assert!(!types.is_printable(points));
         let pair = types.tuple_of(&[TypeId::INT, point_ty]);
         assert!(!types.is_printable(pair));
+    }
+
+    #[test]
+    fn dicts_and_sets_describe_their_keys() {
+        let mut types = TypeTable::new();
+        let counts = types.dict_of(TypeId::STR, TypeId::INT);
+        assert_eq!(types.name(counts), "dict<str, int>");
+        assert_eq!(types.as_dict(counts), Some((TypeId::STR, TypeId::INT)));
+        let seen = types.set_of(TypeId::INT);
+        assert_eq!(types.name(seen), "set<int>");
+        assert_eq!(types.as_set(seen), Some(TypeId::INT));
+        assert!(types.is_reference(counts) && !types.is_pointer_free(seen));
+        assert!(types.is_printable(counts));
+
+        assert!(types.is_hashable(TypeId::BOOL));
+        assert!(!types.is_hashable(TypeId::FLOAT));
+        assert!(types.is_sortable(TypeId::FLOAT));
+        let key = types.tuple_of(&[TypeId::STR, TypeId::BOOL, TypeId::INT]);
+        assert_eq!(types.key_desc(key), Some(0x134));
+        let nested = types.tuple_of(&[key, TypeId::INT]);
+        assert_eq!(types.key_desc(nested), None);
+        assert!(!types.is_hashable(counts));
+        assert_eq!(type_name(Type::Dict(TypeId::INT, TypeId::INT)), "dict");
+        assert_eq!(type_name(Type::Set(TypeId::INT)), "set");
     }
 
     #[test]

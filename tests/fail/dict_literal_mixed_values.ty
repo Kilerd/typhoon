@@ -1,0 +1,7 @@
+# Every value of a dict literal has the same type.
+# milestone: M3
+# error: every value of a dict literal must have the same type
+
+fn main():
+    d = {"a": 1, "b": "two"}
+    print(len(d))

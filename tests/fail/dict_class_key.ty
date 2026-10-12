@@ -1,0 +1,12 @@
+# A class instance cannot be a dict key yet: that needs an eq/hash protocol
+# (DESIGN 9). Keys are int, bool, str or tuples of those.
+# milestone: M3
+# error: `Point` cannot be a dict key
+# error: eq/hash protocol
+
+class Point:
+    x: int
+
+fn main():
+    d: dict<Point, int> = {}
+    print(len(d))

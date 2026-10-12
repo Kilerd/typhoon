@@ -1,0 +1,28 @@
+# sorted(...) returns a sorted copy (DESIGN 4.6): scalars, flat tuples compared
+# member by member, and the keys of a set or a dict.
+# milestone: M3
+# expect: [-1, 0, 2, 3]
+# expect: [-0.5, 1.0, 2.5]
+# expect: ["Apple", "apple", "fig", "pear"]
+# expect: [False, True, True]
+# expect: [(-3, "z"), (-2, "a"), (-2, "b"), (0, "")]
+# expect: [3, 5, 9]
+# expect: ["a", "b"]
+# expect: [3, 1, 2] [1, 2, 3]
+# expect: []
+
+fn main():
+    print(sorted([3, -1, 2, 0]))
+    print(sorted([2.5, -0.5, 1.0]))
+    print(sorted(["pear", "apple", "fig", "Apple"]))
+    print(sorted([True, False, True]))
+    pairs = [(-2, "b"), (-3, "z"), (-2, "a"), (0, "")]
+    print(sorted(pairs))
+    print(sorted({5, 3, 9}))
+    counts = {"b": 2, "a": 1}
+    print(sorted(counts))
+    xs = [3, 1, 2]
+    ys = sorted(xs)
+    print(xs, ys)
+    empty: list<int> = []
+    print(sorted(empty))

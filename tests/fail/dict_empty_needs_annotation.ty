@@ -1,0 +1,7 @@
+# Inference is local, so an empty dict needs an annotation (DESIGN 4.4).
+# milestone: M3
+# error: cannot infer the key and value types of an empty dict
+
+fn main():
+    d = {}
+    print(len(d))

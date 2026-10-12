@@ -1,0 +1,15 @@
+# `d[k]` on a missing key panics, like an out-of-range list index
+# (DESIGN 4.3); the message names the key. Output printed before the panic
+# still reaches stdout.
+# milestone: M3
+# expect: 1
+# expect: 0
+# exit: 101
+# stderr: panic: key not found: "b"
+
+fn main():
+    d = {"a": 1}
+    print(d["a"])
+    print(d.get("b", 0))
+    print(d["b"])
+    print("unreachable")

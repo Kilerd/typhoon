@@ -53,7 +53,12 @@ impl<'t> Layout<'t> {
             }
             Type::Bool => 1,
             Type::Int | Type::Float => 8,
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => PTR_SIZE,
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => PTR_SIZE,
             Type::Tuple(id) => {
                 let members = self.types.tuple_members(id).to_vec();
                 self.struct_size(&members)
@@ -68,7 +73,12 @@ impl<'t> Layout<'t> {
             Type::Optional(inner) if self.types.is_tagged_optional(ty) => self.align_of(inner),
             Type::Bool => 1,
             Type::Int | Type::Float => 8,
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => PTR_SIZE,
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => PTR_SIZE,
             Type::Tuple(id) => self
                 .types
                 .tuple_members(id)

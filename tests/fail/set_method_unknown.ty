@@ -1,0 +1,7 @@
+# `set` has `add`, `remove` and `discard`.
+# milestone: M3
+# error: `set<int>` has no method `append`
+
+fn main():
+    s = {1}
+    s.append(2)

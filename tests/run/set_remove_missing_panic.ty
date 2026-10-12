@@ -1,0 +1,15 @@
+# `s.remove(x)` on a missing element panics (Python raises KeyError);
+# `s.discard(x)` does not. The message renders a tuple key.
+# milestone: M3
+# expect: 1
+# expect: 1
+# exit: 101
+# stderr: panic: key not found: (1, True)
+
+fn main():
+    s: set<tuple<int, bool>> = {(1, False)}
+    print(len(s))
+    s.discard((1, True))
+    print(len(s))
+    s.remove((1, True))
+    print("unreachable")

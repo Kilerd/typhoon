@@ -67,7 +67,12 @@ impl<'p> Emitter<'p> {
                 self.ins(Instruction::LocalGet(address));
                 self.ins(Instruction::I32Load8U(mem(offset, 1)));
             }
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => {
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => {
                 self.ins(Instruction::LocalGet(address));
                 self.ins(Instruction::I32Load(mem(offset, 4)));
             }
@@ -107,7 +112,12 @@ impl<'p> Emitter<'p> {
                 self.ins(Instruction::LocalGet(value[0]));
                 self.ins(Instruction::I32Store8(mem(offset, 1)));
             }
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => {
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => {
                 self.ins(Instruction::LocalGet(address));
                 self.ins(Instruction::LocalGet(value[0]));
                 self.ins(Instruction::I32Store(mem(offset, 4)));
@@ -186,7 +196,7 @@ impl<'p> Emitter<'p> {
     }
 
     /// Pushes the length of the list held in `list`.
-    fn list_len(&mut self, list: u32) {
+    pub(crate) fn list_len(&mut self, list: u32) {
         self.ins(Instruction::LocalGet(list));
         self.list_len_on_stack();
     }
@@ -200,7 +210,7 @@ impl<'p> Emitter<'p> {
     }
 
     /// A fresh local holding the address of a list's element buffer.
-    fn list_data(&mut self, list: u32) -> u32 {
+    pub(crate) fn list_data(&mut self, list: u32) -> u32 {
         let data = self.scratch(ValType::I32);
         self.ins(Instruction::LocalGet(list));
         self.ins(Instruction::I32Load(mem(LIST_DATA_OFFSET, 4)));
@@ -245,7 +255,7 @@ impl<'p> Emitter<'p> {
     }
 
     /// A fresh local holding the address of element `index` of `data`.
-    fn elem_slot(&mut self, data: u32, elem: TypeId, index: u32) -> u32 {
+    pub(crate) fn elem_slot(&mut self, data: u32, elem: TypeId, index: u32) -> u32 {
         let size = self.layout.size_of(elem);
         let slot = self.scratch(ValType::I32);
         self.ins(Instruction::LocalGet(data));
@@ -814,7 +824,7 @@ impl<'p> Emitter<'p> {
 
     /// Writes a literal run of bytes to stdout, for the punctuation around a
     /// container.
-    fn print_raw(&mut self, text: &str) {
+    pub(crate) fn print_raw(&mut self, text: &str) {
         let (global, len) = self.raw_bytes(text);
         self.ins(Instruction::GlobalGet(global));
         self.ins(Instruction::I32Const(len as i32));
@@ -848,6 +858,8 @@ impl<'p> Emitter<'p> {
                 self.call_rt(Rt::PrintStr);
             }
             Type::List(elem) => self.print_list(elem, value[0]),
+            Type::Dict(key, value_ty) => self.print_dict(key, value_ty, value[0]),
+            Type::Set(elem) => self.print_set(elem, value[0]),
             Type::Tuple(_) => {
                 let members = self.layout.tuple_members(ty);
                 self.print_raw("(");

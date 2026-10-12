@@ -254,6 +254,12 @@ fn calls_indexes_and_attributes() {
     assert_eq!(expr("xs[0]"), "(index xs 0)");
     assert_eq!(expr("xs[0][1]"), "(index (index xs 0) 1)");
     assert_eq!(expr("xs[i + 1]"), "(index xs (+ i 1))");
+    assert_eq!(expr("s[1:2]"), "(slice s 1 2)");
+    assert_eq!(expr("s[i:i + k]"), "(slice s i (+ i k))");
+    assert_eq!(expr("s[:2]"), "(slice s _ 2)");
+    assert_eq!(expr("s[-3:]"), "(slice s (- 3) _)");
+    assert_eq!(expr("s[:]"), "(slice s _ _)");
+    assert_eq!(expr("s[1:][0]"), "(index (slice s 1 _) 0)");
     assert_eq!(expr("p.x"), "(. p x)");
     assert_eq!(expr("a.b.c"), "(. (. a b) c)");
     assert_eq!(expr("a.b(c).d"), "(. (call (. a b) c) d)");

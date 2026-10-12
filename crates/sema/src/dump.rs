@@ -132,6 +132,15 @@ fn dump_stmt(out: &mut String, program: &Program, func: &Function, stmt: &Stmt, 
                 dump_expr(program, func, value)
             );
         }
+        Stmt::DictSet { dict, key, value } => {
+            let _ = writeln!(
+                out,
+                "{pad}{}[{}] = {}",
+                dump_expr(program, func, dict),
+                dump_expr(program, func, key),
+                dump_expr(program, func, value)
+            );
+        }
         Stmt::SetField {
             obj,
             class,
@@ -297,6 +306,48 @@ fn dump_expr(program: &Program, func: &Function, expr: &Expr) -> String {
         ExprKind::StructEq { op, lhs, rhs } => {
             format!("({} {} {})", e(lhs), cmp_op_str(*op), e(rhs))
         }
+        ExprKind::DictNew { entries, .. } => {
+            let inner: Vec<String> = entries
+                .iter()
+                .map(|(k, v)| format!("{}: {}", e(k), e(v)))
+                .collect();
+            format!("{{{}}}", inner.join(", "))
+        }
+        ExprKind::SetNew { items, .. } => {
+            let inner: Vec<String> = items.iter().map(e).collect();
+            format!("set({{{}}})", inner.join(", "))
+        }
+        ExprKind::DictGet { dict, key } => format!("{}[{}]", e(dict), e(key)),
+        ExprKind::DictGetOr { dict, key, default } => {
+            format!("{}.get({}, {})", e(dict), e(key), e(default))
+        }
+        ExprKind::DictPop { dict, key, default } => match default {
+            Some(default) => format!("{}.pop({}, {})", e(dict), e(key), e(default)),
+            None => format!("{}.pop({})", e(dict), e(key)),
+        },
+        ExprKind::HashContains {
+            table,
+            key,
+            negated,
+        } => {
+            let op = if *negated { "not in" } else { "in" };
+            format!("({} {op} {})", e(key), e(table))
+        }
+        ExprKind::HashLen(v) => format!("len({})", e(v)),
+        ExprKind::HashKeys(v) => format!("keys({})", e(v)),
+        ExprKind::DictValues(v) => format!("{}.values()", e(v)),
+        ExprKind::DictItems(v) => format!("{}.items()", e(v)),
+        ExprKind::SetAdd { set, value } => format!("{}.add({})", e(set), e(value)),
+        ExprKind::SetRemove { set, value, strict } => {
+            let name = if *strict { "remove" } else { "discard" };
+            format!("{}.{name}({})", e(set), e(value))
+        }
+        ExprKind::Sorted(v) => format!("sorted({})", e(v)),
+        ExprKind::StrSlice {
+            string,
+            start,
+            stop,
+        } => format!("{}[{}:{}]", e(string), e(start), e(stop)),
     };
     format!("{body}:{}", program.types.name(expr.ty))
 }

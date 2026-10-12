@@ -39,6 +39,7 @@
 
 mod chain;
 mod check;
+mod collections;
 mod comp;
 mod consts;
 mod dump;

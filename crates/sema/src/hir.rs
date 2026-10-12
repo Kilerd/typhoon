@@ -161,6 +161,16 @@ pub enum Stmt {
         /// The stored value, of the element type.
         value: Expr,
     },
+    /// `d[k] = value`: inserts the key when it is absent; an existing key
+    /// keeps its place in the iteration order.
+    DictSet {
+        /// The `dict<K, V>`.
+        dict: Expr,
+        /// The key, of type `K`.
+        key: Expr,
+        /// The stored value, of type `V`.
+        value: Expr,
+    },
     /// `obj.field = value`.
     SetField {
         /// The receiver.
@@ -617,6 +627,103 @@ pub enum ExprKind {
         lhs: Box<Expr>,
         /// Right operand.
         rhs: Box<Expr>,
+    },
+
+    // -- dict and set ------------------------------------------------------
+    /// A dict literal, `{}` included; the types are known even when it is
+    /// empty. Entries are evaluated and inserted left to right, so a repeated
+    /// key keeps its first position and its last value, as in Python.
+    DictNew {
+        /// The key type.
+        key: TypeId,
+        /// The value type.
+        value: TypeId,
+        /// The `key: value` pairs, in order.
+        entries: Vec<(Expr, Expr)>,
+    },
+    /// A set literal, or `set()`.
+    SetNew {
+        /// The element type.
+        elem: TypeId,
+        /// The elements, in order.
+        items: Vec<Expr>,
+    },
+    /// `d[k]`; panics with `key not found` when the key is absent
+    /// (DESIGN §4.3).
+    DictGet {
+        /// The dict.
+        dict: Box<Expr>,
+        /// The key.
+        key: Box<Expr>,
+    },
+    /// `d.get(k, default)`; `default` is evaluated whether or not it is used,
+    /// as in Python.
+    DictGetOr {
+        /// The dict.
+        dict: Box<Expr>,
+        /// The key.
+        key: Box<Expr>,
+        /// The value when the key is absent.
+        default: Box<Expr>,
+    },
+    /// `d.pop(k)` (panics when absent) or `d.pop(k, default)`.
+    DictPop {
+        /// The dict.
+        dict: Box<Expr>,
+        /// The key.
+        key: Box<Expr>,
+        /// The value when the key is absent; `None` makes absence a panic.
+        default: Option<Box<Expr>>,
+    },
+    /// `k in d` / `x in s` (and their `not in` forms).
+    HashContains {
+        /// The `dict<K, V>` or `set<K>`.
+        table: Box<Expr>,
+        /// The key looked for.
+        key: Box<Expr>,
+        /// Whether the operator was `not in`.
+        negated: bool,
+    },
+    /// `len(d)` / `len(s)`, read from the table header.
+    HashLen(Box<Expr>),
+    /// `d.keys()`, or the elements of a set: a fresh `list<K>` in insertion
+    /// order. `for k in d` and `for x in s` iterate this snapshot.
+    HashKeys(Box<Expr>),
+    /// `d.values()`: a fresh `list<V>` in insertion order.
+    DictValues(Box<Expr>),
+    /// `d.items()`: a fresh `list<tuple<K, V>>` in insertion order.
+    DictItems(Box<Expr>),
+    /// `s.add(x)`.
+    SetAdd {
+        /// The set.
+        set: Box<Expr>,
+        /// The added element.
+        value: Box<Expr>,
+    },
+    /// `s.remove(x)` (panics when absent) or `s.discard(x)` (does not).
+    SetRemove {
+        /// The set.
+        set: Box<Expr>,
+        /// The removed element.
+        value: Box<Expr>,
+        /// Whether absence is a panic (`remove`) rather than a no-op
+        /// (`discard`).
+        strict: bool,
+    },
+
+    // -- builtins over containers ---------------------------------------------
+    /// `sorted(xs)`: a sorted copy of a `list<T>` (a dict or a set is passed
+    /// as its [`ExprKind::HashKeys`]).
+    Sorted(Box<Expr>),
+    /// `s[start:stop]` on a `str`, in code points with Python's clamping; an
+    /// omitted start is `0` and an omitted stop `i64::MAX`.
+    StrSlice {
+        /// The string.
+        string: Box<Expr>,
+        /// The first code point.
+        start: Box<Expr>,
+        /// The end code point, exclusive.
+        stop: Box<Expr>,
     },
 }
 

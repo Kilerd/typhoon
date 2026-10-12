@@ -1,0 +1,10 @@
+# A set element must be hashable, like a dict key.
+# milestone: M3
+# error: `Point` cannot be a set element
+
+class Point:
+    x: int
+
+fn main():
+    s: set<Point> = set()
+    print(len(s))

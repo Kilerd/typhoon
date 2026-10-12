@@ -1,0 +1,18 @@
+# Every `ty_*` entry point of the M3 containers — dict, set, sorted and str
+# slicing — in one program, the companion of `runtime_surface.ty`. The tuple
+# key is what makes the wasm backend use the runtime's key buffer.
+# milestone: M3
+# expect: {"a": 1, "b": 2} 2
+# expect: True 0 1
+# expect: 1 -1 ["b"] [2] [("b", 2)]
+# expect: {(1, True)} ["bc"]
+
+fn main():
+    d = {"a": 1}
+    d["b"] = 2
+    print(d, d["b"])
+    print("a" in d, d.get("z", 0), d.pop("a"))
+    print(len(d), d.pop("z", -1), d.keys(), d.values(), d.items())
+    s = {(1, True)}
+    s.discard((2, False))
+    print(s, sorted(["abc"[1:3]]))

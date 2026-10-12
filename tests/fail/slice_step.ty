@@ -1,0 +1,7 @@
+# A slice step (`s[a:b:c]`) is not supported.
+# milestone: M3
+# error: a slice step is not supported
+
+fn main():
+    s = "typhoon"
+    print(s[0:4:2])

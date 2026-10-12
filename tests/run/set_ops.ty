@@ -1,0 +1,45 @@
+# set<T>: literals, set(), add / remove / discard, membership, iteration and
+# printing. Elements come out in insertion order (DESIGN 4.1).
+# milestone: M3
+# expect: {3, 1, 2}
+# expect: 3 True False
+# expect: {3, 1, 2, 5}
+# expect: {1, 2, 5}
+# expect: {1, 2, 5} 3
+# expect: set()
+# expect: 13
+# expect: ["fast", "is", "typhoon"]
+# expect: {"typhoon", "is", "fast"}
+# expect: True False
+# expect: 2
+
+fn main():
+    s = {3, 1, 2, 1}
+    print(s)
+    print(len(s), 2 in s, 4 in s)
+    s.add(5)
+    s.add(1)
+    print(s)
+    s.remove(3)
+    print(s)
+    s.discard(42)
+    print(s, len(s))
+
+    # `{}` is an empty dict; an empty set is `set()`
+    empty: set<str> = set()
+    print(empty)
+
+    seen: set<str> = set()
+    for w in "typhoon is fast typhoon fast typhoon".split(" "):
+        seen.add(w)
+    total = 0
+    for w in seen:
+        total = total + len(w)
+    print(total)
+    print(sorted(seen))
+    print(seen)
+
+    pairs: set<tuple<str, int>> = {("a", 1), ("b", 2)}
+    print(("a", 1) in pairs, ("a", 2) in pairs)
+    pairs.add(("a", 1))
+    print(len(pairs))

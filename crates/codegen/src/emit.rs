@@ -223,7 +223,12 @@ impl<'p> Emitter<'p> {
             Type::Int => "i64".to_string(),
             Type::Float => "double".to_string(),
             Type::Bool => "i1".to_string(),
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => "ptr".to_string(),
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => "ptr".to_string(),
             Type::Tuple(id) => {
                 let members: Vec<String> = self
                     .types
@@ -533,6 +538,7 @@ impl<'p> Emitter<'p> {
                 field,
                 value,
             } => self.emit_set_field(func, obj, *class, *field, value),
+            hir::Stmt::DictSet { dict, key, value } => self.emit_dict_set(func, dict, key, value),
             hir::Stmt::Group(block) => self.block(func, block),
             hir::Stmt::Break => {
                 let target = self.loops.last().expect("`break` inside a loop").0.clone();
@@ -816,4 +822,5 @@ pub(crate) fn float_literal(value: f64) -> String {
 }
 
 mod data;
+mod dict;
 mod exprs;

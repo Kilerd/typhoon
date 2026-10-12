@@ -1,0 +1,10 @@
+# `sorted` orders scalars and flat tuples of them; a class has no order.
+# milestone: M3
+# error: `sorted` cannot order `Point` values
+
+class Point:
+    x: int
+
+fn main():
+    ps = [Point(x=1)]
+    print(len(sorted(ps)))

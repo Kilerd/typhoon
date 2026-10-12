@@ -41,6 +41,8 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=assets/loader.js");
     println!("cargo:rerun-if-changed=../runtime/src/lib.rs");
+    // The runtime is more than `lib.rs` (`dict.rs`, `sort.rs`, …).
+    println!("cargo:rerun-if-changed=../runtime/src");
     println!("cargo:rerun-if-changed=../runtime/build.rs");
     println!("cargo:rerun-if-changed=../runtime/Cargo.toml");
     println!("cargo:rerun-if-env-changed=TYPHOON_RUNTIME_WASM");

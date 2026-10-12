@@ -51,6 +51,7 @@ use crate::layout::{Layout, STR_CHAR_LEN_OFFSET, STR_HEADER};
 use crate::rt::Rt;
 
 mod data;
+mod dict;
 mod exprs;
 
 /// Placeholder base for a call to a runtime import, resolved by
@@ -376,9 +377,12 @@ impl<'p> Emitter<'p> {
             Type::Int => out.push(ValType::I64),
             Type::Float => out.push(ValType::F64),
             Type::Bool => out.push(ValType::I32),
-            Type::Str | Type::List(_) | Type::Class(_) | Type::Optional(_) => {
-                out.push(ValType::I32)
-            }
+            Type::Str
+            | Type::List(_)
+            | Type::Class(_)
+            | Type::Optional(_)
+            | Type::Dict(..)
+            | Type::Set(_) => out.push(ValType::I32),
             Type::Tuple(id) => {
                 for member in self.types.tuple_members(id).to_vec() {
                     self.flatten_into(member, out);
@@ -728,6 +732,7 @@ impl<'p> Emitter<'p> {
                 field,
                 value,
             } => self.emit_set_field(func, obj, *class, *field, value),
+            hir::Stmt::DictSet { dict, key, value } => self.emit_dict_set(func, dict, key, value),
             hir::Stmt::Group(block) => self.block(func, block),
             hir::Stmt::Break => {
                 let target = self.loops.last().expect("`break` inside a loop").0;
@@ -913,24 +918,29 @@ mod tests {
     }
 
     /// `tests/run/runtime_surface.ty` exists to call every runtime entry point
-    /// exactly once; if it stops doing so, part of the C ABI is no longer
+    /// exactly once — together with its M3 companion
+    /// `tests/run/runtime_surface_dict.ty` for the dict / set / sorted /
+    /// slicing calls; if they stop doing so, part of the C ABI is no longer
     /// covered by the golden suite on either backend.
     #[test]
     fn the_runtime_surface_program_imports_every_runtime_function() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("crates/codegen-wasm always has two ancestors")
-            .join("tests/run/runtime_surface.ty");
-        let source = std::fs::read_to_string(&path)
-            .unwrap_or_else(|err| panic!("cannot read {}: {err}", path.display()));
-        let module = compile(&source);
-
         let mut imported = Vec::new();
-        for payload in wasmparser::Parser::new(0).parse_all(&module) {
-            if let wasmparser::Payload::ImportSection(section) = payload.unwrap() {
-                for import in section.into_imports() {
-                    imported.push(import.unwrap().name.to_string());
+        for program in ["runtime_surface.ty", "runtime_surface_dict.ty"] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .and_then(std::path::Path::parent)
+                .expect("crates/codegen-wasm always has two ancestors")
+                .join("tests/run")
+                .join(program);
+            let source = std::fs::read_to_string(&path)
+                .unwrap_or_else(|err| panic!("cannot read {}: {err}", path.display()));
+            let module = compile(&source);
+
+            for payload in wasmparser::Parser::new(0).parse_all(&module) {
+                if let wasmparser::Payload::ImportSection(section) = payload.unwrap() {
+                    for import in section.into_imports() {
+                        imported.push(import.unwrap().name.to_string());
+                    }
                 }
             }
         }

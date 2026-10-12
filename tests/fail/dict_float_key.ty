@@ -1,0 +1,7 @@
+# `float` is not a hashable key type in M3.
+# milestone: M3
+# error: `float` cannot be a dict key
+
+fn main():
+    d = {1.5: "a"}
+    print(len(d))

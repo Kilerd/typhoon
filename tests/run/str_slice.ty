@@ -1,0 +1,30 @@
+# str slicing: s[a:b] counts code points, the unit of len(s) and s.find(...),
+# with Python's negative offsets and clamping; s[i] stays an error
+# (DESIGN 9 item 5).
+# milestone: M3
+# expect: typ hoon typ hoon typhoo typhoon
+# expect: True True True 7
+# expect: name Typhoon year=2026
+# expect: 台风 typhoon 3
+# expect: typhoon
+# expect: ["GGT", "GTA", "TAT", "ATT", "TTT", "TTT", "TTA", "TAA", "AAT", "ATT"]
+
+fn main():
+    s = "typhoon"
+    print(s[0:3], s[3:], s[:3], s[-4:], s[:-1], s[:])
+    print(s[2:2] == "", s[5:2] == "", s[10:20] == "", len(s[-100:100]))
+
+    line = "name=Typhoon year=2026"
+    eq = line.find("=")
+    sp = line.find(" ")
+    print(line[:eq], line[eq + 1:sp], line[sp + 1:])
+
+    u = "台风 typhoon"
+    print(u[:2], u[3:], len(u[1:4]))
+    print(u[u.find("t"):])
+
+    dna = "GGTATTTTAATT"
+    kmers: list<str> = []
+    for i in range(len(dna) - 3 + 1):
+        kmers.append(dna[i:i + 3])
+    print(kmers)

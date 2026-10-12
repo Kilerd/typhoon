@@ -108,6 +108,10 @@ pub fn sexpr(e: &Expr) -> String {
         }
         ExprKind::Attribute { base, attr } => format!("(. {} {})", sexpr(base), attr.name),
         ExprKind::Index { base, index } => format!("(index {} {})", sexpr(base), sexpr(index)),
+        ExprKind::Slice { base, start, stop } => {
+            let bound = |b: &Option<Box<Expr>>| b.as_deref().map_or("_".to_string(), sexpr);
+            format!("(slice {} {} {})", sexpr(base), bound(start), bound(stop))
+        }
         ExprKind::Call {
             callee,
             type_args,

@@ -1,0 +1,7 @@
+# `set()` has no elements to infer a type from.
+# milestone: M3
+# error: cannot infer the element type of an empty set
+
+fn main():
+    s = set()
+    print(len(s))

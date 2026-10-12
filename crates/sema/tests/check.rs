@@ -639,28 +639,12 @@ fn constant_initializers_are_evaluated_at_compile_time() {
 #[test]
 fn later_milestones_are_named_in_the_diagnostic() {
     let cases: &[(&str, &str)] = &[
-        (
-            "x = {1: 2}",
-            "a dict literal is not supported yet (planned for M3)",
-        ),
-        (
-            "x = {1, 2}",
-            "a set literal is not supported yet (planned for M3)",
-        ),
         ("x = 1\ny = x[0]", "`int` cannot be indexed"),
         ("x = 1\ny = x.field", "`int` has no field `field`"),
         ("x = 1\ny = x is None", "`int` can never be `None`"),
         (
             "x = 1\ny = x in \"a\"",
             "`in` on a `str` tests for a substring, found `int`",
-        ),
-        (
-            "print(sorted(1))",
-            "the builtin `sorted` is not supported yet (planned for M3)",
-        ),
-        (
-            "d: dict<str, int> = {}",
-            "the type `dict` is not supported yet (planned for M3)",
         ),
         (
             "x: i32 = 1",
@@ -1954,3 +1938,36 @@ snapshot_error!(
     snapshot_iterating_an_int,
     "fn main():\n    for x in 5:\n        pass\n"
 );
+
+#[test]
+fn dict_and_set_keys_must_be_hashable() {
+    let cases: &[(&str, &str)] = &[
+        ("x = {1.5: 2}", "`float` cannot be a dict key"),
+        ("x = {[1]: 2}", "`list<int>` cannot be a dict key"),
+        (
+            "s: set<list<int>> = set()",
+            "`list<int>` cannot be a set element",
+        ),
+        (
+            "x = {}",
+            "cannot infer the key and value types of an empty dict",
+        ),
+        (
+            "s: set<int> = {}",
+            "`{}` is an empty dict, not an empty set",
+        ),
+        ("print(sorted(1))", "`sorted` is not defined for `int`"),
+        (
+            "d = {\"a\": 1}\nprint(d.get(\"a\"))",
+            "`dict.get` needs a default value",
+        ),
+        (
+            "s = \"abc\"\nprint(s[\"a\":])",
+            "a slice bound must be an `int`, found `str`",
+        ),
+        ("xs = [1]\nprint(xs[0:1])", "`list<int>` cannot be sliced"),
+    ];
+    for (body, wanted) in cases {
+        rejects_main(body, [*wanted].as_slice());
+    }
+}

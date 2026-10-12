@@ -63,6 +63,14 @@ impl Checker<'_> {
             } if self.is_generic_call(callee, type_args.is_some()) => {
                 return self.check_generic_call(callee, type_args.as_deref(), args, expected, span);
             }
+            ast::ExprKind::Dict(entries) => {
+                return self.check_dict_literal(entries, literal_hint, span);
+            }
+            ast::ExprKind::Set(items) => return self.check_set_literal(items, literal_hint, span),
+            ast::ExprKind::Call { args, .. } if self.empty_ctor_name(expr).is_some() => {
+                let name = self.empty_ctor_name(expr).unwrap_or("set").to_string();
+                return self.check_empty_ctor(&name, args, literal_hint, span);
+            }
             ast::ExprKind::None => {
                 if let Some(expected) = expected
                     && matches!(self.types.get(expected), Type::Optional(_))
@@ -104,25 +112,15 @@ impl Checker<'_> {
             } => self.check_call(callee, type_args.as_deref(), args, span),
             ast::ExprKind::Attribute { base, attr } => self.check_attribute(base, attr, span),
             ast::ExprKind::Index { base, index } => self.check_index(base, index, span),
+            ast::ExprKind::Slice { base, start, stop } => {
+                self.check_slice(base, start.as_deref(), stop.as_deref(), span)
+            }
             // Handled above, with the expected type.
-            ast::ExprKind::List(_) | ast::ExprKind::Tuple(_) | ast::ExprKind::ListComp { .. } => {
-                self.error_expr(span)
-            }
-            ast::ExprKind::Dict(entries) => {
-                for (k, v) in entries {
-                    self.check_expr(k);
-                    self.check_expr(v);
-                }
-                self.unsupported(span, "a dict literal", "M3");
-                self.error_expr(span)
-            }
-            ast::ExprKind::Set(items) => {
-                for item in items {
-                    self.check_expr(item);
-                }
-                self.unsupported(span, "a set literal", "M3");
-                self.error_expr(span)
-            }
+            ast::ExprKind::List(_)
+            | ast::ExprKind::Tuple(_)
+            | ast::ExprKind::ListComp { .. }
+            | ast::ExprKind::Dict(_)
+            | ast::ExprKind::Set(_) => self.error_expr(span),
         }
     }
 
@@ -646,6 +644,18 @@ impl Checker<'_> {
                     rhs: Box::new(rhs),
                 }
             }
+            crate::types::Type::Dict(..) | crate::types::Type::Set(_) => {
+                let name = self.types.name(lhs.ty);
+                self.error(
+                    Diagnostic::error(format!(
+                        "`{name}` values cannot be compared with `{}`",
+                        entry.op.as_str()
+                    ))
+                    .with_label(entry.op_span, "no comparison for dicts and sets yet")
+                    .with_help("compare `len(...)` and the keys explicitly"),
+                );
+                return self.error_expr(span);
+            }
             crate::types::Type::Class(_) | crate::types::Type::Optional(_) => {
                 let name = self.types.name(lhs.ty);
                 self.error(
@@ -814,6 +824,9 @@ impl Checker<'_> {
                     span,
                 }
             }
+            crate::types::Type::Dict(key, _) | crate::types::Type::Set(key) => {
+                self.check_hash_in(haystack, key, left, negated, span)
+            }
             crate::types::Type::Str => {
                 let needle = self.check_expr(left);
                 if needle.ty == TypeId::ERROR {
@@ -850,7 +863,9 @@ impl Checker<'_> {
                 self.error(
                     Diagnostic::error(format!("`in` is not defined for `{found}`"))
                         .with_label(op_span, format!("cannot search {}", a_type(&found)))
-                        .with_help("`in` works on a `list<T>` and a `str`; dict and set are M3"),
+                        .with_help(
+                            "`in` works on a `list<T>`, a `str`, a `dict<K, V>` and a `set<T>`",
+                        ),
                 );
                 self.error_expr(span)
             }
@@ -1144,6 +1159,17 @@ impl Checker<'_> {
                     span,
                 }
             }
+            Type::Dict(key, value_ty) => self.check_dict_index(value, key, value_ty, index, span),
+            Type::Set(_) => {
+                self.check_expr(index);
+                let found = self.types.name(value.ty);
+                self.error(
+                    Diagnostic::error(format!("`{found}` cannot be indexed"))
+                        .with_label(base.span, format!("this is {}", a_type(&found)))
+                        .with_help("test membership with `x in s`"),
+                );
+                self.error_expr(span)
+            }
             Type::Str => {
                 self.check_expr(index);
                 self.error(
@@ -1352,6 +1378,8 @@ impl Checker<'_> {
             },
             Type::List(elem) => self.check_list_method(recv, elem, name, args, span),
             Type::Str => self.check_str_method(recv, name, args, span),
+            Type::Dict(..) => self.check_dict_method(recv, name, args, span),
+            Type::Set(_) => self.check_set_method(recv, name, args, span),
             Type::Optional(_) => {
                 for arg in args {
                     self.check_expr(&arg.value);
@@ -1367,7 +1395,10 @@ impl Checker<'_> {
                 self.error(
                     Diagnostic::error(format!("`{found}` has no method `{}`", name.as_str()))
                         .with_label(name.span, format!("`{found}` has no methods"))
-                        .with_help("only `list`, `str` and class instances have methods"),
+                        .with_help(
+                            "only `list`, `str` and class instances have methods, \
+                             plus `dict` and `set`",
+                        ),
                 );
                 self.error_expr(span)
             }
@@ -1376,7 +1407,7 @@ impl Checker<'_> {
 
     /// Checks the fixed argument list of a builtin method, returning the
     /// checked arguments when the arity matches.
-    fn builtin_args(
+    pub(crate) fn builtin_args(
         &mut self,
         receiver: &str,
         method: &str,
@@ -1969,6 +2000,11 @@ impl Checker<'_> {
                         ty: TypeId::INT,
                         span,
                     },
+                    Type::Dict(..) | Type::Set(_) => hir::Expr {
+                        kind: hir::ExprKind::HashLen(Box::new(value)),
+                        ty: TypeId::INT,
+                        span,
+                    },
                     // A tuple's arity is part of its type, so `len(t)` folds.
                     Type::Tuple(members) => {
                         let arity = self.types.tuple_members(members).len() as i64;
@@ -1987,7 +2023,10 @@ impl Checker<'_> {
                         self.error(
                             Diagnostic::error(format!("`len` is not defined for `{found}`"))
                                 .with_label(value.span, format!("this is {}", a_type(&found)))
-                                .with_help("`len` takes a `str`, a `list<T>` or a `tuple<...>`"),
+                                .with_help(
+                                    "`len` takes a `str`, a `list<T>`, a `tuple<...>`, \
+                                     a `dict<K, V>` or a `set<T>`",
+                                ),
                         );
                         self.error_expr(span)
                     }
@@ -2028,6 +2067,8 @@ impl Checker<'_> {
                     }
                 }
             }
+            "sorted" => self.check_sorted(args, span),
+            "set" | "dict" => self.check_empty_ctor(builtin, args, None, span),
             other => {
                 for arg in args {
                     self.check_expr(&arg.value);

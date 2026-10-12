@@ -1,0 +1,7 @@
+# The key of `d[k]` must have the dict's key type.
+# milestone: M3
+# error: mismatched types: expected `str`, found `int`
+
+fn main():
+    d = {"a": 1}
+    print(d[1])

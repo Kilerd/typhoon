@@ -1,0 +1,7 @@
+# An f-string hole takes a scalar, exactly as for a list (DESIGN 3.7).
+# milestone: M3
+# error: cannot interpolate a `dict<str, int>`
+
+fn main():
+    d = {"x": 1}
+    print(f"{d}")
