@@ -833,11 +833,20 @@ impl Checker<'_> {
                 continue;
             };
             self.traits.hash_fns.insert(class, hash);
+            // The `key not found` panic shows the key through its `__repr__`:
+            // a written one — on a generic class, instantiated now if nothing
+            // called it yet — or a derived one whose fields allow it.
             let class_ty = self.types.class_ty(class);
-            if self.satisfies(class_ty, Builtin::Repr.id())
+            let repr = Builtin::Repr.method();
+            let written = self.methods.contains_key(&(class, repr.to_string()))
                 || self
-                    .methods
-                    .contains_key(&(class, Builtin::Repr.method().to_string()))
+                    .generics
+                    .origins
+                    .get(&class)
+                    .and_then(|(template, _)| self.generics.classes.get(template))
+                    .is_some_and(|t| t.methods.iter().any(|m| m.name.as_str() == repr));
+            if (written || self.satisfies(class_ty, Builtin::Repr.id()))
+                && self.class_method(class, repr, span).is_some()
             {
                 self.ensure_repr(class_ty, span);
             }
