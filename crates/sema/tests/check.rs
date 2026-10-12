@@ -1958,8 +1958,8 @@ fn dict_and_set_keys_must_be_hashable() {
         ),
         ("print(sorted(1))", "`sorted` is not defined for `int`"),
         (
-            "d = {\"a\": 1}\nprint(d.get(\"a\"))",
-            "`dict.get` needs a default value",
+            "d = {\"a\": 1}\nprint(d.get(\"a\", \"zero\"))",
+            "mismatched types: expected `int`, found `str`",
         ),
         (
             "s = \"abc\"\nprint(s[\"a\":])",

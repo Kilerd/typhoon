@@ -1,7 +1,0 @@
-# `d.get(k)` would return `V | None`; M3 requires the default.
-# milestone: M3
-# error: `dict.get` needs a default value
-
-fn main():
-    d = {"a": 1}
-    print(d.get("a"))

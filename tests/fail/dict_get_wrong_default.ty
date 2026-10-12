@@ -1,0 +1,7 @@
+# The default of `d.get` is a `V` (or `None`, which makes the result optional).
+# milestone: M3
+# error: mismatched types: expected `int`, found `str`
+
+fn main():
+    d = {"a": 1}
+    print(d.get("b", "zero"))

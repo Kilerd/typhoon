@@ -466,35 +466,15 @@ impl Checker<'_> {
         let dict_name = self.types.name(recv.ty);
         let method = name.as_str();
         let (kind, ty) = match method {
+            "get"
+                if (args.len() == 1 || args.len() == 2)
+                    && args.iter().all(|a| a.name.is_none()) =>
+            {
+                return self.check_dict_get(recv, key_ty, val_ty, args, span);
+            }
             "get" => {
-                if args.len() == 1 && args[0].name.is_none() {
-                    self.check_expr(&args[0].value);
-                    self.error(
-                        Diagnostic::error("`dict.get` needs a default value")
-                            .with_label(span, "write `d.get(key, default)`")
-                            .with_help("use `d[key]` when the key must be present")
-                            .with_note(
-                                "a one-argument `get` would return `V | None`, which is not \
-                                 supported for a dict value yet",
-                            ),
-                    );
-                    return self.error_expr(span);
-                }
-                let Some(mut checked) =
-                    self.builtin_args(&dict_name, "get", args, &[key_ty, val_ty], span)
-                else {
-                    return self.error_expr(span);
-                };
-                let default = checked.remove(1);
-                let key = checked.remove(0);
-                (
-                    hir::ExprKind::DictGetOr {
-                        dict: Box::new(recv),
-                        key: Box::new(key),
-                        default: Box::new(default),
-                    },
-                    val_ty,
-                )
+                let _ = self.builtin_args(&dict_name, "get", args, &[key_ty, val_ty], span);
+                return self.error_expr(span);
             }
             "pop" => {
                 let wanted: &[TypeId] = if args.len() == 2 {
@@ -554,6 +534,145 @@ impl Checker<'_> {
             }
         };
         hir::Expr { kind, ty, span }
+    }
+
+    /// `d.get(k, default)`, and `d.get(k)` meaning `d.get(k, None)`.
+    ///
+    /// A default of type `V` gives a `V`. A default that only fits `V | None`
+    /// — `None` itself, or another `V | None` — gives a `V | None`, which the
+    /// caller narrows (DESIGN §3.10). The default is evaluated whether or not
+    /// it is used, as in Python.
+    fn check_dict_get(
+        &mut self,
+        recv: hir::Expr,
+        key_ty: TypeId,
+        val_ty: TypeId,
+        args: &[ast::Arg],
+        span: Span,
+    ) -> hir::Expr {
+        let key = self.check_key(&args[0].value, key_ty);
+        let default = match args.get(1) {
+            Some(arg) => self.check_expr_hint(&arg.value, Some(val_ty)),
+            None => hir::Expr {
+                kind: hir::ExprKind::Unit,
+                ty: TypeId::UNIT,
+                span,
+            },
+        };
+        let Some(key) = key else {
+            return self.error_expr(span);
+        };
+        if default.ty == TypeId::ERROR {
+            return self.error_expr(span);
+        }
+        if self.assignable(val_ty, default.ty) {
+            let default = self.coerce(default, val_ty);
+            return hir::Expr {
+                kind: hir::ExprKind::DictGetOr {
+                    dict: Box::new(recv),
+                    key: Box::new(key),
+                    default: Box::new(default),
+                },
+                ty: val_ty,
+                span,
+            };
+        }
+        let optional = self.types.optional_of(val_ty);
+        if !self.assignable(optional, default.ty) {
+            self.mismatch(default.span, val_ty, default.ty);
+            return self.error_expr(span);
+        }
+        let default = self.coerce(default, optional);
+        self.dict_get_optional(recv, key, default, optional, span)
+    }
+
+    /// `d.get(k, default)` as a `V | None`:
+    ///
+    /// ```text
+    /// { d' = d; k' = k; dv = default
+    ///   if k' in d': r = d'[k'] (widened) else: r = dv
+    ///   ; r }
+    /// ```
+    ///
+    /// The second lookup is answered by the table's lookup cache for `int`,
+    /// `bool` and `str` keys, and the value is widened the way any `V` is
+    /// widened to `V | None`.
+    fn dict_get_optional(
+        &mut self,
+        dict: hir::Expr,
+        key: hir::Expr,
+        default: hir::Expr,
+        optional: TypeId,
+        span: Span,
+    ) -> hir::Expr {
+        let (dict_ty, key_ty) = (dict.ty, key.ty);
+        let val_ty = self
+            .types
+            .as_dict(dict_ty)
+            .map_or(TypeId::ERROR, |(_, v)| v);
+        let d = self.declare_hidden("dict", dict_ty, span);
+        let k = self.declare_hidden("key", key_ty, span);
+        let dv = self.declare_hidden("default", optional, span);
+        let r = self.declare_hidden("get", optional, span);
+        let local = |id: hir::LocalId, ty: TypeId| hir::Expr {
+            kind: hir::ExprKind::Local(id),
+            ty,
+            span,
+        };
+        let found = hir::Expr {
+            kind: hir::ExprKind::DictGet {
+                dict: Box::new(local(d, dict_ty)),
+                key: Box::new(local(k, key_ty)),
+            },
+            ty: val_ty,
+            span,
+        };
+        let found = self.coerce(found, optional);
+        let stmts = vec![
+            hir::Stmt::Assign {
+                local: d,
+                value: dict,
+            },
+            hir::Stmt::Assign {
+                local: k,
+                value: key,
+            },
+            hir::Stmt::Assign {
+                local: dv,
+                value: default,
+            },
+            hir::Stmt::If {
+                cond: hir::Expr {
+                    kind: hir::ExprKind::HashContains {
+                        table: Box::new(local(d, dict_ty)),
+                        key: Box::new(local(k, key_ty)),
+                        negated: false,
+                    },
+                    ty: TypeId::BOOL,
+                    span,
+                },
+                then: hir::Block {
+                    stmts: vec![hir::Stmt::Assign {
+                        local: r,
+                        value: found,
+                    }],
+                },
+                else_: Some(hir::Block {
+                    stmts: vec![hir::Stmt::Assign {
+                        local: r,
+                        value: local(dv, optional),
+                    }],
+                }),
+            },
+        ];
+        hir::Expr {
+            kind: hir::ExprKind::Seq {
+                stmts: hir::Block { stmts },
+                value: Box::new(local(r, optional)),
+            },
+            ty: optional,
+            span,
+        }
     }
 
     /// The methods of `set<T>` (DESIGN §4.6).
